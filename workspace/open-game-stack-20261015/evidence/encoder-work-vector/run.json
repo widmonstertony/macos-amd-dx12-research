@@ -1,0 +1,40 @@
+{
+  "timeUTC": "2026-10-20T15:26:10.357645+00:00",
+  "librarySHA256": "c8f98ae74867e6ef45a7cf186cd98dd3a41c4bc9b6d891487f4472d902322fe0",
+  "command": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/robustness2-reference-20261015/build/vector_tail",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/robustness2-reference-20261015/build/spv",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/encoder-work-vector/output.json"
+  ],
+  "suite": "vector",
+  "gameStarted": false,
+  "featureBitsModified": false,
+  "privateCompilerOptionsOnly": true,
+  "serializePipelineLink": true,
+  "coherentAtomics": false,
+  "encoderLiveCache": false,
+  "specializedQueues": true,
+  "gpuTimeoutTrace": true,
+  "liveLookupFastCache": false,
+  "descriptorUseCache": false,
+  "batchLiveUseResource": false,
+  "exitCode": 0,
+  "elapsedSeconds": 0.47497078801097814,
+  "binaryArchive": null,
+  "renderBinaryArchive": null,
+  "meshBinaryArchive": null,
+  "computeArchiveDirectory": null,
+  "computeArchiveHitRequired": false,
+  "renderArchiveDirectory": null,
+  "renderArchiveHitRequired": false,
+  "graphicsBlendVariant": false,
+  "graphicsSpecializationLayout": null,
+  "results": {
+    "scenarios": 864,
+    "checkedWords": 124416,
+    "mismatches": 0,
+    "passed": true
+  },
+  "metalValidationEnabled": true,
+  "passed": true
+}

@@ -388,13 +388,17 @@ void MVKEventNative::signal(bool status) {
 
 void MVKEventNative::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff, bool status) {
 	if (isSet() != status) {
-		[mtlCmdBuff encodeSignalEvent: _mtlEvent value: _mtlEvent.signaledValue + 1];
+		uint64_t value = _mtlEvent.signaledValue + 1;
+        mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"signal", status ? @"vk-event-set" : @"vk-event-reset");
+		[mtlCmdBuff encodeSignalEvent: _mtlEvent value: value];
 	}
 }
 
 void MVKEventNative::encodeWait(id<MTLCommandBuffer> mtlCmdBuff) {
 	if ( !isSet() ) {
-		[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: _mtlEvent.signaledValue + 1];
+		uint64_t value = _mtlEvent.signaledValue + 1;
+        mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"wait", @"vk-event");
+		[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: value];
 	}
 }
 

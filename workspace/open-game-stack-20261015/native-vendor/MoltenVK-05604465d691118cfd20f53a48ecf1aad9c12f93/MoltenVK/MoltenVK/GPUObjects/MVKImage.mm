@@ -17,6 +17,7 @@
  */
 
 #include "MVKImage.h"
+#include "MVKPresentedFrameTrace.h"
 #include "MVKQueue.h"
 #include "MVKSwapchain.h"
 #include "MVKSurface.h"
@@ -1751,6 +1752,7 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 	// which should be reasonably accurate (sub-ms) to the presentation time. The presentation
 	// time will not be available if the presentation did not actually happen, such as when
 	// running headless, or on a test harness that is not attached to the windowing system.
+	uint64_t nativePresentTime = actualPresentTime;
 	if (actualPresentTime == 0) { actualPresentTime = mvkGetRuntimeNanoseconds(); }
 
 	{	// Scope to avoid deadlock if release() is run within detachment lock
@@ -1758,7 +1760,10 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 		// VkDevice, have been destroyed by the time of this callback, so do not reference them.
 		lock_guard<mutex> lock(_detachmentLock);
 		if (_device) { addPerformanceInterval(getPerformanceStats().queue.presentSwapchains, _presentationStartTime); }
-		if (_swapchain) { _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime); }
+		if (_swapchain) {
+            if (_device) mvkTracePresentedFrame(getMVKConfig(), _swapchain, nativePresentTime);
+            _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime);
+        }
 	}
 
 	// Makes an image available for acquisition by the app.

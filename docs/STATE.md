@@ -57,3 +57,15 @@
 
 
 窗口补充：正常Win32 BringWindowToTop与SetForegroundWindow都返回成功，但WindowServer仍只提供缩略窗口，不能据此宣称用户可见或缩放问题解决。单窗口ScreenCaptureKit截取失败，未取得新游戏画面，没有以进程存活替代视觉验收。已请求用户点击台前调度缩略图后核对实际画面；当前游戏与缓存继续保留。
+
+## GPU 超时仍未解决；可见窗口重新启动（2026-10-20 08:27 本地）
+
+前述 PID80504 在计算归档记录累计13779条后，于09:29Z产生3条GPU超时记录并自行退出。这些是游戏实际失败证据，不能以已进入编译界面或已通过探针替代验收。图形队列中较早已提交且已调度的工作尚未完成，计算队列等待它发出的信号；未证明存在等待环，也未定位具体着色器。
+
+新候选 `c8f98ae74867e6ef45a7cf186cd98dd3a41c4bc9b6d891487f4472d902322fe0` 增加每个命令缓冲有界的编码器/原生管线标签/栅栏记录、VkEvent观察、设备丢失标记前的快照以及原生呈现回调时间窗口。这些是诊断修改，**不是已经修好GPU超时的声明**，不会伪造同步成功或呈现时间。最多保留每个缓冲前16、后48条工作记录，并明确遗漏数量。
+
+真实GPU回归：80次绘制5120像素、向量864场景均0差异；另外80次遮挡查询绘制核对640项查询读回，加入时间戳后80次绘制核对960项，均通过且Metal Validation开启。新增完成记录确实包含原生管线标签和遮挡栅栏等待/更新。查询测试没有复现游戏超时，不能据此排除游戏更复杂的查询或资源用法。原应用宝Wine中计算、33条严格原生计算归档命中和呈现探针也通过。
+
+通过原Steam重新启动的PID2306已核实新候选/代理/窗口模块映射与原资产写保护。系统激活和窗口抬升成功，用户明确确认“能看到，正在加载或编译”。保留全部游戏缓存、存档和原Steam服务。新一轮仍未验收到可玩场景；不能承诺修复概率或所有DX12游戏兼容。
+
+New candidate adds bounded encoder/pipeline/fence observations and native presentation timestamps. It passed owned real-GPU graphics, compute, occlusion and timestamp output checks, plus the original Wine cache/presentation probes. The previous game trial still timed out. A new normal-Steam trial is visible and compiling; **playability and sustained frame rate remain unverified**. No proprietary driver changes or fabricated GPU results are included. The v0.1.0 public diagnostic download remains its historical baseline.

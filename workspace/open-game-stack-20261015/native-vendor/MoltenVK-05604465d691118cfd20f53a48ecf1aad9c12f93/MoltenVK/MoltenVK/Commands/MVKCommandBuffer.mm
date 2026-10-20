@@ -20,6 +20,7 @@
 #include "MVKFramebuffer.h"
 #include "MVKCommandPool.h"
 #include "MVKQueue.h"
+#include "MVKQueueDependencyTrace.h"
 #include "MVKPipeline.h"
 #include "MVKQueryPool.h"
 #include "MVKFoundation.h"
@@ -596,6 +597,7 @@ void MVKCommandEncoder::retainIfImmediatelyEncoding(T& mtlEnc) {
 // End Metal encoder and release retained encoders when immediately encoding.
 template<typename T>
 void MVKCommandEncoder::endMetalEncoding(T& mtlEnc) {
+    mvkRecordEncoderWork(mtlEnc, @"encoder-end", mtlEnc.label);
 	[mtlEnc endEncoding];
 	if (_cmdBuffer->_immediateCmdEncoder) { [mtlEnc release]; }
 	mtlEnc = nil;
@@ -649,6 +651,7 @@ void MVKCommandEncoder::barrierWait(MVKBarrierStage stage, id<MTLRenderCommandEn
 	for (int i = 0; i < kMVKBarrierStageCount; ++i) {
 		auto fenceIndex = _pEncodingContext->fenceSlots.wait[stage][i];
 		auto fence = _device->getFence((MVKBarrierStage)i, fenceIndex);
+		mvkRecordEncoderWork(mtlEncoder, @"fence-wait", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
 		[mtlEncoder waitForFence:fence beforeStages:beforeStages];
 	}
 }
@@ -658,6 +661,7 @@ void MVKCommandEncoder::barrierWait(MVKBarrierStage stage, id<MTLBlitCommandEnco
 	for (int i = 0; i < kMVKBarrierStageCount; ++i) {
 		auto fenceIndex = _pEncodingContext->fenceSlots.wait[stage][i];
 		auto fence = _device->getFence((MVKBarrierStage)i, fenceIndex);
+		mvkRecordEncoderWork(mtlEncoder, @"fence-wait", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
 		[mtlEncoder waitForFence:fence];
 	}
 }
@@ -667,6 +671,7 @@ void MVKCommandEncoder::barrierWait(MVKBarrierStage stage, id<MTLComputeCommandE
 	for (int i = 0; i < kMVKBarrierStageCount; ++i) {
 		auto fenceIndex = _pEncodingContext->fenceSlots.wait[stage][i];
 		auto fence = _device->getFence((MVKBarrierStage)i, fenceIndex);
+		mvkRecordEncoderWork(mtlEncoder, @"fence-wait", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
 		[mtlEncoder waitForFence:fence];
 	}
 }
@@ -674,18 +679,21 @@ void MVKCommandEncoder::barrierWait(MVKBarrierStage stage, id<MTLComputeCommandE
 void MVKCommandEncoder::barrierUpdate(MVKBarrierStage stage, id<MTLRenderCommandEncoder> mtlEncoder, MTLRenderStages afterStages) {
 	if (!isUsingMetalArgumentBuffers() || !getDevice()->hasResidencySet()) return;
 	auto fence = getBarrierStageFence(stage);
+	mvkRecordEncoderWork(mtlEncoder, @"fence-update", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
 	[mtlEncoder updateFence:fence afterStages:afterStages];
 }
 
 void MVKCommandEncoder::barrierUpdate(MVKBarrierStage stage, id<MTLBlitCommandEncoder> mtlEncoder) {
 	if (!isUsingMetalArgumentBuffers() || !getDevice()->hasResidencySet()) return;
 	auto fence = getBarrierStageFence(stage);
+	mvkRecordEncoderWork(mtlEncoder, @"fence-update", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
 	[mtlEncoder updateFence:fence];
 }
 
 void MVKCommandEncoder::barrierUpdate(MVKBarrierStage stage, id<MTLComputeCommandEncoder> mtlEncoder) {
 	if (!isUsingMetalArgumentBuffers() || !getDevice()->hasResidencySet()) return;
 	auto fence = getBarrierStageFence(stage);
+	mvkRecordEncoderWork(mtlEncoder, @"fence-update", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
 	[mtlEncoder updateFence:fence];
 }
 
@@ -845,6 +853,8 @@ void MVKCommandEncoder::beginMetalRenderPass(MVKCommandUse cmdUse) {
 	}
 
     _mtlRenderEncoder = [_mtlCmdBuffer renderCommandEncoderWithDescriptor: mtlRPDesc];
+    mvkAssociateEncoderTrace(_mtlCmdBuffer, _mtlRenderEncoder);
+    mvkRecordEncoderWork(_mtlRenderEncoder, @"encoder-begin", @"render");
 	retainIfImmediatelyEncoding(_mtlRenderEncoder);
 	_cmdBuffer->setMetalObjectLabel(_mtlRenderEncoder, getMTLRenderCommandEncoderName(cmdUse));
 	getState().beginGraphicsEncoding(getSampleCount());
@@ -1066,7 +1076,7 @@ void MVKCommandEncoder::endRenderpass() {
 void MVKCommandEncoder::endMetalRenderEncoding() {
     if (_mtlRenderEncoder == nil) { return; }
 
-	if (_cmdBuffer->_hasStageCounterTimestampCommand) { [_mtlRenderEncoder updateFence: getStageCountersMTLFence() afterStages: MTLRenderStageFragment]; }
+	if (_cmdBuffer->_hasStageCounterTimestampCommand) { mvkRecordEncoderWork(_mtlRenderEncoder, @"timestamp-fence-update", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]); [_mtlRenderEncoder updateFence: getStageCountersMTLFence() afterStages: MTLRenderStageFragment]; }
 	endMetalEncoding(_mtlRenderEncoder);
 
 	getSubpass()->resolveUnresolvableAttachments(this, _attachments.contents());
@@ -1078,11 +1088,11 @@ void MVKCommandEncoder::endCurrentMetalEncoding() {
 	encodeBarrierUpdates();
 	endMetalRenderEncoding();
 
-	if (_mtlComputeEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { [_mtlComputeEncoder updateFence: getStageCountersMTLFence()]; }
+	if (_mtlComputeEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { mvkRecordEncoderWork(_mtlComputeEncoder, @"timestamp-fence-update", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]); [_mtlComputeEncoder updateFence: getStageCountersMTLFence()]; }
 	endMetalEncoding(_mtlComputeEncoder);
 	_mtlComputeEncoderUse = kMVKCommandUseNone;
 
-	if (_mtlBlitEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { [_mtlBlitEncoder updateFence: getStageCountersMTLFence()]; }
+	if (_mtlBlitEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { mvkRecordEncoderWork(_mtlBlitEncoder, @"timestamp-fence-update", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]); [_mtlBlitEncoder updateFence: getStageCountersMTLFence()]; }
 	endMetalEncoding(_mtlBlitEncoder);
     _mtlBlitEncoderUse = kMVKCommandUseNone;
 
@@ -1121,6 +1131,8 @@ id<MTLComputeCommandEncoder> MVKCommandEncoder::getMTLComputeEncoder(MVKCommandU
 		needWaits = true;
 		endCurrentMetalEncoding();
 		_mtlComputeEncoder = [_mtlCmdBuffer computeCommandEncoderWithDispatchType:getDispatchType(cmdUse)];
+    mvkAssociateEncoderTrace(_mtlCmdBuffer, _mtlComputeEncoder);
+    mvkRecordEncoderWork(_mtlComputeEncoder, @"encoder-begin", @"compute");
 		retainIfImmediatelyEncoding(_mtlComputeEncoder);
 		beginMetalComputeEncoding(cmdUse);
 	}
@@ -1141,6 +1153,8 @@ id<MTLBlitCommandEncoder> MVKCommandEncoder::getMTLBlitEncoder(MVKCommandUse cmd
 		needWaits = true;
 		endCurrentMetalEncoding();
 		_mtlBlitEncoder = [_mtlCmdBuffer blitCommandEncoder];
+    mvkAssociateEncoderTrace(_mtlCmdBuffer, _mtlBlitEncoder);
+    mvkRecordEncoderWork(_mtlBlitEncoder, @"encoder-begin", @"blit");
 		retainIfImmediatelyEncoding(_mtlBlitEncoder);
 	}
     if (_mtlBlitEncoderUse != cmdUse) {
@@ -1326,10 +1340,14 @@ void MVKCommandEncoder::encodeTimestampStageCounterSamples() {
 		}
 
 		auto* mtlEnc = [_mtlCmdBuffer blitCommandEncoderWithDescriptor: bpDesc];
+        mvkAssociateEncoderTrace(_mtlCmdBuffer, mtlEnc);
+        mvkRecordEncoderWork(mtlEnc, @"encoder-begin", @"timestamp-sample");
 		_cmdBuffer->setMetalObjectLabel(mtlEnc, mvkMTLBlitCommandEncoderLabel(kMVKCommandUseRecordGPUCounterSample));
 		[bpDesc release];		// Release temp object
+		mvkRecordEncoderWork(mtlEnc, @"timestamp-fence-wait", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]);
 		[mtlEnc waitForFence: getStageCountersMTLFence()];
 		[mtlEnc fillBuffer: _device->getDummyBlitMTLBuffer() range: NSMakeRange(0, 1) value: 0];
+	    mvkRecordEncoderWork(mtlEnc, @"encoder-end", mtlEnc.label);
 		[mtlEnc endEncoding];
 	}
 	_timestampStageCounterQueries.clear();

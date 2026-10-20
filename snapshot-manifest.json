@@ -340,8 +340,8 @@
     },
     {
       "path": "gpu-adapter-experiment/public-api-observations.json",
-      "bytes": 381734,
-      "sha256": "ff43070bcadd5677e6efffc14b1a43f17137411f03f0b696bd24303718d7f6d5",
+      "bytes": 387381,
+      "sha256": "a29b4cc4404d5214e48f5689d4b296ad03caafe4f2354f817589f16ce94dc03f",
       "executable": false
     },
     {
@@ -663,6 +663,60 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/encoder-work-game-20261020/game-trial-config.h",
+      "bytes": 1339,
+      "sha256": "fd5f0fb1b3434bd54651806fc40cbf1d27d29bd160ea26208c5a7a18aafa42da",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-game-20261020/launch-proof.json",
+      "bytes": 956,
+      "sha256": "384d76e4e0a53372a2959e27cbba35c85a57c705af2508ba1785bb37fd393c18",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-graphics/run.json",
+      "bytes": 1636,
+      "sha256": "974ef8d968691475627a5ab763fac5c8117b8013f94d238ce05777c2b80265f6",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-occlusion/output.json",
+      "bytes": 151,
+      "sha256": "79b8c9fea946ca5a649e6ae089e6e4c57dcb053c5c17680a1aac4b93b6e35e7e",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-occlusion/run.json",
+      "bytes": 700,
+      "sha256": "8dbb963b378e8a6b0fbe913cd71f0a25337e2a85a6396d30b3c1f0dddc074a71",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-timestamp/output.json",
+      "bytes": 151,
+      "sha256": "79b8c9fea946ca5a649e6ae089e6e4c57dcb053c5c17680a1aac4b93b6e35e7e",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-timestamp/run.json",
+      "bytes": 1198,
+      "sha256": "ea17a3de6442a70616cc590a8f5e7a29132f351d98b60828e89b1b7c7a12d5f7",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-trace-20261020/checkpoint.json",
+      "bytes": 1792,
+      "sha256": "47b3594b94f7746a0ae1c586b794b28614f72fe4d7b23d4ac9967ffa123877be",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/encoder-work-vector/run.json",
+      "bytes": 1397,
+      "sha256": "d245a4e7e03613c1913447747cfba6ba5ea062beedaded834a69dcc4f8b6a0a6",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/live-recent-cache-20261016/recent-live-cache.patch",
       "bytes": 5398,
       "sha256": "0f1892469df116b8379e89ee2470ab8412d9ed548cce86e9968052626da0b4bd",
@@ -714,6 +768,12 @@
       "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T090447Z/run.json",
       "bytes": 36338,
       "sha256": "8c5f2ec5a210afb4b9bbdcb8eef057291ba6078e892fcfc7dd8223d0b34bfed6",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T152547Z/run.json",
+      "bytes": 36342,
+      "sha256": "d40da13b831e776fc92ecc96e5029746b25483b95b857058aee04dea5f9103de",
       "executable": false
     },
     {
@@ -936,6 +996,12 @@
       "path": "open-game-stack-20261015/evidence/tencent-normal-game-deferred-20261020T090809Z/launch.json",
       "bytes": 2022,
       "sha256": "043b4b9f3ba1c49f458ca881ac4d6af48b15d34b157f797f257b2d7a680b0e77",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/tencent-normal-game-deferred-20261020T152647Z/launch.json",
+      "bytes": 2015,
+      "sha256": "8fc02383105ec439aa6d1f684f2636f50c1788be21f3af61214c7cc5def1a58a",
       "executable": false
     },
     {
@@ -1666,8 +1732,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandBuffer.mm",
-      "bytes": 64169,
-      "sha256": "dd57e58c4f9bce7c118c9bf880ec1351833589f6d046942cedbf88a71663b79c",
+      "bytes": 66093,
+      "sha256": "d0ca3bd9924fcf4885fcbfa31eed06e85ab1aaf040e56440adc8a058c191debc",
       "executable": false
     },
     {
@@ -1678,8 +1744,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 113743,
-      "sha256": "5106c5667165dca7956f307804a0816e0c007df71c2d6f99b8777bd34391b293",
+      "bytes": 114704,
+      "sha256": "cf48f220c3923aa134596a908ffbcf7b72b1dc5efc4f95d40172e369db94a337",
       "executable": false
     },
     {
@@ -1834,8 +1900,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKImage.mm",
-      "bytes": 125733,
-      "sha256": "317e69b2f0d0792ac73e60fca2db851dbf300f1aa183005f4a15b1e1804dc37c",
+      "bytes": 125934,
+      "sha256": "6c3cda1b2c8cda445fafd626fdf6804eaf790cf74e1f2faf49ad877d974c3fc6",
       "executable": false
     },
     {
@@ -1893,6 +1959,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPresentedFrameTrace.h",
+      "bytes": 1766,
+      "sha256": "904242c69ec5a83d9b69bb3e710315cdfe7dafd46e4a190e38d453265dafb593",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueryPool.h",
       "bytes": 11070,
       "sha256": "fc21ad6b62a5f704515c6a98505b53b79e33847de27620ed42b44677f65e925b",
@@ -1912,14 +1984,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueue.mm",
-      "bytes": 38037,
-      "sha256": "13ac8e41a6546d46741880cb3ab01f58da2d4d7a7b887c8477d7916251d581bd",
+      "bytes": 38076,
+      "sha256": "15eca6fcd99fceac81b65bba952ce32bdfc931fc17433264b423324e4de3ea05",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueDependencyTrace.h",
-      "bytes": 6065,
-      "sha256": "5954fd886ba35d31101921f523aae7983422514633fce3c10c866600287080a1",
+      "bytes": 7887,
+      "sha256": "c8d45a10883a1239b8449e77b8971a47948c8536b652bfab025d7dc8a72bda2b",
       "executable": false
     },
     {
@@ -2002,8 +2074,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKSync.mm",
-      "bytes": 21028,
-      "sha256": "778ae0a93c9e7ee26351ed313f879574d3f7145ae97e9ce5c3896facb17e40c2",
+      "bytes": 21287,
+      "sha256": "6f162e163d121b15fe2b64b9230c5039349a2ad27ad9883860bc8ca6f41c7d1d",
       "executable": false
     },
     {
@@ -33363,9 +33435,21 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/graphics-bda/occlusion_probe.cpp",
+      "bytes": 13677,
+      "sha256": "1e4bc533d8576dcadaa04622ad42951665c8dc23983c29f2e04ac562d6f601da",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/graphics-bda/parallel_archive_probe.cpp",
       "bytes": 13530,
       "sha256": "b90d978d8e599ea9d2f3eb559b92f566b262fa346cab7eb701a309104f3670d1",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/graphics-bda/query_timestamp_probe.cpp",
+      "bytes": 14833,
+      "sha256": "518939fe6d71c49a17e1be91f2591705e5d2bad5928aaa4e1fca0a85c293571f",
       "executable": false
     },
     {
@@ -33636,6 +33720,12 @@
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
       "bytes": 7817,
       "sha256": "ad7182b2332f6d94c534447dc4b912849416dde8c0a64ab2728a5e896a05d2a7",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_query_output.py",
+      "bytes": 3485,
+      "sha256": "e759b8160136df56aec610792f0d39fbfcb6ae33af726ddfcb43ea1de10c26f7",
       "executable": false
     },
     {
@@ -68563,8 +68653,44 @@
           "sha256": "fa2735e1670de526993a7f84b2076a89b307fee883fa6061238c1e98c0b6ebff"
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-encoder-work-20261020.tar.gz",
+      "sha256": "ebf32eeaf2a41618a0cd6851b124b4533572d045a89903b32e05e8b60ffa9fb1",
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/mvk-encoder-work-probe/libCandidate.dylib",
+          "bytes": 5955040,
+          "sha256": "c8f98ae74867e6ef45a7cf186cd98dd3a41c4bc9b6d891487f4472d902322fe0"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-encoder-work-probe/libProbeGuard.dylib",
+          "bytes": 28128,
+          "sha256": "544e19981371567215903f83b0383bf4d63e5c6236691d2a059c9752367651f7"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-encoder-work-probe/build.json",
+          "bytes": 962,
+          "sha256": "6058821b628e2f869d5096b7132954221d43c4106d74d341c4be7e2d38570e5f"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-encoder-work-game/libCandidate.dylib",
+          "bytes": 5955040,
+          "sha256": "c8f98ae74867e6ef45a7cf186cd98dd3a41c4bc9b6d891487f4472d902322fe0"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-encoder-work-game/libProbeGuard.dylib",
+          "bytes": 32352,
+          "sha256": "abaa3a8774758b335be9bc3b96f0f8deff5c3e3f53573bb1d6a39491912aec43"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-encoder-work-game/build.json",
+          "bytes": 1107,
+          "sha256": "3d1f6b1b306ee4173e0d86417783204077880d5335a5215fd78a1d99e3a02407"
+        }
+      ]
     }
   ],
-  "updatedUTC": "2026-10-20T09:08:54.524060+00:00",
-  "currentSourceState": "v0.1.0 + exclusive native queue leases + synchronous archive preparation outside the shared Metal device monitor. Additional runtime snapshots preserve exact qualified candidates; none are claimed playable."
+  "updatedUTC": "2026-10-20T15:31:07.442590+00:00",
+  "currentSourceState": "Prior queue leases and archive lock repair plus opt-in bounded encoder work/fence and native presented timestamp diagnostics. Last game still failed; replacement trial is user-visible and compiling, not verified playable."
 }

@@ -24,6 +24,7 @@
 #include "MVKPipeline.h"
 #include "MVKQueryPool.h"
 #include "MVKRuntimeTrace.h"
+#include "MVKQueueDependencyTrace.h"
 #include "mvk_datatypes.hpp"
 
 using namespace std;
@@ -1753,6 +1754,7 @@ void MVKMetalGraphicsCommandEncoderState::prepareDraw(
 		if (mtlPipeline != _pipeline) {
 			_pipeline = mtlPipeline;
 			[encoder setRenderPipelineState:mtlPipeline];
+            mvkRecordEncoderWork(encoder, @"graphics-pipeline", mtlPipeline.label);
             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:mtlPipeline.label ?: @"unlabelled-pipeline"];
 		}
 	}
@@ -1807,6 +1809,7 @@ void MVKMetalGraphicsCommandEncoderState::prepareHelperDraw(
 	if (_pipeline != state.pipeline) {
 		_pipeline = state.pipeline;
 		[encoder setRenderPipelineState:state.pipeline];
+            mvkRecordEncoderWork(encoder, @"helper-graphics-pipeline", state.pipeline.label);
             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:state.pipeline.label ?: @"unlabelled-pipeline"];
 	}
 	if (_cullMode != MTLCullModeNone) {
@@ -1883,6 +1886,7 @@ void MVKMetalComputeCommandEncoderState::bindPipeline(id<MTLComputeCommandEncode
 	if (_pipeline != pipeline) {
 		_pipeline = pipeline;
 		[encoder setComputePipelineState:pipeline];
+            mvkRecordEncoderWork(encoder, @"compute-pipeline", pipeline.label);
             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:pipeline.label ?: @"unlabelled-pipeline"];
 	}
 }
@@ -1914,6 +1918,7 @@ void MVKMetalComputeCommandEncoderState::prepareComputeDispatch(
 	if (_pipeline != mtlPipeline) {
 		_pipeline = mtlPipeline;
 		[encoder setComputePipelineState:mtlPipeline];
+            mvkRecordEncoderWork(encoder, @"compute-pipeline", mtlPipeline.label);
             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:mtlPipeline.label ?: @"unlabelled-pipeline"];
 	}
 
@@ -1964,6 +1969,7 @@ void MVKMetalComputeCommandEncoderState::prepareRenderDispatch(
 	if (_pipeline != mtlPipeline) {
 		_pipeline = mtlPipeline;
 		[encoder setComputePipelineState:mtlPipeline];
+            mvkRecordEncoderWork(encoder, @"compute-pipeline", mtlPipeline.label);
             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:mtlPipeline.label ?: @"unlabelled-pipeline"];
 	}
 
@@ -2279,8 +2285,10 @@ void MVKOcclusionQueryCommandEncoderState::endMetalRenderPass(MVKCommandEncoder*
 	id<MTLComputePipelineState> mtlAccumState = cmdEncoder->getCommandEncodingPool()->getAccumulateOcclusionQueryResultsMTLComputePipelineState();
 	id<MTLComputeCommandEncoder> mtlAccumEncoder = cmdEncoder->getMTLComputeEncoder(kMVKCommandUseAccumOcclusionQuery);
 	for (uint32_t i = 0; i < _numCopyFences; i++) {
-		[mtlAccumEncoder waitForFence:_copyFences[i].write];
-		[mtlAccumEncoder updateFence:_copyFences[i].read];
+		mvkRecordEncoderWork(mtlAccumEncoder, @"occlusion-fence-wait", [NSString stringWithFormat:@"%p",_copyFences[i].write]);
+            [mtlAccumEncoder waitForFence:_copyFences[i].write];
+		mvkRecordEncoderWork(mtlAccumEncoder, @"occlusion-fence-update", [NSString stringWithFormat:@"%p",_copyFences[i].read]);
+            [mtlAccumEncoder updateFence:_copyFences[i].read];
 	}
 	_numCopyFences = 0;
 	MVKMetalComputeCommandEncoderState& state = cmdEncoder->getMtlCompute();
@@ -2399,8 +2407,10 @@ void MVKOcclusionQueryCommandEncoderState::encode(id<MTLRenderCommandEncoder> en
 		auto fence = buffer.currentFence();
 		if (_lastFenceUpdate != fence.write) {
 			_lastFenceUpdate = fence.write;
-			[encoder waitForFence:fence.prevRead beforeStages:MTLRenderStageFragment];
-			[encoder  updateFence:fence.write     afterStages:MTLRenderStageFragment];
+			mvkRecordEncoderWork(encoder, @"occlusion-fence-wait", [NSString stringWithFormat:@"%p",fence.prevRead]);
+            [encoder waitForFence:fence.prevRead beforeStages:MTLRenderStageFragment];
+			mvkRecordEncoderWork(encoder, @"occlusion-fence-update", [NSString stringWithFormat:@"%p",fence.write]);
+            [encoder  updateFence:fence.write     afterStages:MTLRenderStageFragment];
 		}
 	}
 }

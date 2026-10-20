@@ -1,0 +1,41 @@
+{
+  "timeUTC": "2026-10-20T15:29:27.824315+00:00",
+  "gamePID": 2306,
+  "originalSteamPID": 25028,
+  "gameRunningAtLaunch": true,
+  "userConfirmedWindowVisible": true,
+  "userCurrentDisplay": "Loading or compiling",
+  "gamePlayable": false,
+  "GPUTimeoutFixed": false,
+  "candidateSHA256": "c8f98ae74867e6ef45a7cf186cd98dd3a41c4bc9b6d891487f4472d902322fe0",
+  "launchEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-normal-game-deferred-20261020T152647Z/launch.json",
+  "priorRun": {
+    "gamePID": 80504,
+    "GPUTimeouts": 3,
+    "timeoutTimeUTC": "2026-10-20T09:29:04Z",
+    "computeArchiveRecords": 13779,
+    "strictGameCacheHitProven": false,
+    "gameExited": true,
+    "failureLayer": "Graphics producer work did not complete before a dependent compute submission timed out",
+    "specificShaderIdentified": false,
+    "waitCycleProven": false
+  },
+  "changes": [
+    "Bounded CPU encoder work, native pipeline and fence identities",
+    "VkEvent wait/signal observations",
+    "Failure snapshot before markLost",
+    "Native presented timestamp windows; no invented FPS"
+  ],
+  "qualification": {
+    "graphicsDraws": 80,
+    "graphicsCheckedPixels": 5120,
+    "graphicsMismatches": 0,
+    "vectorScenarios": 864,
+    "vectorMismatches": 0,
+    "originalWineComputeCacheAndPresentPassed": true,
+    "evidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T152547Z/run.json"
+  },
+  "cachesRetained": true,
+  "originalSteamReused": true,
+  "next": "Retain current trial, identify unfinished graphics producer shader or fence using work metadata; probe actual occlusion/timestamp paths. No success claim from device creation or progress."
+}

@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/probes/query_timestamp_probe",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/probes/guard.vert.spv",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/probes/guard.frag.spv",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/encoder-work-timestamp/output.json"
+  ],
+  "librarySHA256": "c8f98ae74867e6ef45a7cf186cd98dd3a41c4bc9b6d891487f4472d902322fe0",
+  "exitCode": 0,
+  "timedOut": false,
+  "elapsedSeconds": 1.462337616001605,
+  "timestamps": true,
+  "GPUOutput": {
+    "passed": true,
+    "scenarios": 80,
+    "checkedWords": 25600,
+    "checkedPixels": 5120,
+    "mismatches": 0,
+    "vertexAndFragmentReadWrite": true,
+    "realVertexBufferInput": true
+  },
+  "completedRecords": 80,
+  "workKinds": [
+    "compute-pipeline",
+    "encoder-begin",
+    "encoder-end",
+    "graphics-pipeline",
+    "occlusion-fence-update",
+    "occlusion-fence-wait"
+  ],
+  "metalValidationEnabled": true,
+  "gamePlayable": false,
+  "passed": true
+}

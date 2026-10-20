@@ -274,6 +274,23 @@ void MVKQueue::handleMTLCommandBufferError(id<MTLCommandBuffer> mtlCmdBuff) {
 			vkErr = VK_ERROR_OUT_OF_DEVICE_MEMORY;
 			break;
 	}
+    if (mvkGPUTimeoutTraceEnabled()) {
+        NSMutableArray* encoders = [NSMutableArray array];
+        NSArray<id<MTLCommandBufferEncoderInfo>>* infos = mtlCmdBuff.error.userInfo[MTLCommandBufferEncoderInfoErrorKey];
+        for (id<MTLCommandBufferEncoderInfo> encoder in infos) {
+            [encoders addObject:@{@"label":encoder.label ?: @"", @"state":@(encoder.errorState),
+                @"stateName":@(mvkStringFromMTLCommandEncoderErrorState(encoder.errorState)),
+                @"signposts":encoder.debugSignposts ?: @[]}];
+        }
+        mvkWriteRuntimeTrace(getMVKConfig(), @"gpu-timeout", @{
+            @"snapshotBeforeDeviceLossMark":@YES, @"time":@([NSDate timeIntervalSinceReferenceDate]), @"queueFamily":@(_queueFamily->getIndex()),
+            @"queueIndex":@(_index), @"label":mtlCmdBuff.label ?: @"", @"errorCode":@(mtlCmdBuff.error.code),
+            @"error":mtlCmdBuff.error.localizedDescription ?: @"", @"status":@(mtlCmdBuff.status),
+            @"GPUStartTime":@(mtlCmdBuff.GPUStartTime), @"GPUEndTime":@(mtlCmdBuff.GPUEndTime),
+            @"encoders":encoders,
+            @"dependencies":mvkCommandBufferDependencies(mtlCmdBuff),
+            @"pendingQueueDependencies":mvkSnapshotPendingDependencies()});
+    }
 	if (markDeviceLoss) {
 		getDevice()->stopAutoGPUCapture(MVK_CONFIG_AUTO_GPU_CAPTURE_SCOPE_DEVICE);
 		getDevice()->markLost(markPhysicalDeviceLoss);
@@ -284,23 +301,7 @@ void MVKQueue::handleMTLCommandBufferError(id<MTLCommandBuffer> mtlCmdBuff) {
 				 (mtlCmdBuff.label ? mtlCmdBuff.label.UTF8String : ""),
 				 mtlCmdBuff.error.code, mtlCmdBuff.error.localizedDescription.UTF8String);
 
-    if (mvkGPUTimeoutTraceEnabled()) {
-        NSMutableArray* encoders = [NSMutableArray array];
-        NSArray<id<MTLCommandBufferEncoderInfo>>* infos = mtlCmdBuff.error.userInfo[MTLCommandBufferEncoderInfoErrorKey];
-        for (id<MTLCommandBufferEncoderInfo> encoder in infos) {
-            [encoders addObject:@{@"label":encoder.label ?: @"", @"state":@(encoder.errorState),
-                @"stateName":@(mvkStringFromMTLCommandEncoderErrorState(encoder.errorState)),
-                @"signposts":encoder.debugSignposts ?: @[]}];
-        }
-        mvkWriteRuntimeTrace(getMVKConfig(), @"gpu-timeout", @{
-            @"time":@([NSDate timeIntervalSinceReferenceDate]), @"queueFamily":@(_queueFamily->getIndex()),
-            @"queueIndex":@(_index), @"label":mtlCmdBuff.label ?: @"", @"errorCode":@(mtlCmdBuff.error.code),
-            @"error":mtlCmdBuff.error.localizedDescription ?: @"", @"status":@(mtlCmdBuff.status),
-            @"GPUStartTime":@(mtlCmdBuff.GPUStartTime), @"GPUEndTime":@(mtlCmdBuff.GPUEndTime),
-            @"encoders":encoders,
-            @"dependencies":mvkCommandBufferDependencies(mtlCmdBuff),
-            @"pendingQueueDependencies":mvkSnapshotPendingDependencies()});
-    }
+
 	if (NSArray<id<MTLCommandBufferEncoderInfo>>* mtlEncInfo = mtlCmdBuff.error.userInfo[MTLCommandBufferEncoderInfoErrorKey]) {
 		MVKLogInfo("Encoders for %p \"%s\":", mtlCmdBuff, mtlCmdBuff.label ? mtlCmdBuff.label.UTF8String : "");
 		for (id<MTLCommandBufferEncoderInfo> enc in mtlEncInfo) {

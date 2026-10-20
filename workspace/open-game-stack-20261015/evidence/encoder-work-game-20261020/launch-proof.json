@@ -1,0 +1,21 @@
+{
+  "timeUTC": "2026-10-20T15:26:31.675665+00:00",
+  "nativeRegressionPassed": true,
+  "originalTencentPresentationPassed": true,
+  "deferredGameGuardPassed": true,
+  "gamePlayable": false,
+  "GPUTimeoutFixed": false,
+  "cacheDeleted": false,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-encoder-work-game/libCandidate.dylib",
+    "candidateSHA256": "c8f98ae74867e6ef45a7cf186cd98dd3a41c4bc9b6d891487f4472d902322fe0",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-encoder-work-game/libProbeGuard.dylib",
+    "proxySHA256": "abaa3a8774758b335be9bc3b96f0f8deff5c3e3f53573bb1d6a39491912aec43",
+    "presentationPassed": true
+  },
+  "evidence": [
+    "evidence/encoder-work-graphics/run.json",
+    "evidence/encoder-work-vector/run.json",
+    "evidence/private-cache-wine-20261020T152547Z/run.json"
+  ]
+}

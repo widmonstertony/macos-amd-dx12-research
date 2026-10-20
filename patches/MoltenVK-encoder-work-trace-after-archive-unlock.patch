@@ -1,0 +1,399 @@
+--- a/MoltenVK/MoltenVK/Commands/MVKCommandBuffer.mm
++++ b/MoltenVK/MoltenVK/Commands/MVKCommandBuffer.mm
+@@ -20,6 +20,7 @@
+ #include "MVKFramebuffer.h"
+ #include "MVKCommandPool.h"
+ #include "MVKQueue.h"
++#include "MVKQueueDependencyTrace.h"
+ #include "MVKPipeline.h"
+ #include "MVKQueryPool.h"
+ #include "MVKFoundation.h"
+@@ -596,6 +597,7 @@
+ // End Metal encoder and release retained encoders when immediately encoding.
+ template<typename T>
+ void MVKCommandEncoder::endMetalEncoding(T& mtlEnc) {
++    mvkRecordEncoderWork(mtlEnc, @"encoder-end", mtlEnc.label);
+ 	[mtlEnc endEncoding];
+ 	if (_cmdBuffer->_immediateCmdEncoder) { [mtlEnc release]; }
+ 	mtlEnc = nil;
+@@ -649,6 +651,7 @@
+ 	for (int i = 0; i < kMVKBarrierStageCount; ++i) {
+ 		auto fenceIndex = _pEncodingContext->fenceSlots.wait[stage][i];
+ 		auto fence = _device->getFence((MVKBarrierStage)i, fenceIndex);
++		mvkRecordEncoderWork(mtlEncoder, @"fence-wait", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
+ 		[mtlEncoder waitForFence:fence beforeStages:beforeStages];
+ 	}
+ }
+@@ -658,6 +661,7 @@
+ 	for (int i = 0; i < kMVKBarrierStageCount; ++i) {
+ 		auto fenceIndex = _pEncodingContext->fenceSlots.wait[stage][i];
+ 		auto fence = _device->getFence((MVKBarrierStage)i, fenceIndex);
++		mvkRecordEncoderWork(mtlEncoder, @"fence-wait", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
+ 		[mtlEncoder waitForFence:fence];
+ 	}
+ }
+@@ -667,6 +671,7 @@
+ 	for (int i = 0; i < kMVKBarrierStageCount; ++i) {
+ 		auto fenceIndex = _pEncodingContext->fenceSlots.wait[stage][i];
+ 		auto fence = _device->getFence((MVKBarrierStage)i, fenceIndex);
++		mvkRecordEncoderWork(mtlEncoder, @"fence-wait", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
+ 		[mtlEncoder waitForFence:fence];
+ 	}
+ }
+@@ -674,18 +679,21 @@
+ void MVKCommandEncoder::barrierUpdate(MVKBarrierStage stage, id<MTLRenderCommandEncoder> mtlEncoder, MTLRenderStages afterStages) {
+ 	if (!isUsingMetalArgumentBuffers() || !getDevice()->hasResidencySet()) return;
+ 	auto fence = getBarrierStageFence(stage);
++	mvkRecordEncoderWork(mtlEncoder, @"fence-update", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
+ 	[mtlEncoder updateFence:fence afterStages:afterStages];
+ }
+ 
+ void MVKCommandEncoder::barrierUpdate(MVKBarrierStage stage, id<MTLBlitCommandEncoder> mtlEncoder) {
+ 	if (!isUsingMetalArgumentBuffers() || !getDevice()->hasResidencySet()) return;
+ 	auto fence = getBarrierStageFence(stage);
++	mvkRecordEncoderWork(mtlEncoder, @"fence-update", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
+ 	[mtlEncoder updateFence:fence];
+ }
+ 
+ void MVKCommandEncoder::barrierUpdate(MVKBarrierStage stage, id<MTLComputeCommandEncoder> mtlEncoder) {
+ 	if (!isUsingMetalArgumentBuffers() || !getDevice()->hasResidencySet()) return;
+ 	auto fence = getBarrierStageFence(stage);
++	mvkRecordEncoderWork(mtlEncoder, @"fence-update", [NSString stringWithFormat:@"%p stage=%u",fence,(unsigned)stage]);
+ 	[mtlEncoder updateFence:fence];
+ }
+ 
+@@ -845,6 +853,8 @@
+ 	}
+ 
+     _mtlRenderEncoder = [_mtlCmdBuffer renderCommandEncoderWithDescriptor: mtlRPDesc];
++    mvkAssociateEncoderTrace(_mtlCmdBuffer, _mtlRenderEncoder);
++    mvkRecordEncoderWork(_mtlRenderEncoder, @"encoder-begin", @"render");
+ 	retainIfImmediatelyEncoding(_mtlRenderEncoder);
+ 	_cmdBuffer->setMetalObjectLabel(_mtlRenderEncoder, getMTLRenderCommandEncoderName(cmdUse));
+ 	getState().beginGraphicsEncoding(getSampleCount());
+@@ -1066,7 +1076,7 @@
+ void MVKCommandEncoder::endMetalRenderEncoding() {
+     if (_mtlRenderEncoder == nil) { return; }
+ 
+-	if (_cmdBuffer->_hasStageCounterTimestampCommand) { [_mtlRenderEncoder updateFence: getStageCountersMTLFence() afterStages: MTLRenderStageFragment]; }
++	if (_cmdBuffer->_hasStageCounterTimestampCommand) { mvkRecordEncoderWork(_mtlRenderEncoder, @"timestamp-fence-update", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]); [_mtlRenderEncoder updateFence: getStageCountersMTLFence() afterStages: MTLRenderStageFragment]; }
+ 	endMetalEncoding(_mtlRenderEncoder);
+ 
+ 	getSubpass()->resolveUnresolvableAttachments(this, _attachments.contents());
+@@ -1078,11 +1088,11 @@
+ 	encodeBarrierUpdates();
+ 	endMetalRenderEncoding();
+ 
+-	if (_mtlComputeEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { [_mtlComputeEncoder updateFence: getStageCountersMTLFence()]; }
++	if (_mtlComputeEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { mvkRecordEncoderWork(_mtlComputeEncoder, @"timestamp-fence-update", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]); [_mtlComputeEncoder updateFence: getStageCountersMTLFence()]; }
+ 	endMetalEncoding(_mtlComputeEncoder);
+ 	_mtlComputeEncoderUse = kMVKCommandUseNone;
+ 
+-	if (_mtlBlitEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { [_mtlBlitEncoder updateFence: getStageCountersMTLFence()]; }
++	if (_mtlBlitEncoder && _cmdBuffer->_hasStageCounterTimestampCommand) { mvkRecordEncoderWork(_mtlBlitEncoder, @"timestamp-fence-update", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]); [_mtlBlitEncoder updateFence: getStageCountersMTLFence()]; }
+ 	endMetalEncoding(_mtlBlitEncoder);
+     _mtlBlitEncoderUse = kMVKCommandUseNone;
+ 
+@@ -1121,6 +1131,8 @@
+ 		needWaits = true;
+ 		endCurrentMetalEncoding();
+ 		_mtlComputeEncoder = [_mtlCmdBuffer computeCommandEncoderWithDispatchType:getDispatchType(cmdUse)];
++    mvkAssociateEncoderTrace(_mtlCmdBuffer, _mtlComputeEncoder);
++    mvkRecordEncoderWork(_mtlComputeEncoder, @"encoder-begin", @"compute");
+ 		retainIfImmediatelyEncoding(_mtlComputeEncoder);
+ 		beginMetalComputeEncoding(cmdUse);
+ 	}
+@@ -1141,6 +1153,8 @@
+ 		needWaits = true;
+ 		endCurrentMetalEncoding();
+ 		_mtlBlitEncoder = [_mtlCmdBuffer blitCommandEncoder];
++    mvkAssociateEncoderTrace(_mtlCmdBuffer, _mtlBlitEncoder);
++    mvkRecordEncoderWork(_mtlBlitEncoder, @"encoder-begin", @"blit");
+ 		retainIfImmediatelyEncoding(_mtlBlitEncoder);
+ 	}
+     if (_mtlBlitEncoderUse != cmdUse) {
+@@ -1326,10 +1340,14 @@
+ 		}
+ 
+ 		auto* mtlEnc = [_mtlCmdBuffer blitCommandEncoderWithDescriptor: bpDesc];
++        mvkAssociateEncoderTrace(_mtlCmdBuffer, mtlEnc);
++        mvkRecordEncoderWork(mtlEnc, @"encoder-begin", @"timestamp-sample");
+ 		_cmdBuffer->setMetalObjectLabel(mtlEnc, mvkMTLBlitCommandEncoderLabel(kMVKCommandUseRecordGPUCounterSample));
+ 		[bpDesc release];		// Release temp object
++		mvkRecordEncoderWork(mtlEnc, @"timestamp-fence-wait", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]);
+ 		[mtlEnc waitForFence: getStageCountersMTLFence()];
+ 		[mtlEnc fillBuffer: _device->getDummyBlitMTLBuffer() range: NSMakeRange(0, 1) value: 0];
++	    mvkRecordEncoderWork(mtlEnc, @"encoder-end", mtlEnc.label);
+ 		[mtlEnc endEncoding];
+ 	}
+ 	_timestampStageCounterQueries.clear();
+--- a/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm
++++ b/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm
+@@ -24,6 +24,7 @@
+ #include "MVKPipeline.h"
+ #include "MVKQueryPool.h"
+ #include "MVKRuntimeTrace.h"
++#include "MVKQueueDependencyTrace.h"
+ #include "mvk_datatypes.hpp"
+ 
+ using namespace std;
+@@ -1753,6 +1754,7 @@
+ 		if (mtlPipeline != _pipeline) {
+ 			_pipeline = mtlPipeline;
+ 			[encoder setRenderPipelineState:mtlPipeline];
++            mvkRecordEncoderWork(encoder, @"graphics-pipeline", mtlPipeline.label);
+             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:mtlPipeline.label ?: @"unlabelled-pipeline"];
+ 		}
+ 	}
+@@ -1807,6 +1809,7 @@
+ 	if (_pipeline != state.pipeline) {
+ 		_pipeline = state.pipeline;
+ 		[encoder setRenderPipelineState:state.pipeline];
++            mvkRecordEncoderWork(encoder, @"helper-graphics-pipeline", state.pipeline.label);
+             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:state.pipeline.label ?: @"unlabelled-pipeline"];
+ 	}
+ 	if (_cullMode != MTLCullModeNone) {
+@@ -1883,6 +1886,7 @@
+ 	if (_pipeline != pipeline) {
+ 		_pipeline = pipeline;
+ 		[encoder setComputePipelineState:pipeline];
++            mvkRecordEncoderWork(encoder, @"compute-pipeline", pipeline.label);
+             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:pipeline.label ?: @"unlabelled-pipeline"];
+ 	}
+ }
+@@ -1914,6 +1918,7 @@
+ 	if (_pipeline != mtlPipeline) {
+ 		_pipeline = mtlPipeline;
+ 		[encoder setComputePipelineState:mtlPipeline];
++            mvkRecordEncoderWork(encoder, @"compute-pipeline", mtlPipeline.label);
+             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:mtlPipeline.label ?: @"unlabelled-pipeline"];
+ 	}
+ 
+@@ -1964,6 +1969,7 @@
+ 	if (_pipeline != mtlPipeline) {
+ 		_pipeline = mtlPipeline;
+ 		[encoder setComputePipelineState:mtlPipeline];
++            mvkRecordEncoderWork(encoder, @"compute-pipeline", mtlPipeline.label);
+             if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:mtlPipeline.label ?: @"unlabelled-pipeline"];
+ 	}
+ 
+@@ -2279,8 +2285,10 @@
+ 	id<MTLComputePipelineState> mtlAccumState = cmdEncoder->getCommandEncodingPool()->getAccumulateOcclusionQueryResultsMTLComputePipelineState();
+ 	id<MTLComputeCommandEncoder> mtlAccumEncoder = cmdEncoder->getMTLComputeEncoder(kMVKCommandUseAccumOcclusionQuery);
+ 	for (uint32_t i = 0; i < _numCopyFences; i++) {
+-		[mtlAccumEncoder waitForFence:_copyFences[i].write];
+-		[mtlAccumEncoder updateFence:_copyFences[i].read];
++		mvkRecordEncoderWork(mtlAccumEncoder, @"occlusion-fence-wait", [NSString stringWithFormat:@"%p",_copyFences[i].write]);
++            [mtlAccumEncoder waitForFence:_copyFences[i].write];
++		mvkRecordEncoderWork(mtlAccumEncoder, @"occlusion-fence-update", [NSString stringWithFormat:@"%p",_copyFences[i].read]);
++            [mtlAccumEncoder updateFence:_copyFences[i].read];
+ 	}
+ 	_numCopyFences = 0;
+ 	MVKMetalComputeCommandEncoderState& state = cmdEncoder->getMtlCompute();
+@@ -2399,8 +2407,10 @@
+ 		auto fence = buffer.currentFence();
+ 		if (_lastFenceUpdate != fence.write) {
+ 			_lastFenceUpdate = fence.write;
+-			[encoder waitForFence:fence.prevRead beforeStages:MTLRenderStageFragment];
+-			[encoder  updateFence:fence.write     afterStages:MTLRenderStageFragment];
+-		}
+-	}
+-}
++			mvkRecordEncoderWork(encoder, @"occlusion-fence-wait", [NSString stringWithFormat:@"%p",fence.prevRead]);
++            [encoder waitForFence:fence.prevRead beforeStages:MTLRenderStageFragment];
++			mvkRecordEncoderWork(encoder, @"occlusion-fence-update", [NSString stringWithFormat:@"%p",fence.write]);
++            [encoder  updateFence:fence.write     afterStages:MTLRenderStageFragment];
++		}
++	}
++}
+--- a/MoltenVK/MoltenVK/GPUObjects/MVKQueue.mm
++++ b/MoltenVK/MoltenVK/GPUObjects/MVKQueue.mm
+@@ -274,16 +274,6 @@
+ 			vkErr = VK_ERROR_OUT_OF_DEVICE_MEMORY;
+ 			break;
+ 	}
+-	if (markDeviceLoss) {
+-		getDevice()->stopAutoGPUCapture(MVK_CONFIG_AUTO_GPU_CAPTURE_SCOPE_DEVICE);
+-		getDevice()->markLost(markPhysicalDeviceLoss);
+-	}
+-	reportResult(vkErr, (markDeviceLoss ? MVK_CONFIG_LOG_LEVEL_ERROR : MVK_CONFIG_LOG_LEVEL_WARNING),
+-				 "%s VkDevice after MTLCommandBuffer \"%s\" execution failed (code %li): %s",
+-				 (markDeviceLoss ? "Lost" : "Resumed"),
+-				 (mtlCmdBuff.label ? mtlCmdBuff.label.UTF8String : ""),
+-				 mtlCmdBuff.error.code, mtlCmdBuff.error.localizedDescription.UTF8String);
+-
+     if (mvkGPUTimeoutTraceEnabled()) {
+         NSMutableArray* encoders = [NSMutableArray array];
+         NSArray<id<MTLCommandBufferEncoderInfo>>* infos = mtlCmdBuff.error.userInfo[MTLCommandBufferEncoderInfoErrorKey];
+@@ -293,7 +283,7 @@
+                 @"signposts":encoder.debugSignposts ?: @[]}];
+         }
+         mvkWriteRuntimeTrace(getMVKConfig(), @"gpu-timeout", @{
+-            @"time":@([NSDate timeIntervalSinceReferenceDate]), @"queueFamily":@(_queueFamily->getIndex()),
++            @"snapshotBeforeDeviceLossMark":@YES, @"time":@([NSDate timeIntervalSinceReferenceDate]), @"queueFamily":@(_queueFamily->getIndex()),
+             @"queueIndex":@(_index), @"label":mtlCmdBuff.label ?: @"", @"errorCode":@(mtlCmdBuff.error.code),
+             @"error":mtlCmdBuff.error.localizedDescription ?: @"", @"status":@(mtlCmdBuff.status),
+             @"GPUStartTime":@(mtlCmdBuff.GPUStartTime), @"GPUEndTime":@(mtlCmdBuff.GPUEndTime),
+@@ -301,6 +291,17 @@
+             @"dependencies":mvkCommandBufferDependencies(mtlCmdBuff),
+             @"pendingQueueDependencies":mvkSnapshotPendingDependencies()});
+     }
++	if (markDeviceLoss) {
++		getDevice()->stopAutoGPUCapture(MVK_CONFIG_AUTO_GPU_CAPTURE_SCOPE_DEVICE);
++		getDevice()->markLost(markPhysicalDeviceLoss);
++	}
++	reportResult(vkErr, (markDeviceLoss ? MVK_CONFIG_LOG_LEVEL_ERROR : MVK_CONFIG_LOG_LEVEL_WARNING),
++				 "%s VkDevice after MTLCommandBuffer \"%s\" execution failed (code %li): %s",
++				 (markDeviceLoss ? "Lost" : "Resumed"),
++				 (mtlCmdBuff.label ? mtlCmdBuff.label.UTF8String : ""),
++				 mtlCmdBuff.error.code, mtlCmdBuff.error.localizedDescription.UTF8String);
++
++
+ 	if (NSArray<id<MTLCommandBufferEncoderInfo>>* mtlEncInfo = mtlCmdBuff.error.userInfo[MTLCommandBufferEncoderInfoErrorKey]) {
+ 		MVKLogInfo("Encoders for %p \"%s\":", mtlCmdBuff, mtlCmdBuff.label ? mtlCmdBuff.label.UTF8String : "");
+ 		for (id<MTLCommandBufferEncoderInfo> enc in mtlEncInfo) {
+--- a/MoltenVK/MoltenVK/GPUObjects/MVKQueueDependencyTrace.h
++++ b/MoltenVK/MoltenVK/GPUObjects/MVKQueueDependencyTrace.h
+@@ -35,6 +35,7 @@
+         @"logicalQueue":[NSString stringWithFormat:@"%p",queue],
+         @"nativeQueue":[NSString stringWithFormat:@"%p",cb.commandQueue],
+         @"phases":[NSMutableArray array],
++        @"workEvents":[NSMutableArray array], @"workCount":@0, @"truncatedWorkEvents":@0,
+         @"events":[NSMutableArray array], @"truncatedEvents":@0} mutableCopy];
+     objc_setAssociatedObject(cb, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
+     {
+@@ -44,6 +45,33 @@
+         if (state.records.count < 256) state.records[serial] = record;
+     }
+     [record release];
++}
++// The encoder retains only bounded CPU metadata, never a command buffer or a
++// Vulkan/GPU resource. This also covers helper pipelines without a Vulkan owner.
++inline void mvkAssociateEncoderTrace(id<MTLCommandBuffer> cb, id<MTLCommandEncoder> encoder) {
++    if (!encoder || !mvkDependencyTraceEnabled()) return;
++    id record = objc_getAssociatedObject(cb, mvkDependencyKey());
++    if (record) objc_setAssociatedObject(encoder, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
++}
++inline void mvkRecordEncoderWork(id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
++    if (!encoder || !mvkDependencyTraceEnabled()) return;
++    NSMutableDictionary* record = objc_getAssociatedObject(encoder, mvkDependencyKey());
++    if (!record) return;
++    @synchronized (record) {
++        uint64_t number = [record[@"workCount"] unsignedLongLongValue];
++        record[@"workCount"] = @(number + 1);
++        NSMutableArray* work = record[@"workEvents"];
++        // Preserve first 16 and most recent 48 entries. Counts expose omitted work.
++        if (work.count >= 64) {
++            [work removeObjectAtIndex:16];
++            record[@"truncatedWorkEvents"] = @([record[@"truncatedWorkEvents"] unsignedLongLongValue] + 1);
++        }
++        NSString* text = label ?: @"";
++        if (text.length > 512) text = [text substringToIndex:512];
++        [work addObject:@{@"index":@(number), @"kind":kind, @"label":text,
++            @"encoder":[NSString stringWithFormat:@"%p",encoder],
++            @"time":@([NSDate timeIntervalSinceReferenceDate])}];
++    }
+ }
+ inline void mvkRecordDependencyPhase(id<MTLCommandBuffer> cb, NSString* phase) {
+     if (!cb || !mvkDependencyTraceEnabled()) return;
+@@ -89,7 +117,9 @@
+             @"nativeQueue":record[@"nativeQueue"], @"phases":[NSArray arrayWithArray:record[@"phases"]],
+             @"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
+             @"queueIndex":record[@"queueIndex"], @"createdTime":record[@"createdTime"],
+-            @"events":events, @"truncatedEvents":record[@"truncatedEvents"]};
++            @"events":events, @"truncatedEvents":record[@"truncatedEvents"],
++            @"workEvents":[NSArray arrayWithArray:record[@"workEvents"]],
++            @"workCount":record[@"workCount"], @"truncatedWorkEvents":record[@"truncatedWorkEvents"]};
+     }
+ }
+ inline NSDictionary* mvkCommandBufferDependencies(id<MTLCommandBuffer> cb) {
+--- a/MoltenVK/MoltenVK/GPUObjects/MVKSync.mm
++++ b/MoltenVK/MoltenVK/GPUObjects/MVKSync.mm
+@@ -388,13 +388,17 @@
+ 
+ void MVKEventNative::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff, bool status) {
+ 	if (isSet() != status) {
+-		[mtlCmdBuff encodeSignalEvent: _mtlEvent value: _mtlEvent.signaledValue + 1];
++		uint64_t value = _mtlEvent.signaledValue + 1;
++        mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"signal", status ? @"vk-event-set" : @"vk-event-reset");
++		[mtlCmdBuff encodeSignalEvent: _mtlEvent value: value];
+ 	}
+ }
+ 
+ void MVKEventNative::encodeWait(id<MTLCommandBuffer> mtlCmdBuff) {
+ 	if ( !isSet() ) {
+-		[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: _mtlEvent.signaledValue + 1];
++		uint64_t value = _mtlEvent.signaledValue + 1;
++        mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"wait", @"vk-event");
++		[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: value];
+ 	}
+ }
+ 
+--- a/MoltenVK/MoltenVK/GPUObjects/MVKImage.mm
++++ b/MoltenVK/MoltenVK/GPUObjects/MVKImage.mm
+@@ -17,6 +17,7 @@
+  */
+ 
+ #include "MVKImage.h"
++#include "MVKPresentedFrameTrace.h"
+ #include "MVKQueue.h"
+ #include "MVKSwapchain.h"
+ #include "MVKSurface.h"
+@@ -1751,6 +1752,7 @@
+ 	// which should be reasonably accurate (sub-ms) to the presentation time. The presentation
+ 	// time will not be available if the presentation did not actually happen, such as when
+ 	// running headless, or on a test harness that is not attached to the windowing system.
++	uint64_t nativePresentTime = actualPresentTime;
+ 	if (actualPresentTime == 0) { actualPresentTime = mvkGetRuntimeNanoseconds(); }
+ 
+ 	{	// Scope to avoid deadlock if release() is run within detachment lock
+@@ -1758,7 +1760,10 @@
+ 		// VkDevice, have been destroyed by the time of this callback, so do not reference them.
+ 		lock_guard<mutex> lock(_detachmentLock);
+ 		if (_device) { addPerformanceInterval(getPerformanceStats().queue.presentSwapchains, _presentationStartTime); }
+-		if (_swapchain) { _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime); }
++		if (_swapchain) {
++            if (_device) mvkTracePresentedFrame(getMVKConfig(), _swapchain, nativePresentTime);
++            _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime);
++        }
+ 	}
+ 
+ 	// Makes an image available for acquisition by the app.
+--- a/MoltenVK/MoltenVK/GPUObjects/MVKPresentedFrameTrace.h
++++ b/MoltenVK/MoltenVK/GPUObjects/MVKPresentedFrameTrace.h
+@@ -0,0 +1,35 @@
++// Diagnostic counts only; never replaces a native presentation timestamp.
++#pragma once
++#include "MVKRuntimeTrace.h"
++#include <map>
++#include <mutex>
++struct MVKPresentedFrameWindow {
++    uint64_t callbacks=0, valid=0, invalid=0, first=0, last=0, largestGap=0;
++    double published=0;
++};
++inline void mvkTracePresentedFrame(const MVKConfiguration& config, const void* swapchain,
++                                   uint64_t nativeTimestamp) {
++    if (!mvkGPUTimeoutTraceEnabled()) return;
++    static std::mutex mutex;
++    static std::map<const void*,MVKPresentedFrameWindow> windows;
++    std::lock_guard<std::mutex> guard(mutex);
++    if (!windows.count(swapchain) && windows.size() >= 32) windows.clear();
++    auto& w=windows[swapchain]; ++w.callbacks;
++    if (nativeTimestamp) {
++        ++w.valid;
++        if (!w.first) w.first=nativeTimestamp;
++        if (w.last && nativeTimestamp>w.last) w.largestGap=std::max(w.largestGap,nativeTimestamp-w.last);
++        w.last=std::max(w.last,nativeTimestamp);
++    } else ++w.invalid;
++    double now=[NSDate timeIntervalSinceReferenceDate];
++    if (w.published && now-w.published < 5.0) return;
++    double seconds=w.last>w.first ? (w.last-w.first)/1e9 : 0.0;
++    mvkWriteRuntimeTrace(config,@"present-progress",@{
++        @"swapchain":[NSString stringWithFormat:@"%p",swapchain],
++        @"time":@(now), @"callbacks":@(w.callbacks), @"nativeTimestampCallbacks":@(w.valid),
++        @"callbacksWithoutNativeTimestamp":@(w.invalid), @"nativeIntervalSeconds":@(seconds),
++        @"nativePresentationFPS":seconds>0 && w.valid>1 ? (id)@((w.valid-1)/seconds) : (id)[NSNull null],
++        @"largestNativeGapMilliseconds":@(w.largestGap/1e6),
++        @"sceneAndVisibilityVerified":@NO});
++    w=MVKPresentedFrameWindow{};w.published=now;
++}

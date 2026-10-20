@@ -1,0 +1,15 @@
+{
+  "exitCode": 0,
+  "elapsedSeconds": 1.3148508300073445,
+  "stdout": "GPU AMD Radeon Pro 5600M driver=10402\nORIGINAL_FEATURES robustBufferAccess2=0 robustImageAccess2=0 nullDescriptor=0 (unchanged)\nPrototype driver counters unavailable on reference fork\nCompiler input/output correlation recorded by runner; prototype counters unavailable\nOCCLUSION queryChecks=640 GRAPHICS draws=80 mismatches=0\n",
+  "stderr": "2026-10-20 08:29:07.668 occlusion_probe[2663:1794803] Metal API Validation Enabled\n",
+  "completedRecords": 80,
+  "workKinds": [
+    "compute-pipeline",
+    "encoder-begin",
+    "encoder-end",
+    "graphics-pipeline",
+    "occlusion-fence-update",
+    "occlusion-fence-wait"
+  ]
+}

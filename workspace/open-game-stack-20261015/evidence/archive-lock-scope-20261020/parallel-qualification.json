@@ -1,0 +1,41 @@
+{
+  "results": [
+    {
+      "name": "baseline",
+      "exitCode": 0,
+      "elapsedSeconds": 1.1075063450043672,
+      "GPUResult": {
+        "passed": true,
+        "scenarios": 80,
+        "checkedWords": 25600,
+        "checkedPixels": 5120,
+        "mismatches": 0,
+        "vertexAndFragmentReadWrite": true,
+        "realVertexBufferInput": true
+      },
+      "legacyArchiveBytes": 0,
+      "stdout": "GPU AMD Radeon Pro 5600M driver=10402\nORIGINAL_FEATURES robustBufferAccess2=0 robustImageAccess2=0 nullDescriptor=0 (unchanged)\nParallel actual graphics pipelines=14 elapsedMS=65.7732\nPrototype driver counters unavailable on reference fork\nCompiler input/output correlation recorded by runner; prototype counters unavailable\nGRAPHICS draws=80 mismatches=0\n"
+    },
+    {
+      "name": "fixed",
+      "exitCode": 0,
+      "elapsedSeconds": 1.1654166450025514,
+      "GPUResult": {
+        "passed": true,
+        "scenarios": 80,
+        "checkedWords": 25600,
+        "checkedPixels": 5120,
+        "mismatches": 0,
+        "vertexAndFragmentReadWrite": true,
+        "realVertexBufferInput": true
+      },
+      "legacyArchiveBytes": 0,
+      "stdout": "GPU AMD Radeon Pro 5600M driver=10402\nORIGINAL_FEATURES robustBufferAccess2=0 robustImageAccess2=0 nullDescriptor=0 (unchanged)\nParallel actual graphics pipelines=14 elapsedMS=40.3475\nPrototype driver counters unavailable on reference fork\nCompiler input/output correlation recorded by runner; prototype counters unavailable\nGRAPHICS draws=80 mismatches=0\n"
+    }
+  ],
+  "passed": true,
+  "pipelineCompilationThreads": 14,
+  "allPipelinesDrawn": true,
+  "sameLiveGameKept": true,
+  "speedupNotEstablishedDueToLiveCompilerContentionAndDriverCache": true
+}

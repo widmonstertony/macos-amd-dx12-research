@@ -1,0 +1,21 @@
+{
+  "timeUTC": "2026-10-20T09:07:29.456746+00:00",
+  "nativeRegressionPassed": true,
+  "originalTencentPresentationPassed": true,
+  "deferredGameGuardPassed": true,
+  "gamePlayable": false,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-archive-unlock-game/libCandidate.dylib",
+    "candidateSHA256": "f3b3f775ba97ba3656aa5eb7b66a5b0f77589c43ca2fff677b9b82f3544f4ef7",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-archive-unlock-game/libProbeGuard.dylib",
+    "proxySHA256": "31ac7dc7bb44aa1f1cdecf58f74378690eee5d14273decd8f29b9b7330040b48",
+    "presentationPassed": true
+  },
+  "evidence": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/archive-lock-scope-20261020/parallel-qualification.json",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T090447Z/run.json"
+  ],
+  "GPUTimeoutFixed": false,
+  "gameSpeedupVerified": false,
+  "cacheDeleted": false
+}

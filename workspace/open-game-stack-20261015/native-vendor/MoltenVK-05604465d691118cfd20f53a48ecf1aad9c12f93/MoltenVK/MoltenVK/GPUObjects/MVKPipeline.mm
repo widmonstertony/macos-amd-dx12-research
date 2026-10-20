@@ -4047,8 +4047,11 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 
 	compile(lock, ^{
 		auto mtlDev = getMTLDevice();
+        // Archive preparation is synchronous driver compilation and already
+        // serializes its own state. Do not hold the device-wide monitor while
+        // waiting: unrelated library/function requests need that monitor.
+        if (!useShards) mvkPrepareRenderBinaryArchive(mtlDev, mtlRPLDesc, getPhysicalDevice()->isAMDHardware());
 		@synchronized (mtlDev) {
-			if (!useShards) mvkPrepareRenderBinaryArchive(mtlDev, mtlRPLDesc, getPhysicalDevice()->isAMDHardware());
 			if (loaded || requireHit) {
 				// Loading a file alone does not prove reuse. Ask Metal to reject a
 				// miss before permitting the normal, correctness-preserving fallback.
@@ -4167,8 +4170,10 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
 
 	compile(lock, ^{
 		auto mtlDev = getMTLDevice();
+        // Same lock ordering as render archives: private archive lock only
+        // during synchronous add/serialize; device monitor for submission only.
+        if (!shardPath) mvkPrepareComputeBinaryArchive(mtlDev, plDesc, getPhysicalDevice()->isAMDHardware());
 		@synchronized (mtlDev) {
-			if (!shardPath) mvkPrepareComputeBinaryArchive(mtlDev, plDesc, getPhysicalDevice()->isAMDHardware());
 			if (mvkRuntimeTraceEnabled(getMVKConfig()) && !mvkRuntimeReplayOnly()) mvkWriteRuntimeTrace(getMVKConfig(), @"compute-request", @{@"request":request,@"time":@([NSDate timeIntervalSinceReferenceDate]),@"function":mvkTraceFunction(plDesc.computeFunction),@"maxThreads":@(plDesc.maxTotalThreadsPerThreadgroup),@"fullSubgroups":@(plDesc.threadGroupSizeIsMultipleOfThreadExecutionWidth),@"descriptor":plDesc.description?:@""});
 			[mtlDev newComputePipelineStateWithDescriptor: plDesc
 												  options: requireHit ? MTLPipelineOptionFailOnBinaryArchiveMiss : MTLPipelineOptionNone

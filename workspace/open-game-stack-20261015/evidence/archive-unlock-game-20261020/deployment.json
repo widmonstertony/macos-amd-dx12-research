@@ -1,0 +1,28 @@
+{
+  "timeUTC": "2026-10-20T09:07:53.614007+00:00",
+  "stoppedGamePID": 78427,
+  "comm": "Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\SteamClient\\steamapps\\common\\StellarBlade\\SB\\Binaries\\Win64\\SB-Win64-Shipping.exe",
+  "cacheSnapshotBefore": {
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/private-shader-cache": {
+      "files": 4,
+      "bytes": 201498096
+    },
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/game-metal-binary-cache": {
+      "files": 13273,
+      "bytes": 6057542418
+    }
+  },
+  "cacheDeleted": false,
+  "reason": "Validated archive work moved outside shared device monitor; user authorized repair/deploy/restart",
+  "previousTrialTimeoutCount": 0,
+  "previousSelectors": {
+    "/private/tmp/mvk": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libProbeGuard.dylib",
+    "/private/tmp/mvk-guard-proxy-select/libMoltenVK.dylib": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libProbeGuard.dylib",
+    "/private/tmp/mvk-guard-proxy-select/libMoltenVK.1.dylib": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libProbeGuard.dylib",
+    "/private/tmp/mvk-guard-proxy-select/libMoltenVK.1.4.2.dylib": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libProbeGuard.dylib"
+  },
+  "originalSteamAndWineProcessesPresent": {
+    "25028": true,
+    "24990": true
+  }
+}

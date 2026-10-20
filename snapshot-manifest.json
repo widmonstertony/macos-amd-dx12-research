@@ -340,8 +340,8 @@
     },
     {
       "path": "gpu-adapter-experiment/public-api-observations.json",
-      "bytes": 389560,
-      "sha256": "fdf248bac082e8bbdcf0a4c25252e823b49c5221ccd264bc514e57f6b6d5c0cd",
+      "bytes": 392994,
+      "sha256": "937dc2da785c39bd7f67db2ec3ee0d4c9cf9178152e279a917a897bc3eee2e98",
       "executable": false
     },
     {
@@ -621,6 +621,24 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/compile-provenance-20261020/checkpoint.json",
+      "bytes": 2931,
+      "sha256": "aef7f045a0714bcf9380b654bffe99149f7b2de3d2b77e98b19256ab021bc89f",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/compile-provenance-20261020/qualification.json",
+      "bytes": 524,
+      "sha256": "864b682ca53c0e5b64e0165f710cfe00ec7d62ebff4b4e2545bf2d804d6cd28d",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/compile-provenance-graphics/run.json",
+      "bytes": 1643,
+      "sha256": "b5e73666534403070062e09c9c9513f640a933408dec249663077cd078c2d334",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/compute-compile-cost-20261016/guarded-vector.patch",
       "bytes": 1620,
       "sha256": "e938dd3702fbe439037dffe77dd289f1c8158735cd3c5810253672e0bb8ee60c",
@@ -729,6 +747,18 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/mesh-first-link-20261020/result.json",
+      "bytes": 1533,
+      "sha256": "ef8ee1e8f9e99fbe4fbd27eb195fe3e93f4fdefebb9b05f178e1373b7ec73b92",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/mesh-first-link-20261020/run.json",
+      "bytes": 114,
+      "sha256": "d28e146abc23e050d477809491d73b312705b2459dfcd1c1c6398230b36514a9",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/mesh-gate-lock-scope-20261020/scope-fix.patch",
       "bytes": 940,
       "sha256": "b1698ffacee93539f1aa25976b10867b64d1d892386c2b66ec78399317a415a1",
@@ -786,6 +816,12 @@
       "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T153624Z/run.json",
       "bytes": 52948,
       "sha256": "3617d26af9add868e5a3c8b4ca2b05dcf058e86eec7f27c74e343ef3ebaf33c5",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T160836Z/run.json",
+      "bytes": 52922,
+      "sha256": "476171375fa02153d98dc3cbbd3566deec46b913978891e340149877e7a74510",
       "executable": false
     },
     {
@@ -990,6 +1026,12 @@
       "path": "open-game-stack-20261015/evidence/scene-cpu-resource-use-20261020/new-gpu-timeout-summary.json",
       "bytes": 1502,
       "sha256": "a439f323874cab05154bece2ed3b2311b0447dc26fcb418864d614b7dbcc83fe",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/support-cache-game-20261020/compile-audit-final.json",
+      "bytes": 1315,
+      "sha256": "9927bdeed6779dbcbd953f3255a4aea6d4bf250b78be35a7aa3dd858ebfd03c1",
       "executable": false
     },
     {
@@ -2086,8 +2128,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRuntimeTrace.h",
-      "bytes": 4953,
-      "sha256": "71141e664e34a85389b84866e9be26d1bd5dae11039d622cc6d9d34520ee1194",
+      "bytes": 6611,
+      "sha256": "7bb54d8af3676072bb85ca2d429246d7bcac11c6b03d99126813ec20fd53f75a",
       "executable": false
     },
     {
@@ -2098,8 +2140,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm",
-      "bytes": 38666,
-      "sha256": "55bda937465bc98ce8004d72681df72f2c9b4e9919a5676091366ab331a42791",
+      "bytes": 39108,
+      "sha256": "c7dcdec4429fd7af9c5db40f136c7bb32a509567c7363520af8df5e577c8c74c",
       "executable": false
     },
     {
@@ -33531,6 +33573,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/mesh_link_matrix.mm",
+      "bytes": 4570,
+      "sha256": "2b35f7d8b74c46985e6b399cd50bebcb6e9a3e11802856dd63b3d31a5ddebf80",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/metal_compile_profile.mm",
       "bytes": 6250,
       "sha256": "40df6365ea08c6c312423f6324e61a55064ab8cca4e5eb91f60baceaae355865",
@@ -33784,8 +33832,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "bytes": 9092,
-      "sha256": "c96a329805af5fc5dfd2000bb7367a61b677c01ada354aa6591fd87253b2d56b",
+      "bytes": 9217,
+      "sha256": "16a54536ab6ae9ef33a32e4ade7f4898535770188ff3cab88a3ecaf446ed11cf",
       "executable": false
     },
     {
@@ -68791,8 +68839,29 @@
           "sha256": "1387ef158a19d88649e053ef6aa9c29e6bf3ca33fdb487d6663fabac72be05f3"
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-compile-provenance-20261020.tar.gz",
+      "sha256": "ac2da5359d60c14d47c9b4d3b54da122e805fcc1b918234b131a17a416738881",
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/mvk-compile-provenance-probe/libCandidate.dylib",
+          "bytes": 5959888,
+          "sha256": "e107d5153b55ad500fba24499f6d5d8e529462d9c28be1f08313bb91338a7610"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-compile-provenance-probe/libProbeGuard.dylib",
+          "bytes": 28128,
+          "sha256": "f6c45d0ec49a00ca13f0b6791c2421e4b20f02aa1ccbef737c09f3b1e22d50de"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-compile-provenance-probe/build.json",
+          "bytes": 972,
+          "sha256": "c6ee7202783021108f76173118120ff0ab671930990507b5725db3531d321bcc"
+        }
+      ]
     }
   ],
-  "updatedUTC": "2026-10-20T15:39:42.742254+00:00",
-  "currentSourceState": "Support shader source/entry/compile-option recipes qualified in original Wine; bounded native render shards enabled in normal Steam trial. Actual initial game render archive writes and strict hits observed; GPU timeout and sustained playability unresolved."
+  "updatedUTC": "2026-10-20T16:10:32.277832+00:00",
+  "currentSourceState": "Live support-cache candidate retained; compilation audit matches all 50 intermediate mesh failures to real successful recovery. Prospective qualified compiler provenance/presentation-filter diagnostics are saved but NOT deployed. Initial mesh-link root cause and sustained playability unresolved."
 }

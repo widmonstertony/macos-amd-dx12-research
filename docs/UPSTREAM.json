@@ -68,7 +68,8 @@
       "patches/MoltenVK-native-queue-leases-after-v0.1.0.patch",
       "patches/MoltenVK-archive-lock-scope-after-v0.1.0.patch",
       "patches/MoltenVK-encoder-work-trace-after-archive-unlock.patch",
-      "patches/MoltenVK-support-function-recipes-after-encoder-trace.patch"
+      "patches/MoltenVK-support-function-recipes-after-encoder-trace.patch",
+      "patches/MoltenVK-compile-provenance-after-support-cache.patch"
     ],
     "currentWorkspaceAlreadyContainsPostV010Patches": true
   },

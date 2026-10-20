@@ -169,6 +169,8 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 				}
 			}
 
+			if (mtlFunc && mvkGPUTimeoutTraceEnabled()) objc_setAssociatedObject(mtlFunc, mvkCompileProvenanceKey(), objc_getAssociatedObject(lib, mvkCompileProvenanceKey()), OBJC_ASSOCIATION_RETAIN);
+
 			// Set the debug name. First try name of shader module, otherwise try name of owner.
 			NSString* dbName = shaderModule->getDebugName();
 			if ( !dbName ) { dbName = _owner->getDebugName(); }
@@ -687,10 +689,12 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 																						 count: macro_count];
 				}
 				logCompilation(mtlCompileOptions);
+                NSDictionary* provenance = mvkCompileProvenance(mslSourceCode, mtlCompileOptions);
 
 				[mtlDev newLibraryWithSource: mslSourceCode
 									options: mtlCompileOptions
 						completionHandler: ^(id<MTLLibrary> mtlLib, NSError* error) {
+                            if (mtlLib && provenance) objc_setAssociatedObject(mtlLib, mvkCompileProvenanceKey(), provenance, OBJC_ASSOCIATION_COPY);
 							bool isLate = compileComplete(mtlLib, error);
 							if (isLate) { destroy(); }
 						}];

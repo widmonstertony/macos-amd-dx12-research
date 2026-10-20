@@ -1,0 +1,62 @@
+{
+  "gameCompatibilityProven" : false,
+  "device" : "AMD Radeon Pro 5600M",
+  "GPUWorkDispatched" : false,
+  "exactOriginalCompilerOptionsKnown" : false,
+  "cases" : [
+    {
+      "errorCode" : 0,
+      "elapsedSeconds" : 2.5375200510025024,
+      "mathVariant" : 0,
+      "preserveObjectMeshInvariance" : 0,
+      "pipelineCreated" : true,
+      "error" : "",
+      "functionCount" : 3
+    },
+    {
+      "errorCode" : 0,
+      "elapsedSeconds" : 1.0441329479217529,
+      "mathVariant" : 0,
+      "preserveObjectMeshInvariance" : 1,
+      "pipelineCreated" : true,
+      "error" : "",
+      "functionCount" : 3
+    },
+    {
+      "errorCode" : 0,
+      "elapsedSeconds" : 2.199550986289978,
+      "mathVariant" : 1,
+      "preserveObjectMeshInvariance" : 0,
+      "pipelineCreated" : true,
+      "error" : "",
+      "functionCount" : 3
+    },
+    {
+      "errorCode" : 0,
+      "elapsedSeconds" : 1.3826520442962646,
+      "mathVariant" : 1,
+      "preserveObjectMeshInvariance" : 1,
+      "pipelineCreated" : true,
+      "error" : "",
+      "functionCount" : 3
+    },
+    {
+      "errorCode" : 0,
+      "elapsedSeconds" : 0.0056259632110595703,
+      "mathVariant" : 2,
+      "preserveObjectMeshInvariance" : 0,
+      "pipelineCreated" : true,
+      "error" : "",
+      "functionCount" : 3
+    },
+    {
+      "errorCode" : 0,
+      "elapsedSeconds" : 0.0053189992904663086,
+      "mathVariant" : 2,
+      "preserveObjectMeshInvariance" : 1,
+      "pipelineCreated" : true,
+      "error" : "",
+      "functionCount" : 3
+    }
+  ]
+}

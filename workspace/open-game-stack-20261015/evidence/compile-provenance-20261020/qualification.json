@@ -1,0 +1,14 @@
+{
+  "timeUTC": "2026-10-20T16:09:30.656669+00:00",
+  "candidateSHA256": "e107d5153b55ad500fba24499f6d5d8e529462d9c28be1f08313bb91338a7610",
+  "deployedToGame": false,
+  "graphicsGPUOutputPassed": true,
+  "actualCompilerProvenanceFunctionRecords": 4,
+  "allSourceDigestsMatchActualLibraryInput": true,
+  "originalWineQualificationPassed": true,
+  "presentProgressRecordsInReplayOnlyMode": 2,
+  "nativePresentTimestampCallbacks": 0,
+  "gameFPSMeasured": false,
+  "gamePlayable": false,
+  "sharedGameSelectorsUnchanged": true
+}

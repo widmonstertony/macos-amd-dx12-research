@@ -1,0 +1,77 @@
+{
+  "timeUTC": "2026-10-20T16:10:30.200784+00:00",
+  "gamePID": 3767,
+  "sameGameAndCachesRetained": true,
+  "liveCandidateSHA256": "0b72f494a7fc8279261f2b62889e3a5b7581ba4bb6a4d32dc8c11417b499842e",
+  "gamePlayable": false,
+  "compilationAudit": {
+    "timeUTC": "2026-10-20T16:00:21.016080+00:00",
+    "recordCounts": {
+      "trace-render-archive": 10651,
+      "trace-compute-map": 13783,
+      "trace-compute-archive": 13779,
+      "trace-pipeline-failure": 50,
+      "trace-queue-config": 6,
+      "trace-mesh-replay": 50
+    },
+    "render": {
+      "total": 10651,
+      "strictHits": 4137,
+      "published": 5803,
+      "created": 10651,
+      "failed": 0,
+      "unkeyed": 0,
+      "archiveMissErrorRecords": 0
+    },
+    "compute": {
+      "total": 13779,
+      "created": 13779
+    },
+    "meshReplayCreated": 50,
+    "latestJSONUTC": "2026-10-20T15:57:46.506056+00:00",
+    "recoveryMatchedByActualFunctionObjectIdentities": true,
+    "initialMeshLinkFailures": 50,
+    "matchingSuccessfulRecoveries": 50,
+    "unresolvedInitialFailures": [],
+    "zeroIntermediateErrors": false,
+    "compileSampleContainsNativeCompilerCall": false,
+    "screenCaptureSucceeded": false,
+    "userCurrentDisplayPending": true,
+    "presentationTraceUnavailableBecauseReplayFilterBug": true,
+    "prospectiveDiagnosticFixDeployed": false,
+    "gamePlayable": false,
+    "renderCacheDurability": {
+      "uniqueReferencedKeys": 5803,
+      "missingFiles": 0,
+      "fileBytes": 693331632,
+      "existingFilesWereNotEvicted": true,
+      "validArchiveContentsReverifiedForEveryFile": false
+    },
+    "auditTimeUTC": "2026-10-20T16:08:07.041235+00:00"
+  },
+  "isolatedOriginalMeshLinkRecipe": {
+    "cases": 6,
+    "allLinkedSuccessfully": true,
+    "exactOriginalCompilerOptionsKnown": false,
+    "originalRuntimeFailureReproduced": false,
+    "GPUWorkDispatched": false,
+    "evidence": "evidence/mesh-first-link-20261020/result.json"
+  },
+  "prospectiveDiagnosticFix": {
+    "timeUTC": "2026-10-20T16:09:30.656669+00:00",
+    "candidateSHA256": "e107d5153b55ad500fba24499f6d5d8e529462d9c28be1f08313bb91338a7610",
+    "deployedToGame": false,
+    "graphicsGPUOutputPassed": true,
+    "actualCompilerProvenanceFunctionRecords": 4,
+    "allSourceDigestsMatchActualLibraryInput": true,
+    "originalWineQualificationPassed": true,
+    "presentProgressRecordsInReplayOnlyMode": 2,
+    "nativePresentTimestampCallbacks": 0,
+    "gameFPSMeasured": false,
+    "gamePlayable": false,
+    "sharedGameSelectorsUnchanged": true
+  },
+  "rootCauseOfInitialMeshLinkErrorsFixed": false,
+  "currentVisualConfirmationPending": true,
+  "next": "Keep live run. Need current displayed menu/loading/scene state; link recovery is matched by actual function identities. New qualified diagnostic records original compiler options and fixes filtered presentation callbacks, but is not deployed and does not fix the unknown initial link/root runtime cause."
+}

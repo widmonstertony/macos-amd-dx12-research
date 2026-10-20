@@ -81,3 +81,15 @@ New candidate adds bounded encoder/pipeline/fence observations and native presen
 首批实际游戏164条图形归档记录中，134条发布新分片、10条严格原生命中、0条管线创建失败，约10.7MB归档落盘。这个结果证明缓存路径在游戏中运行，不是游戏已经可玩或GPU超时修好的证明。当前尚未核实正常场景和持续帧率。公开v0.1.0诊断下载保持旧基线，新精确运行库另存 `runtime-support-cache-20261020.tar.gz`。
 
 The original Wine strict graphics-cache test exposed missing identities for internal blit shaders. Source/entry/compiler-option recipes now cover these support functions; all five presentation pipelines strictly hit native archives across processes with correct GPU output. Twelve native cache/variant/fallback cases also passed. The normal Steam game trial now writes bounded render shards and reports actual strict hits. **Scene correctness, GPU timeout resolution and sustained playability remain unverified.**
+
+## 本轮编译核对与诊断修复（2026-10-20 09:09 本地）
+
+保持同一PID3767和全部缓存，未重启。记录核对结果：10651条顶点/片元图形管线、13779条有归档记录的计算管线均创建成功；图形严格原生命中4137次，5803个唯一引用分片全部落盘，共693331632字节，没有缺失文件。并未逐个重新加载所有分片，不能据此声称每个文件都重新通过了驱动验证。
+
+中间仍存在50次mesh接口链接失败（47次locn2、3次locn0）。通过三阶段实际函数对象identity逐项匹配，50次都对应真实成功的重编译，未发现未恢复的链接失败。不能把它写成“全程零错误”。抽取一例现有生成源码，6组数学/不变性选项独立链接均成功；这不是原运行时错误的复现，也不是GPU执行正确性的证明。初始失败根因仍未确定，未根据猜测改着色器逻辑。
+
+新发现并修复了精简日志模式遗漏present-progress记录的问题；补充实际库输入源码SHA256与编译选项关联到函数对象，供下一次真正失败时比较来源。新候选 `e107d5153b55ad500fba24499f6d5d8e529462d9c28be1f08313bb91338a7610` **仅隔离验证，未部署到当前游戏**。80次真实GPU绘制0差异，4条函数来源的SHA256均与实际库输入一致；原Wine计算、33条严格计算归档命中、5条严格图形归档命中和呈现通过。replay-only模式下确实产生2条呈现记录，但本次探针的原生呈现时间均为0，所以没有虚构FPS。
+
+最新线程采样已不在原生编译调用，正在编码图形/计算命令；游戏实际菜单/场景状态仍待用户反馈。单窗口截图失败，不把它推断成游戏黑屏或驱动失败。没有将“管线创建成功”当作可玩验收。
+
+Compilation audit found no unrecovered pipeline-creation failure in the observed records, but 50 initial mesh-link errors were recovered and remain disclosed. Six isolated option combinations linked the extracted recipe successfully, so the initial runtime error was not reproduced. A prospective, GPU-qualified diagnostic candidate records actual compiler provenance and fixes presentation tracing in replay-only mode; it is **not deployed**. Current game and caches remain intact. Sustained scene correctness and performance are unverified.

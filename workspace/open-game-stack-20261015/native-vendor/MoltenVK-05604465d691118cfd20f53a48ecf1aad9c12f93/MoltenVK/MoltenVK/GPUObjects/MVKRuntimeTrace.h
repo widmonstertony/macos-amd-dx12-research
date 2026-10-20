@@ -3,6 +3,8 @@
 #include <atomic>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <objc/runtime.h>
+#include <CommonCrypto/CommonDigest.h>
 static inline bool mvkGPUTimeoutTraceEnabled() {
     static const bool enabled = [] { const char* v = getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v, "1"); }();
     return enabled;
@@ -43,7 +45,7 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
         ![kind isEqualToString:@"slow-compute"] &&
         !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
         !([kind isEqualToString:@"compute-archive"] && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
-        !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"] ||
+        !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"present-progress"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"] ||
           ([kind isEqualToString:@"queue-dependencies"] && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))))) return;
     static std::atomic<uint64_t> sequence{0};
     NSString* dir = @(config.shaderDumpDir);
@@ -52,9 +54,34 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
     NSData* data = [NSJSONSerialization dataWithJSONObject:record options:NSJSONWritingPrettyPrinted error:nil];
     [data writeToFile:path options:NSDataWritingAtomic error:nil];
 }
+// Diagnostic provenance travels with the actual library/function object. It
+// is not a shader cache key and never changes compilation options or results.
+static inline const void* mvkCompileProvenanceKey() {
+    return sel_registerName("mvkActualCompileProvenanceV1");
+}
+static inline NSDictionary* mvkCompileProvenance(NSString* source, MTLCompileOptions* options) {
+    if (!mvkGPUTimeoutTraceEnabled()) return nil;
+    NSData* bytes = [source dataUsingEncoding:NSUTF8StringEncoding];
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(bytes.bytes, (CC_LONG)bytes.length, digest);
+    char hex[CC_SHA256_DIGEST_LENGTH * 2 + 1];
+    for (size_t i = 0; i < CC_SHA256_DIGEST_LENGTH; ++i) snprintf(hex + 2*i, 3, "%02x", digest[i]);
+    NSMutableDictionary* info = [@{@"sourceSHA256":@(hex), @"sourceBytes":@(bytes.length),
+        @"languageVersion":@(options.languageVersion), @"fastMathEnabled":@(options.fastMathEnabled),
+        @"preserveInvariance":@(options.preserveInvariance),
+        @"preprocessorMacros":options.preprocessorMacros ?: @{}} mutableCopy];
+    if ([options respondsToSelector:@selector(optimizationLevel)]) info[@"optimizationLevel"]=@(options.optimizationLevel);
+#if MVK_XCODE_16
+    if ([options respondsToSelector:@selector(mathMode)]) {
+        info[@"mathMode"]=@(options.mathMode);
+        info[@"mathFloatingPointFunctions"]=@(options.mathFloatingPointFunctions);
+    }
+#endif
+    return [info autorelease];
+}
 static inline NSDictionary* mvkTraceFunction(id<MTLFunction> function) {
     if (!function) return @{};
-    return @{@"label":function.label ?: @"", @"name":function.name ?: @"", @"type":@(function.functionType), @"identity":[NSString stringWithFormat:@"%p",function]};
+    return @{@"label":function.label ?: @"", @"name":function.name ?: @"", @"type":@(function.functionType), @"identity":[NSString stringWithFormat:@"%p",function], @"compileProvenance":objc_getAssociatedObject(function, mvkCompileProvenanceKey()) ?: @{}};
 }
 static inline NSDictionary* mvkTraceConfig(const mvk::SPIRVToMSLConversionConfiguration& c) {
     NSMutableArray* inputs = [NSMutableArray array];

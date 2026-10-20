@@ -1,0 +1,45 @@
+{
+  "timeUTC": "2026-10-20T16:00:21.016080+00:00",
+  "recordCounts": {
+    "trace-render-archive": 10651,
+    "trace-compute-map": 13783,
+    "trace-compute-archive": 13779,
+    "trace-pipeline-failure": 50,
+    "trace-queue-config": 6,
+    "trace-mesh-replay": 50
+  },
+  "render": {
+    "total": 10651,
+    "strictHits": 4137,
+    "published": 5803,
+    "created": 10651,
+    "failed": 0,
+    "unkeyed": 0,
+    "archiveMissErrorRecords": 0
+  },
+  "compute": {
+    "total": 13779,
+    "created": 13779
+  },
+  "meshReplayCreated": 50,
+  "latestJSONUTC": "2026-10-20T15:57:46.506056+00:00",
+  "recoveryMatchedByActualFunctionObjectIdentities": true,
+  "initialMeshLinkFailures": 50,
+  "matchingSuccessfulRecoveries": 50,
+  "unresolvedInitialFailures": [],
+  "zeroIntermediateErrors": false,
+  "compileSampleContainsNativeCompilerCall": false,
+  "screenCaptureSucceeded": false,
+  "userCurrentDisplayPending": true,
+  "presentationTraceUnavailableBecauseReplayFilterBug": true,
+  "prospectiveDiagnosticFixDeployed": false,
+  "gamePlayable": false,
+  "renderCacheDurability": {
+    "uniqueReferencedKeys": 5803,
+    "missingFiles": 0,
+    "fileBytes": 693331632,
+    "existingFilesWereNotEvicted": true,
+    "validArchiveContentsReverifiedForEveryFile": false
+  },
+  "auditTimeUTC": "2026-10-20T16:08:07.041235+00:00"
+}

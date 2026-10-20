@@ -28,6 +28,7 @@ def main():
     parser.add_argument('--private-directory', type=Path, default=PRIVATE)
     parser.add_argument('--compute-shards', action='store_true')
     parser.add_argument('--render-shards', action='store_true')
+    parser.add_argument('--replay-only', action='store_true')
     parser.add_argument('--gpu-timeout-trace', action='store_true')
     parser.add_argument('--specialized-queues', action='store_true')
     args = parser.parse_args()
@@ -62,6 +63,7 @@ def main():
                    MVK_AMD_COMPUTE_ARCHIVE_TRACE='1')
     if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
     if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
+    if args.replay_only:env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
     if args.render_shards:
         env.pop('MVK_AMD_RENDER_BINARY_ARCHIVE_PATH', None)
         render_directory = out / 'render-shards'

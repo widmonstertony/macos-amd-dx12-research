@@ -1,0 +1,21 @@
+{
+  "timeUTC": "2026-10-20T08:48:02.889587+00:00",
+  "nativeRegressionPassed": true,
+  "originalTencentPresentationPassed": true,
+  "deferredGameGuardPassed": true,
+  "gamePlayable": false,
+  "GPUchecks": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-native-alias-20261020/native-qualification.json"
+  ],
+  "originalTencentEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T084605Z/run.json",
+  "guardQualificationScope": "Same asset guard source as probe-qualified original-Wine compute/presentation; new game config changes diagnostic paths only and preserves caches. Actual game write denial must be rechecked.",
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libCandidate.dylib",
+    "candidateSHA256": "0ea6accc79c78bec4aa2d742078385fdab3ba7e99c8f47602a05eed059fe0a07",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libProbeGuard.dylib",
+    "proxySHA256": "c9e1c1ebe2dd0759044a6f4b09720ce76aff5e37d1165bbb6d617e4187c25903",
+    "presentationPassed": true
+  },
+  "gameTrialDirectory": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-leases-game-20261020",
+  "GPUTimeoutFixed": false
+}

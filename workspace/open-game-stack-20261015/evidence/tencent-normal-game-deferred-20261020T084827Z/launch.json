@@ -1,0 +1,39 @@
+{
+  "timeUTC": "2026-10-20T08:48:27.735236+00:00",
+  "normalLicensedSteamRequest": true,
+  "existingSteamPID": 25028,
+  "clientPID": 78408,
+  "privateCrashState": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/stellar-crash-report-state",
+  "proxySHA256": "c9e1c1ebe2dd0759044a6f4b09720ce76aff5e37d1165bbb6d617e4187c25903",
+  "candidateSHA256": "0ea6accc79c78bec4aa2d742078385fdab3ba7e99c8f47602a05eed059fe0a07",
+  "command": [
+    "/Users/tonytan/Library/Application Support/YYBIntelLauncher/wine-loader",
+    "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine/wine/drive_c/Program Files (x86)/Steam/Steam.exe",
+    "-applaunch",
+    "3489700",
+    "-dx12",
+    "-windowed",
+    "-ResX=1280",
+    "-ResY=800"
+  ],
+  "observed": {
+    "78427": {
+      "pid": 78427,
+      "ppid": 1,
+      "comm": "Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\SteamClient\\steamapps\\common\\StellarBlade\\SB\\Binaries\\Win64\\SB-Win64-Shipping.exe",
+      "mappings": [
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libCandidate.dylib",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-leases-game/libProbeGuard.dylib",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-leaf-select/winemac.so",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/stellar-overlay/SB/Binaries/Win64/dxgi.dll",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/ntdll.so",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/win32u.so"
+      ],
+      "candidateMapped": true,
+      "proxyMapped": true,
+      "fixedWindowModuleMapped": true,
+      "originalWriteDenied": true
+    }
+  },
+  "verified": true
+}

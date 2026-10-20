@@ -53,8 +53,9 @@ public:
 		if (queueProperties) { *queueProperties = _properties; }
 	}
 
-	/** Returns the MTLCommandQueue at the specified index. */
+	/** Leases an exclusive cached native queue until releaseMTLCommandQueue(). */
 	id<MTLCommandQueue> getMTLCommandQueue(uint32_t queueIndex);
+	void releaseMTLCommandQueue(id<MTLCommandQueue> queue, bool reusable);
 
 	/** Constructs an instance with the specified index. */
 	MVKQueueFamily(MVKPhysicalDevice* physicalDevice, uint32_t queueFamilyIndex, const VkQueueFamilyProperties* pProperties);
@@ -65,7 +66,8 @@ protected:
 	MVKPhysicalDevice* _physicalDevice;
     uint32_t _queueFamilyIndex;
 	VkQueueFamilyProperties _properties;
-	MVKSmallVector<id<MTLCommandQueue>, kMVKQueueCountPerQueueFamily> _mtlQueues;
+	struct CachedQueue { id<MTLCommandQueue> queue; uint32_t index; bool inUse; };
+	MVKSmallVector<CachedQueue, kMVKQueueCountPerQueueFamily> _mtlQueues;
 	std::mutex _qLock;
 };
 

@@ -25,12 +25,16 @@ inline id mvkObservedEventValue(id<MTLEvent> event) {
     return [event respondsToSelector:@selector(signaledValue)]
         ? @(((id<MTLSharedEvent>)event).signaledValue) : (id)[NSNull null];
 }
-inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, uint32_t index) {
+inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, uint32_t index, const void* device, const void* queue) {
     if (!cb || !mvkDependencyTraceEnabled()) return;
     auto& state = mvkPendingDependencies();
     NSNumber* serial = @(state.sequence.fetch_add(1));
     NSMutableDictionary* record = [@{@"submission":serial, @"queueFamily":@(family),
         @"queueIndex":@(index), @"createdTime":@([NSDate timeIntervalSinceReferenceDate]),
+        @"logicalDevice":[NSString stringWithFormat:@"%p",device],
+        @"logicalQueue":[NSString stringWithFormat:@"%p",queue],
+        @"nativeQueue":[NSString stringWithFormat:@"%p",cb.commandQueue],
+        @"phases":[NSMutableArray array],
         @"events":[NSMutableArray array], @"truncatedEvents":@0} mutableCopy];
     objc_setAssociatedObject(cb, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
     {
@@ -40,6 +44,17 @@ inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, ui
         if (state.records.count < 256) state.records[serial] = record;
     }
     [record release];
+}
+inline void mvkRecordDependencyPhase(id<MTLCommandBuffer> cb, NSString* phase) {
+    if (!cb || !mvkDependencyTraceEnabled()) return;
+    NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
+    if (!record) return;
+    @synchronized (record) {
+        NSMutableArray* phases = record[@"phases"];
+        if (phases.count < 8) [phases addObject:@{
+            @"phase":phase, @"order":@(mvkPendingDependencies().sequence.fetch_add(1)),
+            @"time":@([NSDate timeIntervalSinceReferenceDate]), @"nativeStatus":@(cb.status)}];
+    }
 }
 inline void mvkRecordEventDependency(id<MTLCommandBuffer> cb, id<MTLEvent> event,
                                      uint64_t value, NSString* operation, NSString* kind) {
@@ -70,7 +85,9 @@ inline NSDictionary* mvkSnapshotDependencyRecord(NSDictionary* record) {
                 @"requestedValue":raw[@"requestedValue"], @"valueAtEncode":raw[@"valueAtEncode"],
                 @"valueAtObservation":mvkObservedEventValue(event), @"encodeTime":raw[@"encodeTime"]}];
         }
-        return @{@"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
+        return @{@"logicalDevice":record[@"logicalDevice"], @"logicalQueue":record[@"logicalQueue"],
+            @"nativeQueue":record[@"nativeQueue"], @"phases":[NSArray arrayWithArray:record[@"phases"]],
+            @"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
             @"queueIndex":record[@"queueIndex"], @"createdTime":record[@"createdTime"],
             @"events":events, @"truncatedEvents":record[@"truncatedEvents"]};
     }

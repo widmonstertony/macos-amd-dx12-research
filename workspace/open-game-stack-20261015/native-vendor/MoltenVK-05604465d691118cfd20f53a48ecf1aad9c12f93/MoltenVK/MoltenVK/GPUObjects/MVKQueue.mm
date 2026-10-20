@@ -33,31 +33,45 @@ using namespace std;
 #pragma mark -
 #pragma mark MVKQueueFamily
 
-// MTLCommandQueues are cached in MVKQueueFamily/MVKPhysicalDevice because they are very
-// limited in number. An app that creates multiple VkDevices over time (such as a test suite)
-// will soon find 15 second delays when creating subsequent MTLCommandQueues.
+// Reuse queues across sequential logical devices, but never alias concurrently live
+// VkQueues: a FIFO native queue must not put a signal behind another queue's wait.
 id<MTLCommandQueue> MVKQueueFamily::getMTLCommandQueue(uint32_t queueIndex) {
-	lock_guard<mutex> lock(_qLock);
-	id<MTLCommandQueue> mtlQ = _mtlQueues[queueIndex];
-	if ( !mtlQ ) {
-		@autoreleasepool {		// Catch any autoreleased objects created during MTLCommandQueue creation
-			uint32_t maxCmdBuffs = getMVKConfig().maxActiveMetalCommandBuffersPerQueue;
-			mtlQ = [_physicalDevice->getMTLDevice() newCommandQueueWithMaxCommandBufferCount: maxCmdBuffs];		// retained
-			_mtlQueues[queueIndex] = mtlQ;
-		}
-	}
-	return mtlQ;
+    lock_guard<mutex> lock(_qLock);
+    for (auto& entry : _mtlQueues) {
+        if (!entry.inUse && entry.index == queueIndex && entry.queue) {
+            entry.inUse = true;
+            return entry.queue;
+        }
+    }
+    @autoreleasepool {
+        uint32_t maxCmdBuffs = getMVKConfig().maxActiveMetalCommandBuffersPerQueue;
+        id<MTLCommandQueue> queue = [_physicalDevice->getMTLDevice() newCommandQueueWithMaxCommandBufferCount:maxCmdBuffs];
+        if (queue) _mtlQueues.push_back({queue, queueIndex, true});
+        return queue;
+    }
+}
+
+void MVKQueueFamily::releaseMTLCommandQueue(id<MTLCommandQueue> queue, bool reusable) {
+    lock_guard<mutex> lock(_qLock);
+    for (auto& entry : _mtlQueues) {
+        if (entry.queue != queue) continue;
+        // A lost device's queue may still be draining errors. Never lend it to a
+        // new device. Metal retains any outstanding submitted command buffers.
+        if (!reusable) { [entry.queue release]; entry.queue = nil; }
+        entry.inUse = false;
+        return;
+    }
 }
 
 MVKQueueFamily::MVKQueueFamily(MVKPhysicalDevice* physicalDevice, uint32_t queueFamilyIndex, const VkQueueFamilyProperties* pProperties) {
 	_physicalDevice = physicalDevice;
 	_queueFamilyIndex = queueFamilyIndex;
 	_properties = *pProperties;
-	_mtlQueues.assign(_properties.queueCount, nil);
+
 }
 
 MVKQueueFamily::~MVKQueueFamily() {
-	mvkReleaseContainerContents(_mtlQueues);
+	for (auto& entry : _mtlQueues) [entry.queue release];
 }
 
 
@@ -159,6 +173,7 @@ VkResult MVKQueue::waitIdle(MVKCommandUse cmdUse) {
 	}
 	@autoreleasepool {
 		auto* mtlCmdBuff = getMTLCommandBuffer(cmdUse);
+		mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
 		[mtlCmdBuff commit];
 		[mtlCmdBuff waitUntilCompleted];
 	}
@@ -180,8 +195,12 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
 	addPerformanceInterval(getPerformanceStats().queue.retrieveMTLCommandBuffer, startTime);
 	NSString* mtlCmdBuffLabel = getMTLCommandBufferLabel(cmdUse);
 	setMetalObjectLabel(mtlCmdBuff, mtlCmdBuffLabel);
-	mvkBeginDependencyTrace(mtlCmdBuff, _queueFamily->getIndex(), _index);
+	mvkBeginDependencyTrace(mtlCmdBuff, _queueFamily->getIndex(), _index, _device, this);
+    if (mvkDependencyTraceEnabled()) [mtlCmdBuff addScheduledHandler:^(id<MTLCommandBuffer> cb) {
+        mvkRecordDependencyPhase(cb, @"scheduled");
+    }];
 	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) {
+        mvkRecordDependencyPhase(mtlCB, @"completed");
 		handleMTLCommandBufferError(mtlCB);
 		if (mvkDependencyTraceEnabled() && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))
 			mvkWriteRuntimeTrace(getMVKConfig(), @"queue-dependencies", mvkCommandBufferDependencies(mtlCB));
@@ -310,7 +329,7 @@ void MVKQueue::handleMTLCommandBufferError(id<MTLCommandBuffer> mtlCmdBuff) {
 MVKQueue::MVKQueue(MVKDevice* device, MVKQueueFamily* queueFamily, uint32_t index, float priority, VkQueueGlobalPriority globalPriority) : MVKDeviceTrackingMixin(device) {
 	_queueFamily = queueFamily;
 	_index = index;
-    if (mvkGPUTimeoutTraceEnabled()) mvkWriteRuntimeTrace(getMVKConfig(), @"queue-config", @{@"queueFamily":@(queueFamily->getIndex()), @"queueIndex":@(index), @"specializedFamilies":@(getMVKConfig().specializedQueueFamilies)});
+
 
 	_priority = priority;
 	_globalPriority = globalPriority;
@@ -354,7 +373,13 @@ void MVKQueue::initExecQueue() {
 
 // Retrieves and initializes the Metal command queue and Xcode GPU capture scopes
 void MVKQueue::initMTLCommandQueue() {
-	_mtlQueue = _queueFamily->getMTLCommandQueue(_index);	// not retained (cached in queue family)
+	_mtlQueue = _queueFamily->getMTLCommandQueue(_index);	// exclusive lease; retained by family
+    if (mvkGPUTimeoutTraceEnabled()) mvkWriteRuntimeTrace(getMVKConfig(), @"queue-config", @{
+        @"queueFamily":@(_queueFamily->getIndex()), @"queueIndex":@(_index),
+        @"logicalDevice":[NSString stringWithFormat:@"%p",_device],
+        @"logicalQueue":[NSString stringWithFormat:@"%p",this],
+        @"nativeQueue":[NSString stringWithFormat:@"%p",_mtlQueue],
+        @"specializedFamilies":@(getMVKConfig().specializedQueueFamilies)});
 	_device->addResidencySet(_mtlQueue);
 
 	_submissionCaptureScope = new MVKGPUCaptureScope(this);
@@ -370,6 +395,7 @@ MVKQueue::~MVKQueue() {
 	destroyExecQueue();
 	_submissionCaptureScope->destroy();
 	_device->removeResidencySet(_mtlQueue);
+	_queueFamily->releaseMTLCommandQueue(_mtlQueue, _device->getConfigurationResult() == VK_SUCCESS);
 
 	[_mtlCmdBuffLabelBeginCommandBuffer release];
 	[_mtlCmdBuffLabelQueueSubmit release];
@@ -530,6 +556,7 @@ void MVKQueueCommandBufferSubmission::setActiveMTLCommandBuffer(id<MTLCommandBuf
 	if (_activeMTLCommandBuffer) { commitActiveMTLCommandBuffer(); }
 
 	_activeMTLCommandBuffer = [mtlCmdBuff retain];		// retained to handle prefilled
+	mvkRecordDependencyPhase(_activeMTLCommandBuffer, @"enqueueRequested");
 	[_activeMTLCommandBuffer enqueue];
 }
 
@@ -580,7 +607,8 @@ VkResult MVKQueueCommandBufferSubmission::commitActiveMTLCommandBuffer(bool sign
 
 	// Retrieve the result before committing MTLCommandBuffer, because finish() will destroy this instance.
 	VkResult rslt = mtlCmdBuff ? getConfigurationResult() : VK_ERROR_OUT_OF_POOL_MEMORY;
-	[mtlCmdBuff commit];
+	mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
+		[mtlCmdBuff commit];
 	[mtlCmdBuff release];		// retained
 
 	// If we need to signal completion, but an error occurred and the MTLCommandBuffer
@@ -771,6 +799,7 @@ VkResult MVKQueuePresentSurfaceSubmission::execute() {
 	VkResult rslt = getConfigurationResult();
 	if (mtlCmdBuff) {
 		[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) { this->finish(); }];
+		mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
 		[mtlCmdBuff commit];
 	} else {
 		finish();

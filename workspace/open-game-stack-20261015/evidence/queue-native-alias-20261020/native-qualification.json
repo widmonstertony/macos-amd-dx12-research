@@ -1,0 +1,88 @@
+{
+  "candidateSHA256": "0ea6accc79c78bec4aa2d742078385fdab3ba7e99c8f47602a05eed059fe0a07",
+  "results": [
+    {
+      "fixture": "queue-probe",
+      "mode": "default",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          0,
+          0,
+          0
+        ],
+        "rounds": 64,
+        "checkedWords": 262144,
+        "mismatches": 0,
+        "totalMilliseconds": 65.8926,
+        "slowestRoundMilliseconds": 27.7681
+      }
+    },
+    {
+      "fixture": "queue-probe",
+      "mode": "specialized",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          3,
+          2,
+          0
+        ],
+        "rounds": 64,
+        "checkedWords": 262144,
+        "mismatches": 0,
+        "totalMilliseconds": 71.0142,
+        "slowestRoundMilliseconds": 32.6483
+      }
+    },
+    {
+      "fixture": "queue-burst-probe",
+      "mode": "default",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          0,
+          0,
+          0
+        ],
+        "rounds": 2048,
+        "checkedWords": 8388608,
+        "mismatches": 0,
+        "totalMilliseconds": 954.462,
+        "slowestRoundMilliseconds": 5.50009
+      }
+    },
+    {
+      "fixture": "queue-burst-probe",
+      "mode": "specialized",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          3,
+          2,
+          0
+        ],
+        "rounds": 2048,
+        "checkedWords": 8388608,
+        "mismatches": 0,
+        "totalMilliseconds": 919.647,
+        "slowestRoundMilliseconds": 4.11361
+      }
+    }
+  ],
+  "multiDevice": {
+    "passed": true,
+    "independentNativeQueues": true,
+    "releasedQueueReused": true,
+    "liveQueueNotReused": true,
+    "rounds": 32,
+    "checkedWords": 262144,
+    "mismatches": 0
+  },
+  "passed": true,
+  "gameFixProven": false
+}

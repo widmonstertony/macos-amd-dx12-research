@@ -5,6 +5,18 @@
 #include <unistd.h>
 #include <unordered_map>
 #include <mutex>
+#include "MVKMeshLinkDifferential.h"
+
+// Wine drives pipeline creation from long-lived worker threads that do not
+// necessarily drain an Objective-C autorelease pool between requests. An array
+// literal here would therefore retain each per-request MTLBinaryArchive (and its
+// file mapping) until the worker exits. Keep the temporary ownership explicit;
+// the descriptor retains the array for exactly as long as it needs it.
+static void mvkSetBinaryArchive(id descriptor, id<MTLBinaryArchive> archive) {
+    NSArray* archives = [[NSArray alloc] initWithObjects:archive, nil];
+    [descriptor setBinaryArchives:archives];
+    [archives release];
+}
 
 static uint64_t mvkComputeArchiveLimit(const char* name, uint64_t fallback) {
     const char* value = getenv(name);
@@ -46,7 +58,7 @@ static bool mvkLoadComputeShard(id<MTLDevice> device,
     id<MTLBinaryArchive> archive = [device newBinaryArchiveWithDescriptor:archiveDescriptor error:&error];
     [archiveDescriptor release];
     if (!archive) return false;
-    descriptor.binaryArchives = @[archive]; // The descriptor retains this request's archive.
+    mvkSetBinaryArchive(descriptor, archive); // The descriptor retains this request's archive.
     [archive release];
     return true;
 }
@@ -91,8 +103,10 @@ static bool mvkStoreComputeShard(id<MTLDevice> device,
     id<MTLBinaryArchive> archive = [device newBinaryArchiveWithDescriptor:archiveDescriptor error:&error];
     [archiveDescriptor release];
     if (!archive) return false;
-    descriptor.binaryArchives = @[archive];
+    mvkSetBinaryArchive(descriptor, archive);
+    uint64_t operation=mvkLinkOperationBegin(@"compute-archive-add",descriptor.label);
     bool added = [archive addComputePipelineFunctionsWithDescriptor:descriptor error:&error];
+    mvkLinkOperationEnd(operation);
     NSString* temporary = [path stringByAppendingFormat:@".tmp.%@", [NSUUID UUID].UUIDString];
     bool serialized = added && [archive serializeToURL:[NSURL fileURLWithPath:temporary] error:&error];
     bool published = false;

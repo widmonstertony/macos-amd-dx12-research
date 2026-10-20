@@ -5,23 +5,31 @@ root=pathlib.Path(__file__).resolve().parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--run',action='store_true')
 parser.add_argument('--label',required=True)
-parser.add_argument('--suite',choices=['static','memory','vector','aggregate','graphics','bda','descriptors','typed64','typedvec','typedgraphics','geometry','vertexarray'],default='static')
+parser.add_argument('--suite',choices=['static','memory','vector','aggregate','graphics','heapgraphics','bda','descriptors','heapdescriptors','multiheapdescriptors','typed64','typedvec','typedgraphics','geometry','vertexarray'],default='static')
 parser.add_argument('--library',type=pathlib.Path)
 parser.add_argument('--runtime-trace',action='store_true')
 parser.add_argument('--gpu-timeout-trace',action='store_true')
+parser.add_argument('--queue-timing',action='store_true')
+parser.add_argument('--encoder-transitions',type=int,default=1)
 parser.add_argument('--specialized-queues',action='store_true')
 parser.add_argument('--fresh-mesh-libraries',action='store_true')
 parser.add_argument('--safe-mesh-libraries',action='store_true')
 parser.add_argument('--sync-mesh-libraries',action='store_true')
 parser.add_argument('--sync-mesh-pipelines',action='store_true')
+parser.add_argument('--mesh-link-differential',action='store_true')
 parser.add_argument('--replay-only',action='store_true')
 parser.add_argument('--replay-failed-mesh',action='store_true')
 parser.add_argument('--serialize-pipeline-link',action='store_true')
 parser.add_argument('--coherent-atomics',action='store_true')
 parser.add_argument('--encoder-live-cache',action='store_true')
+parser.add_argument('--cross-encoder-live-cache',action='store_true')
 parser.add_argument('--live-lookup-fast-cache',action='store_true')
 parser.add_argument('--descriptor-use-cache',action='store_true')
 parser.add_argument('--batch-live-use-resource',action='store_true')
+parser.add_argument('--batch-argument-heaps',action='store_true')
+parser.add_argument('--argument-heap-threshold',type=int,default=16)
+parser.add_argument('--use-mtl-heap',action='store_true')
+parser.add_argument('--trace-argument-heaps',action='store_true')
 parser.add_argument('--pipeline-cache',type=pathlib.Path)
 parser.add_argument('--native-3d-attachments',action='store_true')
 parser.add_argument('--binary-archive',type=pathlib.Path)
@@ -53,6 +61,10 @@ env={k:v for k,v in os.environ.items() if not k.startswith(('DYLD_','VK_','MVK_'
 env.update(PATH='/nonexistent',VK_ICD_FILENAMES=str(icd),MTL_DEBUG_LAYER='1',MVK_CONFIG_LOG_LEVEL='2',MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS='1',MVK_AMD_REFERENCE_RBA2='1',MVK_AMD_REFERENCE_RIA2='1',MVK_AMD_REFERENCE_NULL='1',MVK_AMD_BYTE_GUARDS='1',MVK_CONFIG_SHADER_DUMP_DIR=str(dest/'msl'))
 if args.runtime_trace:env['MVK_AMD_RUNTIME_TRACE']='1'
 if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
+if args.queue_timing:env['MVK_AMD_QUEUE_TIMING']='1'
+if args.encoder_transitions != 1:
+    if args.suite != 'heapgraphics' or not 1 <= args.encoder_transitions <= 64:parser.error('1..64 encoder transitions require heapgraphics')
+    env['GPU_ENCODER_TRANSITIONS']=str(args.encoder_transitions)
 if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
 if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
 if args.safe_mesh_libraries:
@@ -62,6 +74,7 @@ if args.sync_mesh_libraries:
     if not args.safe_mesh_libraries:parser.error('--sync-mesh-libraries requires safe mesh libraries')
     env['MVK_AMD_SYNC_MESH_LIBRARIES']='1'
 if args.sync_mesh_pipelines:env['MVK_AMD_SYNC_MESH_PIPELINES']='1'
+if args.mesh_link_differential:env['MVK_AMD_LINK_DIFFERENTIAL_CAPTURE']='1'
 if args.replay_only:
     if not args.runtime_trace or not args.replay_failed_mesh:parser.error('--replay-only requires runtime trace and mesh replay')
     env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
@@ -69,8 +82,18 @@ if args.replay_failed_mesh:env['MVK_AMD_REPLAY_FAILED_MESH']='1'
 if args.serialize_pipeline_link:env['MVK_AMD_SERIALIZE_PIPELINE_LINK']='1'
 if args.coherent_atomics:env['MVK_AMD_COHERENT_ATOMICS']='1'
 if args.encoder_live_cache:env['MVK_AMD_ENCODER_LIVE_CACHE']='1'
+if args.cross_encoder_live_cache:
+    if not args.encoder_live_cache:parser.error('--cross-encoder-live-cache requires --encoder-live-cache')
+    env['MVK_AMD_CROSS_ENCODER_LIVE_CACHE']='1'
 if args.descriptor_use_cache:env['MVK_AMD_DESCRIPTOR_USE_CACHE']='1'
 if args.batch_live_use_resource:env['MVK_AMD_BATCH_LIVE_USE_RESOURCE']='1'
+if args.batch_argument_heaps:
+    if not args.batch_live_use_resource:parser.error('--batch-argument-heaps requires --batch-live-use-resource')
+    if args.argument_heap_threshold < 1:parser.error('--argument-heap-threshold must be at least 1')
+    env['MVK_AMD_BATCH_ARGUMENT_HEAPS']='1'
+    env['MVK_AMD_ARGUMENT_HEAP_THRESHOLD']=str(args.argument_heap_threshold)
+if args.use_mtl_heap:env['MVK_CONFIG_USE_MTLHEAP']='2'
+if args.trace_argument_heaps:env['MVK_AMD_TRACE_ARGUMENT_HEAPS']='1'
 if args.live_lookup_fast_cache:
     if not args.encoder_live_cache:parser.error('--live-lookup-fast-cache requires --encoder-live-cache')
     env['MVK_AMD_LIVE_LOOKUP_FAST_CACHE']='1'
@@ -142,18 +165,32 @@ elif args.suite=='typedvec':cmd=[root/'build/probes/bda_probe',root/'build/probe
 elif args.suite=='typedgraphics':cmd=[root/'build/probes/graphics_typed_roots',root/'build/probes/typed.vert.spv',root/'build/probes/typed.frag.spv',dest/'output.json']
 elif args.suite=='descriptors':
     cmd=[root/'build/probes/descriptor_probe',root/'build/probes/variable-array.spv',dest/'output.json'];env['R2_VARIABLE_COUNT']='3'
+elif args.suite=='heapdescriptors':
+    cmd=[root/'build/probes/heap_descriptor_probe',root/'build/probes/variable-array.spv',dest/'output.json']
+elif args.suite=='multiheapdescriptors':
+    cmd=[root/'build/probes/multiheap_descriptor_probe',root/'build/probes/variable-array.spv',dest/'output.json']
+elif args.suite=='heapgraphics':
+    cmd=[root/'build/probes/heap_graphics_probe',root/'build/probes/heap-graphics.vert.spv',root/'build/probes/heap-graphics.frag.spv',dest/'output.json']
 else:cmd=[reference/'build/reference_robust_access',reference/'build/spv']
 record={'timeUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'librarySHA256':hashlib.sha256(lib.read_bytes()).hexdigest(),'command':[str(a)for a in cmd],'suite':args.suite,'gameStarted':False,'featureBitsModified':False,'privateCompilerOptionsOnly':True,'serializePipelineLink':args.serialize_pipeline_link,'coherentAtomics':args.coherent_atomics,'encoderLiveCache':args.encoder_live_cache}
+record['crossEncoderLiveCache']=args.cross_encoder_live_cache
 record['specializedQueues']=args.specialized_queues
 record['freshMeshLibraries']=args.fresh_mesh_libraries
 record['safeMeshLibraries']=args.safe_mesh_libraries
 record['syncMeshLibraries']=args.sync_mesh_libraries
 record['syncMeshPipelines']=args.sync_mesh_pipelines
+record['meshLinkDifferential']=args.mesh_link_differential
 record['failedMeshReplayEnabled']=args.replay_failed_mesh
 record['gpuTimeoutTrace']=args.gpu_timeout_trace
+record['queueTiming']=args.queue_timing
+record['encoderTransitions']=args.encoder_transitions
 record['liveLookupFastCache']=args.live_lookup_fast_cache
 record['descriptorUseCache']=args.descriptor_use_cache
 record['batchLiveUseResource']=args.batch_live_use_resource
+record['batchArgumentHeaps']=args.batch_argument_heaps
+record['argumentHeapThreshold']=args.argument_heap_threshold
+record['useMTLHeap']=args.use_mtl_heap
+record['traceArgumentHeaps']=args.trace_argument_heaps
 started=time.monotonic()
 try:
     r=subprocess.run([str(a)for a in cmd],env=env,capture_output=True,text=True,timeout=50);record['exitCode']=r.returncode;out,err=r.stdout,r.stderr

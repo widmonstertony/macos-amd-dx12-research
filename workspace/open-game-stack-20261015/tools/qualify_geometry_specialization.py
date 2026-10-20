@@ -20,6 +20,7 @@ def main():
     ap.add_argument('--safe-math', action='store_true')
     ap.add_argument('--sync-mesh-libraries', action='store_true')
     ap.add_argument('--sync-mesh-pipelines', action='store_true')
+    ap.add_argument('--mesh-link-differential', action='store_true')
     args = ap.parse_args()
     lib, shaders = args.library.resolve(), args.shaders.resolve()
     assert lib.is_relative_to(ROOT / 'build') and lib.is_file()
@@ -47,6 +48,8 @@ def main():
         env['MVK_AMD_SYNC_MESH_LIBRARIES'] = '1'
     if args.sync_mesh_pipelines:
         env['MVK_AMD_SYNC_MESH_PIPELINES'] = '1'
+    if args.mesh_link_differential:
+        env['MVK_AMD_LINK_DIFFERENTIAL_CAPTURE'] = '1'
     command = [str(ROOT / 'build/probes/geometry_specialization_gpu'), str(shaders), str(out / 'output.json')]
     start = time.monotonic()
     p = subprocess.run(command, env=env, capture_output=True, text=True, timeout=35)
@@ -55,7 +58,7 @@ def main():
     result = json.loads((out / 'output.json').read_text()) if (out / 'output.json').exists() else {}
     row = {'command': command, 'exitCode': p.returncode, 'elapsedSeconds': time.monotonic() - start,
            'candidateSHA256': hashlib.sha256(lib.read_bytes()).hexdigest(), 'result': result,
-           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math, 'syncMeshLibraries': args.sync_mesh_libraries, 'syncMeshPipelines': args.sync_mesh_pipelines,
+           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math, 'syncMeshLibraries': args.sync_mesh_libraries, 'syncMeshPipelines': args.sync_mesh_pipelines, 'meshLinkDifferential': args.mesh_link_differential,
            'metalValidationEnabled': 'Metal API Validation Enabled' in p.stderr}
     row['passed'] = p.returncode == 0 and result.get('passed', False)
     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')

@@ -9,7 +9,8 @@ struct MVKPresentedFrameWindow {
 };
 inline void mvkTracePresentedFrame(const MVKConfiguration& config, const void* swapchain,
                                    uint64_t nativeTimestamp) {
-    if (!mvkGPUTimeoutTraceEnabled()) return;
+    const char* timing = getenv("MVK_AMD_QUEUE_TIMING");
+    if (!mvkGPUTimeoutTraceEnabled() && !(timing && !strcmp(timing, "1"))) return;
     static std::mutex mutex;
     static std::map<const void*,MVKPresentedFrameWindow> windows;
     std::lock_guard<std::mutex> guard(mutex);

@@ -1,0 +1,22 @@
+{
+  "nativeRegressionPassed": true,
+  "nativeRegressionEvidence": [
+    "evidence/effective_profile_final_transition_gpu_20261020/run.json",
+    "evidence/effective_profile_final_descriptors_gpu_20261020/run.json",
+    "evidence/effective_profile_final_memory_gpu_20261020/run.json"
+  ],
+  "originalTencentPresentationPassed": true,
+  "originalTencentPresentationEvidence": "evidence/private-cache-wine-20261020T232503Z/run.json",
+  "deferredGameGuardPassed": true,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-effective-profile-game/libCandidate.dylib",
+    "candidateSHA256": "512c041a3f8d3e5a89aae4d195ed4524a16846ba5ebbb97ba53ef21c0b8fa952",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-effective-profile-game/libProbeGuard.dylib",
+    "proxySHA256": "47d7abc5710febf384639574793dda9827f7dc3872096d338e1ee867145957ba",
+    "presentationPassed": true,
+    "crossEncoderLiveCache": true,
+    "argumentHeapThreshold": 2,
+    "actualConfigEvidenceRequired": true,
+    "cachePathsPreserved": true
+  }
+}

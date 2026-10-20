@@ -28,14 +28,22 @@ def main():
     parser.add_argument('--private-directory', type=Path, default=PRIVATE)
     parser.add_argument('--compute-shards', action='store_true')
     parser.add_argument('--render-shards', action='store_true')
+    parser.add_argument('--render-global-read-only', type=Path)
+    parser.add_argument('--render-rehydrate', action='store_true')
+    parser.add_argument('--compute-rehydrate', action='store_true')
     parser.add_argument('--replay-only', action='store_true')
     parser.add_argument('--fresh-mesh-libraries', action='store_true')
     parser.add_argument('--safe-mesh-libraries', action='store_true')
     parser.add_argument('--sync-mesh-libraries', action='store_true')
     parser.add_argument('--sync-mesh-pipelines',action='store_true')
+    parser.add_argument('--mesh-link-differential',action='store_true')
     parser.add_argument('--disable-mesh-replay', action='store_true')
     parser.add_argument('--gpu-timeout-trace', action='store_true')
     parser.add_argument('--specialized-queues', action='store_true')
+    parser.add_argument('--use-mtl-heap', action='store_true')
+    parser.add_argument('--cross-encoder-live-cache', action='store_true')
+    parser.add_argument('--batch-argument-heaps', action='store_true')
+    parser.add_argument('--argument-heap-threshold', type=int, default=16)
     args = parser.parse_args()
     private = args.private_directory.resolve()
     if not private.is_relative_to(ROOT / 'build') or not (private / 'libCandidate.dylib').is_file():
@@ -68,6 +76,16 @@ def main():
                    MVK_AMD_COMPUTE_ARCHIVE_TRACE='1')
     if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
     if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
+    if args.use_mtl_heap:env['MVK_CONFIG_USE_MTLHEAP']='2'
+    if args.cross_encoder_live_cache:
+        env['MVK_AMD_ENCODER_LIVE_CACHE']='1'
+        env['MVK_AMD_CROSS_ENCODER_LIVE_CACHE']='1'
+    if args.batch_argument_heaps:
+        if not args.use_mtl_heap:parser.error('--batch-argument-heaps requires --use-mtl-heap')
+        if args.argument_heap_threshold < 1:parser.error('--argument-heap-threshold must be at least 1')
+        env['MVK_AMD_BATCH_LIVE_USE_RESOURCE']='1'
+        env['MVK_AMD_BATCH_ARGUMENT_HEAPS']='1'
+        env['MVK_AMD_ARGUMENT_HEAP_THRESHOLD']=str(args.argument_heap_threshold)
     if args.replay_only:env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
     if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
     if args.safe_mesh_libraries:
@@ -77,6 +95,7 @@ def main():
         if not args.safe_mesh_libraries:parser.error('--sync-mesh-libraries requires safe mesh libraries')
         env['MVK_AMD_SYNC_MESH_LIBRARIES']='1'
     if args.sync_mesh_pipelines:env['MVK_AMD_SYNC_MESH_PIPELINES']='1'
+    if args.mesh_link_differential:env['MVK_AMD_LINK_DIFFERENTIAL_CAPTURE']='1'
     if args.disable_mesh_replay:env.pop('MVK_AMD_REPLAY_FAILED_MESH', None)
     if args.render_shards:
         env.pop('MVK_AMD_RENDER_BINARY_ARCHIVE_PATH', None)
@@ -84,13 +103,29 @@ def main():
         render_directory.mkdir()
         env.update(MVK_AMD_RENDER_ARCHIVE_DIR=str(render_directory),
                    MVK_AMD_RENDER_ARCHIVE_TRACE='1')
+    if args.render_global_read_only:
+        archive = args.render_global_read_only.resolve()
+        if not archive.is_file():
+            parser.error('--render-global-read-only must name an existing archive')
+        env.pop('MVK_AMD_RENDER_ARCHIVE_DIR', None)
+        env.update(MVK_AMD_RENDER_BINARY_ARCHIVE_PATH=str(archive),
+                   MVK_AMD_RENDER_BINARY_ARCHIVE_READ_ONLY='1',
+                   MVK_AMD_BINARY_ARCHIVE_MAX_BYTES=str(256 * 1024 * 1024))
+    if args.render_rehydrate:
+        env['MVK_AMD_RENDER_ARCHIVE_REHYDRATE'] = '1'
+    if args.compute_rehydrate:
+        env['MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE'] = '1'
     candidate = private / "libCandidate.dylib"
     proxy = private / "libProbeGuard.dylib"
     shared = Path("/private/tmp/mvk-guard-proxy/libQualifiedCandidateReexport.dylib")
     shared_before = digest(shared)
     result = {"timeLocal": datetime.datetime.now().astimezone().isoformat(),
               "candidateSHA256": digest(candidate), "proxySHA256": digest(proxy),
-              "liveGameLibrariesChanged": False, "gpuTimeoutTrace": args.gpu_timeout_trace, "specializedQueues": args.specialized_queues, "results": {}}
+              "liveGameLibrariesChanged": False, "gpuTimeoutTrace": args.gpu_timeout_trace,
+              "specializedQueues": args.specialized_queues, "useMTLHeap": args.use_mtl_heap,
+              "crossEncoderLiveCache": args.cross_encoder_live_cache,
+              "batchArgumentHeaps": args.batch_argument_heaps,
+              "argumentHeapThreshold": args.argument_heap_threshold, "results": {}}
     probes = [
         ("compute-seed", "d3d12_compute_probe.exe", "compute.result=PASS"),
         ("compute-load", "d3d12_compute_probe.exe", "compute.result=PASS"),

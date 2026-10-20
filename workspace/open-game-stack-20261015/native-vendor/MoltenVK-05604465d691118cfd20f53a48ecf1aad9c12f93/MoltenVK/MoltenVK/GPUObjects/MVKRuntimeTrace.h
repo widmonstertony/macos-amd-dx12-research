@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <objc/runtime.h>
 #include <CommonCrypto/CommonDigest.h>
+#include "MVKMeshLinkDifferential.h"
 static inline bool mvkGPUTimeoutTraceEnabled() {
     static const bool enabled = [] { const char* v = getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v, "1"); }();
     return enabled;
@@ -42,10 +43,12 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
     if (mvkRuntimeReplayOnly() && ![kind isEqualToString:@"mesh-replay"] &&
         ![kind isEqualToString:@"pipeline-failure"] &&
         ![kind isEqualToString:@"fresh-mesh-function"] &&
+        ![kind isEqualToString:@"mesh-link-differential"] &&
         ![kind isEqualToString:@"compute-failure"] &&
         ![kind isEqualToString:@"slow-compute"] &&
         !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
         !([kind isEqualToString:@"compute-archive"] && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
+        !([kind isEqualToString:@"present-progress"] && getenv("MVK_AMD_QUEUE_TIMING") && !strcmp(getenv("MVK_AMD_QUEUE_TIMING"), "1")) &&
         !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"present-progress"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"] ||
           ([kind isEqualToString:@"queue-dependencies"] && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))))) return;
     static std::atomic<uint64_t> sequence{0};
@@ -82,7 +85,7 @@ static inline NSDictionary* mvkCompileProvenance(NSString* source, MTLCompileOpt
 }
 static inline NSDictionary* mvkTraceFunction(id<MTLFunction> function) {
     if (!function) return @{};
-    return @{@"label":function.label ?: @"", @"name":function.name ?: @"", @"type":@(function.functionType), @"identity":[NSString stringWithFormat:@"%p",function], @"compileProvenance":objc_getAssociatedObject(function, mvkCompileProvenanceKey()) ?: @{}};
+    return @{@"label":function.label ?: @"", @"name":function.name ?: @"", @"type":@(function.functionType), @"identity":[NSString stringWithFormat:@"%p",function], @"deviceIdentity":[NSString stringWithFormat:@"%p",function.device], @"deviceRegistryID":@(function.device.registryID), @"fullCompileContextCaptured":@(objc_getAssociatedObject(function,mvkMeshContextKey())!=nil), @"compileProvenance":objc_getAssociatedObject(function, mvkCompileProvenanceKey()) ?: @{}};
 }
 static inline NSDictionary* mvkTraceConfig(const mvk::SPIRVToMSLConversionConfiguration& c) {
     NSMutableArray* inputs = [NSMutableArray array];

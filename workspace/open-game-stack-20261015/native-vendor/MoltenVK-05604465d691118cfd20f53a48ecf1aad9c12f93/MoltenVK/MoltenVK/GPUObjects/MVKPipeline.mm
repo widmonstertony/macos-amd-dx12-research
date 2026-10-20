@@ -46,6 +46,7 @@ using namespace SPIRV_CROSS_NAMESPACE;
 #include "MVKRuntimeTrace.h"
 #include "MVKMeshReplay.h"
 #include "MVKPipelineLinkGate.h"
+#include "MVKMeshLinkDifferential.h"
 #include "MVKComputeArchive.h"
 #include "MVKRenderArchive.h"
 
@@ -1953,6 +1954,7 @@ bool MVKGraphicsPipeline::addVertexShaderToPipeline(MTLMeshRenderPipelineDescrip
 	// The vertex shader feeds the geometry shader (object stage), never the rasterizer.
 	shaderConfig.options.mslOptions.disable_rasterization = false;
 	shaderConfig.options.mslOptions.for_mesh_pipeline = true;
+	shaderConfig.options.uniqueEntryPointName = getPhysicalDevice()->isAMDHardware();
 	shaderConfig.options.mslOptions.msl_version = getPhysicalDevice()->getMetalFeatures()->mslVersion;
 	shaderConfig.options.shouldFlipVertexY = false;
 	// steamac: the object/mesh (geometry shader) stages emit positions through the mesh path, which
@@ -2001,6 +2003,7 @@ bool MVKGraphicsPipeline::addGeometryShaderToPipeline(MTLMeshRenderPipelineDescr
 	shaderConfig.options.mslOptions.capture_output_to_buffer = false;
 	shaderConfig.options.mslOptions.disable_rasterization = !_isRasterizing;
 	shaderConfig.options.mslOptions.for_mesh_pipeline = true;
+	shaderConfig.options.uniqueEntryPointName = getPhysicalDevice()->isAMDHardware();
 	shaderConfig.options.mslOptions.msl_version = getPhysicalDevice()->getMetalFeatures()->mslVersion;
 	shaderConfig.options.shouldFlipVertexY = true;
 	setEmulatedReversedDepthViewportConfig(shaderConfig, implicit, false);
@@ -2213,6 +2216,7 @@ bool MVKGraphicsPipeline::addFragmentShaderToPipeline(T* plDesc,
 			shaderConfig.options.mslOptions.sample_dref_lod_array_as_grad = true;
 		}
 		shaderConfig.options.mslOptions.for_mesh_pipeline = false;
+		shaderConfig.options.uniqueEntryPointName = forceReplaySource && getPhysicalDevice()->isAMDHardware();
 		if (_isRasterizing && pCreateInfo->pMultisampleState) {		// Must ignore allowed bad pMultisampleState pointer if rasterization disabled
 #if MVK_USE_METAL_PRIVATE_API
 			if (!getMVKConfig().useMetalPrivateAPI) {
@@ -3726,7 +3730,8 @@ namespace mvk {
 				opt.tessPatchKind,
 				opt.numTessControlPoints,
 				opt.shouldFlipVertexY,
-				opt.shouldFixupClipSpace);
+				opt.shouldFixupClipSpace,
+				opt.uniqueEntryPointName);
 	}
 
 	template<class Archive>
@@ -3893,9 +3898,12 @@ static id<MTLBinaryArchive> mvkPrepareBinaryArchive(MVKBinaryArchiveState& state
 	}
 	if (!state.archive) { return nil; }
 
-	[descriptor setBinaryArchives:@[state.archive]];
+	mvkSetBinaryArchive(descriptor, state.archive);
+	bool isRenderArchive = !strcmp(pathEnvironment, "MVK_AMD_RENDER_BINARY_ARCHIVE_PATH");
+	bool readOnly = isRenderArchive && getenv("MVK_AMD_RENDER_BINARY_ARCHIVE_READ_ONLY") &&
+		!strcmp(getenv("MVK_AMD_RENDER_BINARY_ARCHIVE_READ_ONLY"), "1");
 	NSError* addError = nil;
-	if (!state.full && addFunctions(state.archive, &addError)) {
+	if (!readOnly && !state.full && addFunctions(state.archive, &addError)) {
 		state.additions++;
 		uint64_t flushEvery = 64;
 		if (const char* flushC = getenv("MVK_AMD_BINARY_ARCHIVE_FLUSH_INTERVAL")) {
@@ -3909,7 +3917,6 @@ static id<MTLBinaryArchive> mvkPrepareBinaryArchive(MVKBinaryArchiveState& state
 		// UE shader worker. Playable replay-only runs may consume the last verified
 		// archive and extend it in memory, but defer render serialization until a
 		// future sharded writer can do so without holding the device lock.
-		bool isRenderArchive = !strcmp(pathEnvironment, "MVK_AMD_RENDER_BINARY_ARCHIVE_PATH");
 		bool deferPlayableRenderSerialization = isRenderArchive && mvkRuntimeReplayOnly();
 		if (!deferPlayableRenderSerialization && (state.additions % flushEvery) == 0) {
 			NSString* tempPath = [state.path stringByAppendingFormat:@".tmp.%d.%llu", getpid(),
@@ -3962,7 +3969,9 @@ static id<MTLBinaryArchive> mvkPrepareComputeBinaryArchive(id<MTLDevice> mtlDev,
 	static MVKBinaryArchiveState state;
 	return mvkPrepareBinaryArchive(state, mtlDev, plDesc, isAMD, "MVK_AMD_BINARY_ARCHIVE_PATH",
 		[&](id<MTLBinaryArchive> archive, NSError** error) {
-			return [archive addComputePipelineFunctionsWithDescriptor:plDesc error:error];
+			uint64_t operation=mvkLinkOperationBegin(@"compute-legacy-archive-add",plDesc.label);
+			bool result=[archive addComputePipelineFunctionsWithDescriptor:plDesc error:error];
+			mvkLinkOperationEnd(operation);return result;
 		});
 }
 
@@ -4020,7 +4029,9 @@ static id<MTLBinaryArchive> mvkPrepareRenderBinaryArchive(id<MTLDevice> mtlDev,
 	static MVKBinaryArchiveState state;
 	return mvkPrepareBinaryArchive(state, mtlDev, plDesc, isAMD, "MVK_AMD_RENDER_BINARY_ARCHIVE_PATH",
 		[&](id<MTLBinaryArchive> archive, NSError** error) {
-			return [archive addRenderPipelineFunctionsWithDescriptor:plDesc error:error];
+			uint64_t operation=mvkLinkOperationBegin(@"render-legacy-archive-add",plDesc.label);
+			bool result=[archive addRenderPipelineFunctionsWithDescriptor:plDesc error:error];
+			mvkLinkOperationEnd(operation);return result;
 		});
 }
 
@@ -4044,6 +4055,9 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 	__block bool strictHit = false;
 	__block bool fallback = false;
 	__block NSInteger archiveErrorCode = 0;
+	bool rehydrated = false;
+	double rehydrateMS = 0;
+	NSInteger rehydrateErrorCode = 0;
 
 	compile(lock, ^{
 		auto mtlDev = getMTLDevice();
@@ -4051,6 +4065,7 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
         // serializes its own state. Do not hold the device-wide monitor while
         // waiting: unrelated library/function requests need that monitor.
         if (!useShards) mvkPrepareRenderBinaryArchive(mtlDev, mtlRPLDesc, getPhysicalDevice()->isAMDHardware());
+		uint64_t operation=mvkLinkOperationBegin(@"render-pipeline",mtlRPLDesc.label);
 		@synchronized (mtlDev) {
 			if (loaded || requireHit) {
 				// Loading a file alone does not prove reuse. Ask Metal to reject a
@@ -4067,23 +4082,59 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 							@synchronized (mtlDev) {
 								[mtlDev newRenderPipelineStateWithDescriptor:cold
 									completionHandler:^(id<MTLRenderPipelineState> normal, NSError* normalError) {
-										bool isLate = compileComplete(normal, normalError);
+										mvkLinkOperationEnd(operation);
+							bool isLate = compileComplete(normal, normalError);
 										if (isLate) destroy();
 									}];
 							}
 							[cold release];
 						} else {
+							mvkLinkOperationEnd(operation);
 							bool isLate = compileComplete(ps, error);
 							if (isLate) destroy();
 						}
 					}];
 			} else [mtlDev newRenderPipelineStateWithDescriptor: mtlRPLDesc
 									   completionHandler: ^(id<MTLRenderPipelineState> ps, NSError* error) {
-										   bool isLate = compileComplete(ps, error);
+										   mvkLinkOperationEnd(operation);
+							bool isLate = compileComplete(ps, error);
 										   if (isLate) { destroy(); }
 									   }];
 		}
 	});
+	// On this Intel macOS AMD driver, a pipeline state created directly from a
+	// binary archive keeps that archive file mapped for the state's lifetime.
+	// Thousands of per-pipeline shards therefore exhaust memory. The successful
+	// archive creation warms Metal's in-process native cache; immediately create
+	// the retained state again without an archive, which is a cheap cache hit and
+	// no longer pins the shard. Preserve the archive-backed state on any failure.
+	bool shouldRehydrate = loaded && _mtlRenderPipelineState &&
+		getenv("MVK_AMD_RENDER_ARCHIVE_REHYDRATE") &&
+		!strcmp(getenv("MVK_AMD_RENDER_ARCHIVE_REHYDRATE"), "1");
+	if (shouldRehydrate) {
+		MTLRenderPipelineDescriptor* detachedDesc = [mtlRPLDesc copy];
+		detachedDesc.binaryArchives = nil;
+		NSError* detachedError = nil;
+		uint64_t detachedStart = mvkGetTimestamp();
+		id<MTLRenderPipelineState> detachedState = nil;
+		@synchronized (getMTLDevice()) {
+			detachedState = [getMTLDevice() newRenderPipelineStateWithDescriptor:detachedDesc
+				error:&detachedError];
+		}
+		rehydrateMS = mvkGetElapsedNanoseconds(detachedStart) / 1e6;
+		rehydrateErrorCode = detachedError.code;
+		if (detachedState) {
+			[_mtlRenderPipelineState release];
+			_mtlRenderPipelineState = detachedState;
+			rehydrated = true;
+		}
+		[detachedDesc release];
+	}
+	// MTLRenderPipelineState is immutable and owns everything needed for use.
+	// Vulkan pipeline objects keep this descriptor alive, so leaving the
+	// per-request archive attached would pin one mapped .metalar file for every
+	// cache hit until the Vulkan pipeline is destroyed.
+	if (loaded) mtlRPLDesc.binaryArchives = nil;
 	double pipelineMS = mvkGetElapsedNanoseconds(started) / 1e6 - loadMS;
 	uint64_t publishStart = mvkGetTimestamp();
 	bool published = shardPath && !loaded && !requireHit && _mtlRenderPipelineState &&
@@ -4093,6 +4144,8 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 			@"shard":shardPath.lastPathComponent ?: @"", @"loaded":@(loaded),
 			@"strictArchiveHit":@(strictHit), @"requireHit":@(requireHit),
 			@"fallback":@(fallback), @"archiveErrorCode":@(archiveErrorCode),
+			@"rehydrated":@(rehydrated), @"rehydrateMilliseconds":@(rehydrateMS),
+			@"rehydrateErrorCode":@(rehydrateErrorCode),
 			@"published":@(published), @"pipelineCreated":@(_mtlRenderPipelineState != nil),
 			@"loadMilliseconds":@(loadMS), @"pipelineMilliseconds":@(pipelineMS),
 			@"publishMilliseconds":@(mvkGetElapsedNanoseconds(publishStart) / 1e6)});
@@ -4118,6 +4171,13 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 		// Keep mesh submissions serialized through their completion callback.
 		dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
 		if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+		if (mvkMeshDifferentialEnabled()) {
+			static std::atomic<unsigned> submits{0};
+			if (submits.fetch_add(1)<64) mvkWriteRuntimeTrace(getMVKConfig(),@"mesh-link-differential",@{
+				@"case":@"original-submit",@"timeNS":@(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)),
+				@"activeOperations":mvkLinkOperationSnapshot(),@"deviceIdentity":mvkMeshIdentity(mtlDev),
+				@"object":mvkTraceFunction(mtlRPLDesc.objectFunction),@"mesh":mvkTraceFunction(mtlRPLDesc.meshFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction)});
+		}
 		if (synchronousMesh) {
 			// Public API control matching the successful diagnostic rebuild.
 			// Preserve the complete descriptor, native result and timeout;
@@ -4145,6 +4205,12 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 
 	if (mvkRuntimeTraceEnabled(getMVKConfig()) && (!mvkRuntimeReplayOnly() || !_mtlRenderPipelineState))
 		mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"pipeline-failure" : @"pipeline", @{@"kind":@"mesh",@"linkCreationAPI":synchronousMesh ? @"synchronous" : @"asynchronous",@"object":mvkTraceFunction(mtlRPLDesc.objectFunction),@"mesh":mvkTraceFunction(mtlRPLDesc.meshFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil),@"error":_compileError.localizedDescription?:@"",@"errorCode":@(_compileError.code)});
+	if (!_mtlRenderPipelineState && _compileError.code == 2 &&
+		[_compileError.localizedDescription containsString:@"fragment input"] && getPhysicalDevice()->isAMDHardware()) {
+		mvkDiagnoseMeshLink(getMTLDevice(),mtlRPLDesc,mvkGetPipelineLinkGate(true),^(NSDictionary* row) {
+			mvkWriteRuntimeTrace(getMVKConfig(),@"mesh-link-differential",row);
+		});
+	}
 	if (!_mtlRenderPipelineState && _compileError.code == 2 &&
 		[_compileError.localizedDescription containsString:@"fragment input"] && getPhysicalDevice()->isAMDHardware()) {
 		_mtlRenderPipelineState = mvkReplayFailedMesh(getMTLDevice(),mtlRPLDesc,getMVKConfig());
@@ -4183,23 +4249,54 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
     double loadMS = shardPath ? mvkGetElapsedNanoseconds(shardStart) / 1e6 : 0;
     bool requireHit = shardPath && getenv("MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT") &&
         !strcmp(getenv("MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT"), "1");
+	bool rehydrated = false;
+	double rehydrateMS = 0;
+	NSInteger rehydrateErrorCode = 0;
 
 	compile(lock, ^{
 		auto mtlDev = getMTLDevice();
         // Same lock ordering as render archives: private archive lock only
         // during synchronous add/serialize; device monitor for submission only.
         if (!shardPath) mvkPrepareComputeBinaryArchive(mtlDev, plDesc, getPhysicalDevice()->isAMDHardware());
+		uint64_t operation=mvkLinkOperationBegin(@"compute-pipeline",plDesc.label);
 		@synchronized (mtlDev) {
 			if (mvkRuntimeTraceEnabled(getMVKConfig()) && !mvkRuntimeReplayOnly()) mvkWriteRuntimeTrace(getMVKConfig(), @"compute-request", @{@"request":request,@"time":@([NSDate timeIntervalSinceReferenceDate]),@"function":mvkTraceFunction(plDesc.computeFunction),@"maxThreads":@(plDesc.maxTotalThreadsPerThreadgroup),@"fullSubgroups":@(plDesc.threadGroupSizeIsMultipleOfThreadExecutionWidth),@"descriptor":plDesc.description?:@""});
 			[mtlDev newComputePipelineStateWithDescriptor: plDesc
 												  options: requireHit ? MTLPipelineOptionFailOnBinaryArchiveMiss : MTLPipelineOptionNone
 										completionHandler: ^(id<MTLComputePipelineState> ps, MTLComputePipelineReflection*, NSError* error) {
 				if (mvkRuntimeTraceEnabled(getMVKConfig()) && (!mvkRuntimeReplayOnly() || !ps)) mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"compute-failure" : @"compute-result", @{@"request":request,@"time":@([NSDate timeIntervalSinceReferenceDate]),@"function":mvkTraceFunction(plDesc.computeFunction),@"created":@(ps!=nil),@"error":error.localizedDescription?:@"",@"errorCode":@(error.code)});
-											bool isLate = compileComplete(ps, error);
+											mvkLinkOperationEnd(operation);
+				bool isLate = compileComplete(ps, error);
 											if (isLate) { destroy(); }
 										}];
 		}
 	});
+    bool shouldRehydrate = shardLoaded && _mtlComputePipelineState &&
+        getenv("MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE") &&
+        !strcmp(getenv("MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE"), "1");
+    if (shouldRehydrate) {
+        MTLComputePipelineDescriptor* detachedDesc = [plDesc copy];
+        detachedDesc.binaryArchives = nil;
+        NSError* detachedError = nil;
+        uint64_t detachedStart = mvkGetTimestamp();
+        id<MTLComputePipelineState> detachedState = nil;
+        @synchronized (getMTLDevice()) {
+            detachedState = [getMTLDevice() newComputePipelineStateWithDescriptor:detachedDesc
+                options:MTLPipelineOptionNone reflection:nil error:&detachedError];
+        }
+        rehydrateMS = mvkGetElapsedNanoseconds(detachedStart) / 1e6;
+        rehydrateErrorCode = detachedError.code;
+        if (detachedState) {
+            [_mtlComputePipelineState release];
+            _mtlComputePipelineState = detachedState;
+            rehydrated = true;
+        }
+        [detachedDesc release];
+    }
+    // The Vulkan pipeline keeps this descriptor alive after the immutable
+    // compute pipeline state has been created. Drop the request-local archive
+    // so its file mapping does not live for the lifetime of the Vulkan object.
+    if (shardLoaded) plDesc.binaryArchives = nil;
     bool shardPublished = false;
     uint64_t publishStart = shardPath ? mvkGetTimestamp() : 0;
     if (shardPath && !shardLoaded && !requireHit && _mtlComputePipelineState)
@@ -4209,6 +4306,8 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
             @"request":request, @"key":plDesc.label ?: @"", @"loaded":@(shardLoaded),
             @"published":@(shardPublished), @"requireHit":@(requireHit),
             @"pipelineCreated":@(_mtlComputePipelineState != nil), @"loadMilliseconds":@(loadMS),
+            @"rehydrated":@(rehydrated), @"rehydrateMilliseconds":@(rehydrateMS),
+            @"rehydrateErrorCode":@(rehydrateErrorCode),
             @"postCompilePublishMilliseconds":@(mvkGetElapsedNanoseconds(publishStart) / 1e6)});
 	return [_mtlComputePipelineState retain];
 }
@@ -4266,11 +4365,11 @@ void mvkValidateCeralArchiveDefinitions() {
 	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::MSLConstexprSampler>();
 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVWorkgroupSizeDimension>(3);
 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVEntryPoint>(20);						// Contains string
-	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionOptions>(27);			// Contains string
+	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionOptions>(26);			// Contains string
 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLShaderInterfaceVariable>(6);
 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLResourceBinding>(2);
 	missingBytes += mvkValidateCerealArchiveSize<mvk::DescriptorBinding>();
-	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionConfiguration>(107);	// Contains collection
+	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionConfiguration>(106);	// Contains collection
 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionResultInfo>(39);		// Contains collection
 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLSpecializationMacroInfo>(22);			// Contains string
 	missingBytes += mvkValidateCerealArchiveSize<MVKShaderModuleKey>();

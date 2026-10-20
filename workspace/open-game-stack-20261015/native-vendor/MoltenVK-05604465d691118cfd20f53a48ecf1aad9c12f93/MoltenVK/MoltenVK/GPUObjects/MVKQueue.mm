@@ -26,6 +26,7 @@
 #include "MVKGPUCapture.h"
 #include "MVKRuntimeTrace.h"
 #include "MVKQueueDependencyTrace.h"
+#include "MVKQueueTimingTrace.h"
 
 using namespace std;
 
@@ -174,6 +175,7 @@ VkResult MVKQueue::waitIdle(MVKCommandUse cmdUse) {
 	@autoreleasepool {
 		auto* mtlCmdBuff = getMTLCommandBuffer(cmdUse);
 		mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
+		mvkQueueTimingCommit(mtlCmdBuff);
 		[mtlCmdBuff commit];
 		[mtlCmdBuff waitUntilCompleted];
 	}
@@ -191,6 +193,7 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
 	}
 	mtlCmdBuff = [_mtlQueue commandBufferWithDescriptor: mtlCmdBuffDesc];
 	[mtlCmdBuffDesc release];														// temp release
+	mvkQueueTimingBegin(mtlCmdBuff, _queueFamily->getIndex(), _index, getMVKConfig().shaderDumpDir);
 
 	addPerformanceInterval(getPerformanceStats().queue.retrieveMTLCommandBuffer, startTime);
 	NSString* mtlCmdBuffLabel = getMTLCommandBufferLabel(cmdUse);
@@ -609,6 +612,7 @@ VkResult MVKQueueCommandBufferSubmission::commitActiveMTLCommandBuffer(bool sign
 	// Retrieve the result before committing MTLCommandBuffer, because finish() will destroy this instance.
 	VkResult rslt = mtlCmdBuff ? getConfigurationResult() : VK_ERROR_OUT_OF_POOL_MEMORY;
 	mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
+	mvkQueueTimingCommit(mtlCmdBuff);
 		[mtlCmdBuff commit];
 	[mtlCmdBuff release];		// retained
 
@@ -801,6 +805,7 @@ VkResult MVKQueuePresentSurfaceSubmission::execute() {
 	if (mtlCmdBuff) {
 		[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) { this->finish(); }];
 		mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
+		mvkQueueTimingCommit(mtlCmdBuff);
 		[mtlCmdBuff commit];
 	} else {
 		finish();

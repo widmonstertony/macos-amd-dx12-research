@@ -1,5 +1,23 @@
-> 最新核对（2026-10-20 10:13 PDT）：游戏仍未修好。最新实机在同步库与同步管线创建下仍有 2 次 mesh/fragment locn2 链接失败并显示显存错误；初始化 API 返回成功不能替代编译或可玩验收。所有失败候选均为研究快照，不是可玩推荐版本。
-> Latest: the game remains unplayable. Synchronous library and mesh-pipeline creation did not eliminate two initial locn2 link failures. Native device creation succeeds; actual VRAM exhaustion is unproven. Failed candidates are research checkpoints.
+> 最新核对（2026-10-20 16:38 PDT）：游戏尚不可正常游玩。此前 locn2 链接失败已用稳定且唯一的原生 mesh 入口名消除；归档管线保留大量文件映射的问题已通过命中后重建无归档管线处理。实机场景能够正确显示，但上一轮只有约 1–2 FPS，随后发生原生 GPU 超时。当前轮正在验证资源声明优化的实际生效配置与分队列计时，尚无游戏加速结论。
+> Latest: not playable. Unique mesh entry names removed the observed locn2 failures, and archive-hit pipeline rehydration eliminated retained archive mappings in the measured replay. The previous correctly rendered scene delivered about 1–2 FPS and later timed out. Effective resource-declaration configuration and per-queue timing are now being measured in a new normal-Steam run; no playable result is claimed.
+
+## 当前候选 / Current candidate
+
+Candidate SHA-256: `512c041a3f8d3e5a89aae4d195ed4524a16846ba5ebbb97ba53ef21c0b8fa952`. Game proxy SHA-256: `47d7abc5710febf384639574793dda9827f7dc3872096d338e1ee867145957ba`. Evidence: [qualification and effective configuration](release-evidence/effective-submission-profile-20261020/).
+
+真实 GPU 回归：20 轮 × 16 次 encoder 切换的图形测试共 20,480 像素、6 个描述符场景共 99,456 words、12 个内存场景共 9,648 结果及 192,528 witness words，均无差异。原应用宝 Wine 计算、严格缓存命中及呈现探针通过。这些测试不能替代游戏验证。
+
+Real GPU regressions passed with zero mismatches: 20,480 pixels over repeated encoder transitions, 99,456 descriptor words, and 9,648 result plus 192,528 witness words for memory protection. Original Tencent Wine compute/cache/presentation probes passed. These are fixtures, not proof of game playability.
+
+此前给已运行 Steam 的启动客户端设置环境变量，未证明游戏实际继承了参数。因此之前 heap 阈值与跨 encoder 缓存的游戏对照结论不成立。新代理在游戏内明确设置并读取真实解析值，确认 crossEncoderLiveCache=1、recentCacheSlots=256、heapThreshold=2。启用低开销 Metal 原生时间戳聚合，关闭完整逐 encoder 工作追踪，保留错误记录与缓存。
+
+Earlier environment settings on a launch client did not establish what the existing Steam process passed to the game. Previous threshold/cache comparisons are therefore inconclusive. The new game-side profile records the actual parsed values and measures host precommit time, native GPU execution, and submit-to-GPU delay. All caches remain intact.
+
+FSR3 超分与帧生成仍未验证；历史配置包含强制关闭项，当前基础帧率测量不能算 FSR3 支持。恢复功能并逐项实测是完成条件。
+
+FSR3 upscaling and frame generation are unvalidated. Historical force-off settings are still present during this base-frame-rate diagnosis. Both features require restoration and real game validation before claiming support.
+
+以下为保留的历史记录，不代表最新候选或活动 PID。 / The following sections are historical evidence, not the current candidate or live PID.
 
 # 保存时的真实状态
 

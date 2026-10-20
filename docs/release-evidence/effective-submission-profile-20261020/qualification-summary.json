@@ -1,0 +1,60 @@
+{
+  "timeUTC": "2026-10-20T23:29:45.837357+00:00",
+  "gamePlayable": false,
+  "regressions": {
+    "effective_profile_final_transition_gpu_20261020": {
+      "passed": true,
+      "results": {
+        "passed": true,
+        "sharedAllocationResources": 64,
+        "rounds": 20,
+        "passesPerSubmission": 16,
+        "checkedPixels": 20480,
+        "mismatches": 0,
+        "milliseconds": 190.95
+      },
+      "librarySHA256": "512c041a3f8d3e5a89aae4d195ed4524a16846ba5ebbb97ba53ef21c0b8fa952"
+    },
+    "effective_profile_final_descriptors_gpu_20261020": {
+      "passed": true,
+      "results": {
+        "passed": true,
+        "device": "AMD Radeon Pro 5600M",
+        "scenarios": 6,
+        "checkedWords": 99456,
+        "mismatches": 0,
+        "nativeFeatureFlagsModified": false
+      },
+      "librarySHA256": "512c041a3f8d3e5a89aae4d195ed4524a16846ba5ebbb97ba53ef21c0b8fa952"
+    },
+    "effective_profile_final_memory_gpu_20261020": {
+      "passed": true,
+      "results": {
+        "device": "AMD Radeon Pro 5600M",
+        "nativeRobustness2FeaturesChanged": false,
+        "scenarios": 12,
+        "gpuResultWordsChecked": 9648,
+        "witnessWordsChecked": 192528,
+        "mismatches": 0,
+        "passed": true,
+        "scope": "Source-built MoltenVK internal compiler and descriptors; experimental private opt-in, not full conformance"
+      },
+      "librarySHA256": "512c041a3f8d3e5a89aae4d195ed4524a16846ba5ebbb97ba53ef21c0b8fa952"
+    }
+  },
+  "wineEvidence": "evidence/private-cache-wine-20261020T232503Z/run.json",
+  "previousGameGPUTimeouts": 13,
+  "previousGamePipelineFailures": 0,
+  "previousGameNativePresentationFPSRange": [
+    1.01,
+    2.35
+  ],
+  "fixedLaunchEvidenceGap": "Previous game proxy omitted crossEncoderLiveCache and heapThreshold settings; new game-only proxy explicitly applies them and the native helper writes parsed effective values.",
+  "FSR3": {
+    "upscalingValidated": false,
+    "frameGenerationValidated": false,
+    "historicalForcedOffConfigurationPresent": true,
+    "mustRestoreAndValidate": true
+  },
+  "cacheDeleted": false
+}

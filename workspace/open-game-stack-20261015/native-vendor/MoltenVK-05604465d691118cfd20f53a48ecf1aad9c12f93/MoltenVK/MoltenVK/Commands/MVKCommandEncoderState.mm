@@ -1059,7 +1059,14 @@ void MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages 
 	auto res = used.emplace(resource, info);
 	ResourceInfo& stored = res.first->second;
 	bool fresh = res.second || stored.generation != encoderGeneration;
-	if (fresh && !res.second) stored = info;
+	if (fresh && !res.second) {
+		// A cross-encoder liveness reference is independent of per-encoder
+		// stage/usage bookkeeping. Preserve that owned reference while starting
+		// the resource's declarations for the new Metal encoder.
+		bool liveRetained = stored.liveRetained;
+		stored = info;
+		stored.liveRetained = liveRetained;
+	}
 	if (fresh || !isCompatible(stored, info)) {
 		if (!fresh) {
 			stored.deferred = true;
@@ -1092,12 +1099,32 @@ void MVKUseResourceHelper::releasePendingBatchLiveResources() {
 }
 
 void MVKUseResourceHelper::resetForEncoder() {
-	releaseLiveResources();
+	// Record the helper's parsed values, rather than inferring them from the
+	// Steam launch client's environment. A running Steam can inherit different
+	// values from those supplied to a later -applaunch request.
+	static const char* configPath = getenv("MVK_AMD_EFFECTIVE_CONFIG_PATH");
+	static std::atomic_flag configWritten = ATOMIC_FLAG_INIT;
+	if (configPath && !configWritten.test_and_set()) {
+		FILE* file = fopen(configPath, "w");
+		if (file) {
+			fprintf(file, "{\"pid\":%d,\"encoderLiveCache\":%u,\"crossEncoderLiveCache\":%u,\"recentCacheSlots\":%zu,\"batchLiveResources\":%u,\"batchArgumentHeaps\":%u,\"heapThreshold\":%u}\n",
+			        getpid(),cacheLiveResources,crossEncoderLiveCache,recentLiveResources.size(),batchLiveResources,batchArgumentHeaps,heapBatchThreshold);
+			fclose(file);
+		}
+	}
+	releasePendingBatchLiveResources();
+	// Direct-map entries contain ResourceInfo pointers. Clear them at every
+	// encoder boundary so the new encoder always receives its own useResource
+	// declaration, while optionally retaining the validated Metal objects for
+	// the duration of this command submission.
+	for (auto& recent : recentLiveResources) recent = {};
+	if (!crossEncoderLiveCache) releaseLiveResources();
 	// Mark retained map nodes stale instead of freeing and reallocating every
 	// time Vulkan command encoding switches between Metal render and compute.
 	// Bound long-lived command buffers conservatively; clearing here affects CPU
 	// bookkeeping only and never skips a liveness validation.
 	if (++encoderGeneration == 0 || used.size() > 8192) {
+		if (crossEncoderLiveCache) releaseLiveResources();
 		used.clear();
 		encoderGeneration = 1;
 	}
@@ -1135,12 +1162,20 @@ void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 	}
 	if (cacheLiveResources) {
 		auto it = used.find(resource);
-		if (it != used.end() && it->second.generation == encoderGeneration && it->second.liveRetained) {
+		if (it != used.end() && it->second.liveRetained &&
+		    (it->second.generation == encoderGeneration || crossEncoderLiveCache)) {
+			// Metal resource-use declarations belong to an individual encoder.
+			// A retained object lets us skip the serialized live-list lookup across
+			// encoder transitions, but it does not let the next encoder inherit the
+			// previous encoder's useResource/useHeap declaration.  Treat the first
+			// use in every generation as a declaration even when access and stages
+			// are otherwise compatible.
+			bool needsEncoderDeclaration = it->second.generation != encoderGeneration;
 			if (recent) *recent = {resource, &liveList, &it->second, 0};
 			if (traceLiveCache) ++liveReuseCount;
 			// Holding the Metal object prevents pointer reuse (ABA) even if its
 			// Vulkan wrapper was removed from the live list in the meantime.
-			if (!isCompatible(it->second, ResourceInfo{stage, write, false}))
+			if (needsEncoderDeclaration || !isCompatible(it->second, ResourceInfo{stage, write, false}))
 				recordValidatedResource(true);
 			return;
 		}
@@ -1190,6 +1225,35 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 		MVKResourceUsageStages stages = static_cast<MVKResourceUsageStages>(i);
 		MTLRenderStages mtlStages = getMTLStages(stages);
 		Entry& entry = entries[stages];
+		MVKSmallVector<id<MTLHeap>> heaps;
+		if (batchArgumentHeaps) {
+			// A large D3D12 bindless table can contain thousands of resources
+			// suballocated from only a few Vulkan allocations. Metal permits all
+			// indirect resources in one MTLHeap to be declared with one useHeap.
+			// Collapse only groups large enough to amortize the heap declaration;
+			// keep small and non-heap groups on the precise useResources path.
+			std::unordered_map<id<MTLHeap>, uint32_t> heapCounts;
+			for (id<MTLResource> resource : entry.read) {
+				id<MTLHeap> heap = resource.heap;
+				if (heap) ++heapCounts[heap];
+			}
+			for (id<MTLResource> resource : entry.readWrite) {
+				id<MTLHeap> heap = resource.heap;
+				if (heap) ++heapCounts[heap];
+			}
+			uint32_t collapsedResources = 0;
+			for (auto& pair : heapCounts) if (pair.second >= heapBatchThreshold) { heaps.push_back(pair.first); collapsedResources += pair.second; }
+			if (!heaps.empty()) {
+				auto keepPrecise = [&](id<MTLResource> resource) {
+					id<MTLHeap> heap = resource.heap;
+					return !heap || heapCounts[heap] < heapBatchThreshold;
+				};
+				entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
+				entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());
+				[encoder useHeaps:heaps.data() count:heaps.size() stages:mtlStages];
+				if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS graphics resources=%u heaps=%zu stage=%u\n", collapsedResources, heaps.size(), i);
+			}
+		}
 		if (!entry.read.empty()) {
 			[encoder useResources:entry.read.data() count:entry.read.size() usage:MTLResourceUsageRead stages:mtlStages];
 			entry.read.clear();
@@ -1203,6 +1267,30 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 }
 void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> encoder) {
 	Entry& entry = entries[MVKResourceUsageStages::Compute];
+	MVKSmallVector<id<MTLHeap>> heaps;
+	if (batchArgumentHeaps) {
+		std::unordered_map<id<MTLHeap>, uint32_t> heapCounts;
+		for (id<MTLResource> resource : entry.read) {
+			id<MTLHeap> heap = resource.heap;
+			if (heap) ++heapCounts[heap];
+		}
+		for (id<MTLResource> resource : entry.readWrite) {
+			id<MTLHeap> heap = resource.heap;
+			if (heap) ++heapCounts[heap];
+		}
+		uint32_t collapsedResources = 0;
+		for (auto& pair : heapCounts) if (pair.second >= heapBatchThreshold) { heaps.push_back(pair.first); collapsedResources += pair.second; }
+		if (!heaps.empty()) {
+			auto keepPrecise = [&](id<MTLResource> resource) {
+				id<MTLHeap> heap = resource.heap;
+				return !heap || heapCounts[heap] < heapBatchThreshold;
+			};
+			entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
+			entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());
+			[encoder useHeaps:heaps.data() count:heaps.size()];
+			if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS compute resources=%u heaps=%zu\n", collapsedResources, heaps.size());
+		}
+	}
 	if (!entry.read.empty()) {
 		[encoder useResources:entry.read.data() count:entry.read.size() usage:MTLResourceUsageRead];
 		entry.read.clear();

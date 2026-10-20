@@ -80,7 +80,7 @@ static bool mvkLoadRenderShard(id<MTLDevice> device, MTLRenderPipelineDescriptor
     id<MTLBinaryArchive> archive = [device newBinaryArchiveWithDescriptor:ad error:&error];
     [ad release];
     if (!archive) return false;
-    descriptor.binaryArchives = @[archive];
+    mvkSetBinaryArchive(descriptor, archive);
     [archive release];
     return true;
 }
@@ -97,8 +97,10 @@ static bool mvkStoreRenderShard(id<MTLDevice> device, MTLRenderPipelineDescripto
     if (!archive) return false;
     // A private copy leaves the successful compiler's original descriptor intact.
     MTLRenderPipelineDescriptor* writer = [descriptor copy];
-    writer.binaryArchives = @[archive];
+    mvkSetBinaryArchive(writer, archive);
+    uint64_t operation=mvkLinkOperationBegin(@"render-archive-add",writer.label);
     bool added = [archive addRenderPipelineFunctionsWithDescriptor:writer error:&error];
+    mvkLinkOperationEnd(operation);
     NSString* temporary = [path stringByAppendingFormat:@".tmp.%@", NSUUID.UUID.UUIDString];
     bool serialized = added && [archive serializeToURL:[NSURL fileURLWithPath:temporary] error:&error];
     bool published = false;

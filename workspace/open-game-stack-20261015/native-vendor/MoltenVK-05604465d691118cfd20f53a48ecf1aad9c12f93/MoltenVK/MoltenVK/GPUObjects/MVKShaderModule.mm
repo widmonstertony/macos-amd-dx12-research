@@ -27,6 +27,7 @@
 using namespace std;
 using namespace mvk;
 #include "MVKRuntimeTrace.h"
+#include "MVKMeshLinkDifferential.h"
 
 MVKMTLFunction::MVKMTLFunction(id<MTLFunction> mtlFunc, const SPIRVToMSLConversionResultInfo scRslts, MTLSize tgSize) {
 	_mtlFunction = [mtlFunc retain];		// retained
@@ -170,6 +171,10 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 			}
 
 			if (mtlFunc && mvkGPUTimeoutTraceEnabled()) objc_setAssociatedObject(mtlFunc, mvkCompileProvenanceKey(), objc_getAssociatedObject(lib, mvkCompileProvenanceKey()), OBJC_ASSOCIATION_RETAIN);
+			if (mtlFunc && mvkMeshDifferentialEnabled()) {
+				NSDictionary* context=objc_getAssociatedObject(lib,mvkMeshContextKey());
+				if (context) objc_setAssociatedObject(mtlFunc,mvkMeshContextKey(),context,OBJC_ASSOCIATION_RETAIN);
+			}
 
 			// Set the debug name. First try name of shader module, otherwise try name of owner.
 			NSString* dbName = shaderModule->getDebugName();
@@ -710,6 +715,8 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 		auto mtlDev = getMTLDevice();
 		MTLCompileOptions* synchronousOptions = nil;
 		NSDictionary* synchronousProvenance = nil;
+		NSDictionary* synchronousContext = nil;
+		uint64_t libraryOperation=0;
 		@synchronized (mtlDev) {
 			@autoreleasepool {
 				auto mtlCompileOptions = getDevice()->getMTLCompileOptions(shaderConversionResults.entryPoint.fpFastMathFlags,
@@ -745,7 +752,9 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 					detail[@"libraryCreationAPI"] = synchronousMesh ? @"synchronous" : @"asynchronous";
 					provenance = detail;
 				}
+				NSDictionary* fullContext=mvkMeshCompileContext(mslSourceCode,mtlCompileOptions,conservativeMeshLibrary);
 
+				libraryOperation=mvkLinkOperationBegin(@"source-library",provenance[@"sourceSHA256"]);
 				if (synchronousMesh) {
 					// Match the public API used by successful diagnostic source
 					// rebuilds, without disk replay or a hidden retry. Keep source,
@@ -753,11 +762,14 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 					// outside the device monitor so unrelated requests can proceed.
 					synchronousOptions = [mtlCompileOptions retain];
 					synchronousProvenance = [provenance retain];
+					synchronousContext = [fullContext retain];
 				} else {
 				[mtlDev newLibraryWithSource: mslSourceCode
 									options: mtlCompileOptions
 						completionHandler: ^(id<MTLLibrary> mtlLib, NSError* error) {
                             if (mtlLib && provenance) objc_setAssociatedObject(mtlLib, mvkCompileProvenanceKey(), provenance, OBJC_ASSOCIATION_COPY);
+							if (mtlLib && fullContext) objc_setAssociatedObject(mtlLib,mvkMeshContextKey(),fullContext,OBJC_ASSOCIATION_RETAIN);
+							mvkLinkOperationEnd(libraryOperation);
 							bool isLate = compileComplete(mtlLib, error);
 							if (isLate) { destroy(); }
 						}];
@@ -769,10 +781,14 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 			id<MTLLibrary> library = [mtlDev newLibraryWithSource:mslSourceCode options:synchronousOptions error:&error];
 			if (library && synchronousProvenance)
 				objc_setAssociatedObject(library, mvkCompileProvenanceKey(), synchronousProvenance, OBJC_ASSOCIATION_COPY);
+			if (library && synchronousContext)
+				objc_setAssociatedObject(library,mvkMeshContextKey(),synchronousContext,OBJC_ASSOCIATION_RETAIN);
+			mvkLinkOperationEnd(libraryOperation);
 			bool isLate = compileComplete(library, error);
 			[library release];
 			[synchronousOptions release];
 			[synchronousProvenance release];
+			[synchronousContext release];
 			// The existing timeout/deferred-destroy contract also applies to
 			// this blocking native call on the compiler's worker queue.
 			if (isLate) { destroy(); }

@@ -200,8 +200,22 @@ struct MVKUseResourceHelper {
 		// optimized library without requiring a new prefix or login session.
 		value = getenv("MVK_AMD_RUNTIME_REPLAY_ONLY");
 		batchLiveResources |= value && !strcmp(value, "1");
+		value = getenv("MVK_AMD_BATCH_ARGUMENT_HEAPS");
+		batchArgumentHeaps = value && !strcmp(value, "1");
+		value = getenv("MVK_AMD_ARGUMENT_HEAP_THRESHOLD");
+		if (value) {
+			char* end = nullptr;
+			unsigned long parsed = strtoul(value, &end, 10);
+			if (end != value && !*end && parsed >= 1 && parsed <= UINT32_MAX) {
+				heapBatchThreshold = static_cast<uint32_t>(parsed);
+			}
+		}
+		value = getenv("MVK_AMD_TRACE_ARGUMENT_HEAPS");
+		traceArgumentHeaps = value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_LIVE_LOOKUP_FAST_CACHE");
 		if (cacheLiveResources && value && !strcmp(value, "1")) recentLiveResources.resize(256);
+		value = getenv("MVK_AMD_CROSS_ENCODER_LIVE_CACHE");
+		crossEncoderLiveCache = cacheLiveResources && value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_TRACE_LIVE_CACHE");
 		traceLiveCache = value && !strcmp(value, "1");
 	}
@@ -230,7 +244,11 @@ struct MVKUseResourceHelper {
 	MVKOnePerEnumEntry<Entry, MVKResourceUsageStages> entries;
 	std::unordered_map<id<MTLResource>, ResourceInfo> used;
 	bool cacheLiveResources = false;
+	bool crossEncoderLiveCache = false;
 	bool batchLiveResources = false;
+	bool batchArgumentHeaps = false;
+	uint32_t heapBatchThreshold = 16;
+	bool traceArgumentHeaps = false;
 	bool traceLiveCache = false;
 	uint64_t encoderGeneration = 1;
 	uint64_t liveLookupCount = 0, liveReuseCount = 0;

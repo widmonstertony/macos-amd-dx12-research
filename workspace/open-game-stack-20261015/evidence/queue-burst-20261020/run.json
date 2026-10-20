@@ -1,0 +1,44 @@
+{
+  "candidateSHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "results": {
+    "default": {
+      "exitCode": 0,
+      "elapsedSeconds": 2.9115877209987957,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          0,
+          0,
+          0
+        ],
+        "rounds": 2048,
+        "checkedWords": 8388608,
+        "mismatches": 0,
+        "totalMilliseconds": 866.62,
+        "slowestRoundMilliseconds": 4.19542
+      },
+      "MetalValidationEnabled": true
+    },
+    "specialized": {
+      "exitCode": 0,
+      "elapsedSeconds": 0.9330624220019672,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          3,
+          2,
+          0
+        ],
+        "rounds": 2048,
+        "checkedWords": 8388608,
+        "mismatches": 0,
+        "totalMilliseconds": 837.548,
+        "slowestRoundMilliseconds": 4.01217
+      },
+      "MetalValidationEnabled": true
+    }
+  },
+  "gamePlayable": false,
+  "forcedGPUHang": false,
+  "scope": "2048 ordered GPU fill/copy chains, sixteen rounds queued before each host readback. Every signal has an explicit predecessor wait; not an intentionally cyclic workload."
+}

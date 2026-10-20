@@ -675,6 +675,30 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/queue-burst-20261020/game-failure-analysis.json",
+      "bytes": 7296,
+      "sha256": "7555ca3c77fd39865a355f2837e5d926aaf55cae826ef2b80aa952c121dc7354",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/queue-burst-20261020/queue_burst_probe.cpp",
+      "bytes": 7996,
+      "sha256": "a8f7154dcacd2f5873cddf9a21fcbc815d982539165cc4ee45dfe55e85f939fa",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/queue-burst-20261020/run.json",
+      "bytes": 1194,
+      "sha256": "4566e03090426ad5159cb08631ec513aff26e9b845dba9a07d05adf7fa796263",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/queue-burst-20261020/state.json",
+      "bytes": 976,
+      "sha256": "bb0a792cb37796966cd6d6c26b9443c03f7621c74900db04158543807336ac9b",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/queue-dependencies-20261020/cache-regression.json",
       "bytes": 5638,
       "sha256": "a06786d48d58d81da4addde6480a1ad63e32cee18a82a9b88a7a168dc9cd5344",
@@ -33420,6 +33444,12 @@
       "path": "open-game-stack-20261015/tools/audit_winemac_abi.py",
       "bytes": 3386,
       "sha256": "492f83daaff5ed679602ca438c158119716f361136e6298a50432508d53b038a",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/build_queue_burst_probe.py",
+      "bytes": 3091,
+      "sha256": "2048c4b38521fb734c1018324df5bb552c48f70f9d5f0b23a11820bbdcd0fd13",
       "executable": false
     },
     {

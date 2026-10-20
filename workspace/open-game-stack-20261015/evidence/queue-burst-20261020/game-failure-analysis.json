@@ -1,0 +1,245 @@
+[
+  {
+    "trace": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-dependency-trial-preview-20261020/msl/trace-gpu-timeout-66635-6.json",
+    "errorCode": 2,
+    "queueFamily": 2,
+    "failedSubmission": 185386,
+    "timeUTC": "2026-10-20T07:41:16.638146+00:00",
+    "pendingRecords": 24,
+    "explicitWaits": [
+      {
+        "submission": 185399,
+        "queueFamily": 2,
+        "event": "0x7fa7e6f5e720",
+        "requested": 108039,
+        "observed": 108030,
+        "earliestValueProducer": 185397,
+        "producerWaits": []
+      },
+      {
+        "submission": 185388,
+        "queueFamily": 0,
+        "event": "0x7fa736f1ebe0",
+        "requested": 15418,
+        "observed": 15417,
+        "earliestValueProducer": 185386,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7e6f5e720",
+            "encodeTime": 814174871.63575,
+            "requestedValue": 108032,
+            "kind": "timeline",
+            "valueAtEncode": 108030,
+            "valueAtObservation": 108030
+          }
+        ]
+      },
+      {
+        "submission": 185404,
+        "queueFamily": 0,
+        "event": "0x7fa7f3005b10",
+        "requested": 967,
+        "observed": 966,
+        "earliestValueProducer": 185403,
+        "producerWaits": []
+      },
+      {
+        "submission": 185406,
+        "queueFamily": 0,
+        "event": "0x7fa716fdab40",
+        "requested": 4612,
+        "observed": 4611,
+        "earliestValueProducer": 185404,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7f3005b10",
+            "encodeTime": 814174871.669704,
+            "requestedValue": 967,
+            "kind": "binary",
+            "valueAtEncode": 966,
+            "valueAtObservation": 966
+          }
+        ]
+      },
+      {
+        "submission": 185392,
+        "queueFamily": 0,
+        "event": "0x7fa7e7338860",
+        "requested": 967,
+        "observed": 966,
+        "earliestValueProducer": 185391,
+        "producerWaits": []
+      },
+      {
+        "submission": 185400,
+        "queueFamily": 0,
+        "event": "0x7fa736f1ebe0",
+        "requested": 15419,
+        "observed": 15417,
+        "earliestValueProducer": 185399,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7e6f5e720",
+            "encodeTime": 814174871.657475,
+            "requestedValue": 108039,
+            "kind": "timeline",
+            "valueAtEncode": 108030,
+            "valueAtObservation": 108030
+          }
+        ]
+      },
+      {
+        "submission": 185386,
+        "queueFamily": 2,
+        "event": "0x7fa7e6f5e720",
+        "requested": 108032,
+        "observed": 108030,
+        "earliestValueProducer": 185385,
+        "producerWaits": []
+      },
+      {
+        "submission": 185394,
+        "queueFamily": 0,
+        "event": "0x7fa717706db0",
+        "requested": 4611,
+        "observed": 4610,
+        "earliestValueProducer": 185392,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7e7338860",
+            "encodeTime": 814174871.650337,
+            "requestedValue": 967,
+            "kind": "binary",
+            "valueAtEncode": 966,
+            "valueAtObservation": 966
+          }
+        ]
+      }
+    ],
+    "queueCommitOrderKnown": false,
+    "nativeQueueIdentityKnown": false,
+    "explicitDependencyCycleProven": false,
+    "limit": "Creation/submission IDs are not native enqueue/commit ordering. First exact-value producers have no recorded semaphore waits; their GPU execution status is not in this snapshot. Timeout of a waiting CB does not identify an offending shader."
+  },
+  {
+    "trace": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-dependency-trial-preview-20261020/msl/trace-gpu-timeout-66635-7.json",
+    "errorCode": 2,
+    "queueFamily": 0,
+    "failedSubmission": 185388,
+    "timeUTC": "2026-10-20T07:41:16.652655+00:00",
+    "pendingRecords": 20,
+    "explicitWaits": [
+      {
+        "submission": 185399,
+        "queueFamily": 2,
+        "event": "0x7fa7e6f5e720",
+        "requested": 108039,
+        "observed": 108035,
+        "earliestValueProducer": 185397,
+        "producerWaits": []
+      },
+      {
+        "submission": 185388,
+        "queueFamily": 0,
+        "event": "0x7fa736f1ebe0",
+        "requested": 15418,
+        "observed": 15417,
+        "earliestValueProducer": 185399,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7e6f5e720",
+            "encodeTime": 814174871.657475,
+            "requestedValue": 108039,
+            "kind": "timeline",
+            "valueAtEncode": 108030,
+            "valueAtObservation": 108035
+          }
+        ]
+      },
+      {
+        "submission": 185404,
+        "queueFamily": 0,
+        "event": "0x7fa7f3005b10",
+        "requested": 967,
+        "observed": 966,
+        "earliestValueProducer": 185403,
+        "producerWaits": []
+      },
+      {
+        "submission": 185406,
+        "queueFamily": 0,
+        "event": "0x7fa716fdab40",
+        "requested": 4612,
+        "observed": 4611,
+        "earliestValueProducer": 185404,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7f3005b10",
+            "encodeTime": 814174871.669704,
+            "requestedValue": 967,
+            "kind": "binary",
+            "valueAtEncode": 966,
+            "valueAtObservation": 966
+          }
+        ]
+      },
+      {
+        "submission": 185392,
+        "queueFamily": 0,
+        "event": "0x7fa7e7338860",
+        "requested": 967,
+        "observed": 966,
+        "earliestValueProducer": 185391,
+        "producerWaits": []
+      },
+      {
+        "submission": 185400,
+        "queueFamily": 0,
+        "event": "0x7fa736f1ebe0",
+        "requested": 15419,
+        "observed": 15417,
+        "earliestValueProducer": 185399,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7e6f5e720",
+            "encodeTime": 814174871.657475,
+            "requestedValue": 108039,
+            "kind": "timeline",
+            "valueAtEncode": 108030,
+            "valueAtObservation": 108035
+          }
+        ]
+      },
+      {
+        "submission": 185394,
+        "queueFamily": 0,
+        "event": "0x7fa717706db0",
+        "requested": 4611,
+        "observed": 4610,
+        "earliestValueProducer": 185392,
+        "producerWaits": [
+          {
+            "operation": "wait",
+            "event": "0x7fa7e7338860",
+            "encodeTime": 814174871.650337,
+            "requestedValue": 967,
+            "kind": "binary",
+            "valueAtEncode": 966,
+            "valueAtObservation": 966
+          }
+        ]
+      }
+    ],
+    "queueCommitOrderKnown": false,
+    "nativeQueueIdentityKnown": false,
+    "explicitDependencyCycleProven": false,
+    "limit": "Creation/submission IDs are not native enqueue/commit ordering. First exact-value producers have no recorded semaphore waits; their GPU execution status is not in this snapshot. Timeout of a waiting CB does not identify an offending shader."
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "timeUTC": "2026-10-20T08:01:36.029625+00:00",
+  "gamePID": 66635,
+  "gameRunning": false,
+  "gamePlayable": false,
+  "newestGameTrialFailed": true,
+  "gameFailureUTC": "2026-10-20T07:41:16.638146+00:00",
+  "GPUTimeoutCount": 2,
+  "errorCode": 2,
+  "failureAnalysis": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-burst-20261020/game-failure-analysis.json",
+  "newGPUQueueBurstRegression": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-burst-20261020/run.json",
+  "burstModesPassed": 2,
+  "burstCheckedWords": 16777216,
+  "gameFixProven": false,
+  "explicitDependencyCycleProven": false,
+  "next": "Record native enqueue/commit/scheduled ordering and producer command-buffer work for the first stalled graphics timeline signal. Current snapshots have creation order only; do not modify synchronization semantics or attribute a shader without this evidence."
+}

@@ -1,0 +1,28 @@
+{
+  "timeUTC": "2026-10-20T16:25:22.186476+00:00",
+  "candidateSHA256": "e895710029a1e0507eeb2eddd72520b9074d3d348840e70de299ce876a0df0af",
+  "native": [
+    {
+      "case": "fresh-final-geometry",
+      "freshFunctions": 24,
+      "checkedPixels": 512,
+      "mismatches": 0,
+      "firstPassFailures": 0,
+      "retries": 0,
+      "allFunctionsHaveActualCompileProvenance": true
+    },
+    {
+      "case": "fresh-final-specialization",
+      "freshFunctions": 24,
+      "checkedPixels": 512,
+      "mismatches": 0,
+      "firstPassFailures": 0,
+      "retries": 0,
+      "allFunctionsHaveActualCompileProvenance": true
+    }
+  ],
+  "originalWinePassed": true,
+  "originalWineEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T162349Z/run.json",
+  "gameFirstPassFailureFixed": false,
+  "gamePlayable": false
+}

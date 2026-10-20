@@ -1,0 +1,30 @@
+[
+  {
+    "mode": "mesh-only",
+    "exitCode": 0,
+    "elapsedSeconds": 0.7589090809924528,
+    "requests": 32,
+    "failures": 0
+  },
+  {
+    "mode": "mixed",
+    "exitCode": 0,
+    "elapsedSeconds": 0.5560059279960115,
+    "requests": 128,
+    "failures": 0
+  },
+  {
+    "mode": "all-gated",
+    "exitCode": 0,
+    "elapsedSeconds": 0.1310857109929202,
+    "requests": 128,
+    "failures": 0
+  },
+  {
+    "mode": "synchronous",
+    "exitCode": 0,
+    "elapsedSeconds": 0.13054224700317718,
+    "requests": 128,
+    "failures": 0
+  }
+]

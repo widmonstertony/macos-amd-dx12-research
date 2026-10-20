@@ -1,0 +1,244 @@
+{
+  "timeUTC": "2026-10-20T16:31:22.619402+00:00",
+  "candidateSHA256": "e895710029a1e0507eeb2eddd72520b9074d3d348840e70de299ce876a0df0af",
+  "gamePID": 13176,
+  "normalSteamLaunchVerified": true,
+  "failedMeshReplayEnabled": false,
+  "userError": "Out of video memory trying to allocate a rendering resource",
+  "gameExited": true,
+  "firstPassCompilationPassed": false,
+  "gamePlayable": false,
+  "pipelineFailures": [
+    {
+      "file": "trace-pipeline-failure-13176-491.json",
+      "kind": "mesh",
+      "error": "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+      "errorCode": 2,
+      "object": {
+        "label": "443695132d90c29a:e86f5a3cf9a10f49:0",
+        "identity": "0x7fd23e26a8e0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "4ec749a8a036eaf709b67b2ee9016f3a89b0f2971004841b1d8bc699b8303b12",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 18637,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 8
+      },
+      "mesh": {
+        "label": "d3d6d9d55af0b72a:bf07c30f5f1ae731:3",
+        "identity": "0x7fd2ec0ce7c0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "278ed062a4e6e0e7fffb318976a3f6cafc285c32becc8e0c950c710c29e66eb2",
+          "languageVersion": 262144,
+          "preserveInvariance": true,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 55846,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 7
+      },
+      "fragment": {
+        "label": "6ef12e286dd56f9a:51dbca98c678c8fc:4",
+        "identity": "0x7fd23e515120",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "fb2e6ec6bb8cd99377077215c7d108cea28ee000eb92a79b9c8936d6f705b6fa",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 2369,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 2
+      }
+    },
+    {
+      "file": "trace-pipeline-failure-13176-489.json",
+      "kind": "mesh",
+      "error": "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+      "errorCode": 2,
+      "object": {
+        "label": "443695132d90c29a:e86f5a3cf9a10f49:0",
+        "identity": "0x7fd23e26a8e0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "4ec749a8a036eaf709b67b2ee9016f3a89b0f2971004841b1d8bc699b8303b12",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 18637,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 8
+      },
+      "mesh": {
+        "label": "d3d6d9d55af0b72a:bf07c30f5f1ae731:3",
+        "identity": "0x7fd2ec0ce7c0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "278ed062a4e6e0e7fffb318976a3f6cafc285c32becc8e0c950c710c29e66eb2",
+          "languageVersion": 262144,
+          "preserveInvariance": true,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 55846,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 7
+      },
+      "fragment": {
+        "label": "6f478c186d156efd:628cbb140e5fc43c:4",
+        "identity": "0x7fd2ff230b00",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "440563483ad5676cb73922dcaa0c38070a51126f9fcb410f456465653a6abef2",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 2369,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 2
+      }
+    },
+    {
+      "file": "trace-pipeline-failure-13176-488.json",
+      "kind": "mesh",
+      "error": "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+      "errorCode": 2,
+      "object": {
+        "label": "443695132d90c29a:e86f5a3cf9a10f49:0",
+        "identity": "0x7fd23e26a8e0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "4ec749a8a036eaf709b67b2ee9016f3a89b0f2971004841b1d8bc699b8303b12",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 18637,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 8
+      },
+      "mesh": {
+        "label": "d3d6d9d55af0b72a:bf07c30f5f1ae731:3",
+        "identity": "0x7fd2ec0ce7c0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "278ed062a4e6e0e7fffb318976a3f6cafc285c32becc8e0c950c710c29e66eb2",
+          "languageVersion": 262144,
+          "preserveInvariance": true,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 55846,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 7
+      },
+      "fragment": {
+        "label": "6ef12e286dd56f9a:51dbca98c678c8fc:4",
+        "identity": "0x7fd23e515120",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "fb2e6ec6bb8cd99377077215c7d108cea28ee000eb92a79b9c8936d6f705b6fa",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 2369,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 2
+      }
+    },
+    {
+      "file": "trace-pipeline-failure-13176-492.json",
+      "kind": "mesh",
+      "error": "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+      "errorCode": 2,
+      "object": {
+        "label": "443695132d90c29a:e86f5a3cf9a10f49:0",
+        "identity": "0x7fd23e26a8e0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "4ec749a8a036eaf709b67b2ee9016f3a89b0f2971004841b1d8bc699b8303b12",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 18637,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 8
+      },
+      "mesh": {
+        "label": "d3d6d9d55af0b72a:bf07c30f5f1ae731:3",
+        "identity": "0x7fd2ec0ce7c0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "278ed062a4e6e0e7fffb318976a3f6cafc285c32becc8e0c950c710c29e66eb2",
+          "languageVersion": 262144,
+          "preserveInvariance": true,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 55846,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 7
+      },
+      "fragment": {
+        "label": "6a18efc01914f966:324fb66845da6afc:4",
+        "identity": "0x7fd23e0b95b0",
+        "compileProvenance": {
+          "optimizationLevel": 0,
+          "mathMode": 2,
+          "sourceSHA256": "348c261c42b9846429ed158f742ab60b3ef1ef06e1cbf7dea9e7f726fc5d1510",
+          "languageVersion": 262144,
+          "preserveInvariance": false,
+          "fastMathEnabled": true,
+          "preprocessorMacros": {},
+          "sourceBytes": 2369,
+          "mathFloatingPointFunctions": 0
+        },
+        "name": "main0",
+        "type": 2
+      }
+    }
+  ],
+  "GPUTimeouts": 0,
+  "computeFailures": 0,
+  "inference": "Fresh native libraries with unchanged fast math did not resolve the runtime mesh interface link failure. No proof of actual VRAM exhaustion. No successful-error substitution or fallback used."
+}

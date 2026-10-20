@@ -1,0 +1,1510 @@
+{
+  "timeLocal": "2026-10-20T09:33:35.220326-07:00",
+  "candidateSHA256": "b9ceea9fa85b2bc033f6f3046fbf46c517d691fa818fa3c50ccaeadebc787699",
+  "proxySHA256": "90dcc6a22d98841d3fa00d1a0651271e7ec97925e341cc3373974fb7d48dac1f",
+  "liveGameLibrariesChanged": false,
+  "gpuTimeoutTrace": true,
+  "specializedQueues": true,
+  "results": {
+    "compute-seed": {
+      "pid": 14022,
+      "exitCode": 0,
+      "timedOut": false,
+      "actualGPUOutputPassed": true,
+      "privateCandidateMapped": true,
+      "privateProxyMapped": true,
+      "assetGuardReady": true,
+      "sharedGameCandidateMapped": false,
+      "nativeCacheBytes": 0,
+      "computeArchiveRecords": [
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.8454,
+          "published": true,
+          "requireHit": false,
+          "request": 30,
+          "key": "mvk-cs2-3bc138a6abbeac91f5f27daa0637c0af4b5454d155a9c7769d7fda30935a56ea",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.023393
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 17.417013,
+          "published": true,
+          "requireHit": false,
+          "request": 21,
+          "key": "mvk-cs2-cb6d45ccf1d687f5bedb309cde847f9d0cf502398527240a833adad3db8154a1",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.022051
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 24.002641,
+          "published": true,
+          "requireHit": false,
+          "request": 27,
+          "key": "mvk-cs2-b8066271f8fd94acc5884b2308c887a0653bda6edcbdf9e9df8fe3968e5f184a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.019363
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.855386,
+          "published": true,
+          "requireHit": false,
+          "request": 4,
+          "key": "mvk-cs2-4dd64087a497b244cd5a3b082fa1fe3b7a46fa68fe2003350678a2476d581e9a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.019741
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 19.96589,
+          "published": true,
+          "requireHit": false,
+          "request": 19,
+          "key": "mvk-cs2-f1f79d809770f99a53554fc308aed80a6314cde04f30fa7ccfd5834eaad1f961",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.020513
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 20.640828,
+          "published": true,
+          "requireHit": false,
+          "request": 7,
+          "key": "mvk-cs2-03ee36c3e5488940f36711ea8986db678204d2eaf21830152dd2fbb6678f7d46",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.018505
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 20.656291,
+          "published": true,
+          "requireHit": false,
+          "request": 17,
+          "key": "mvk-cs2-d9c22cb6954bc8ef903496b9988b3c0c7bf1b41b3afa3713094e7fcb8383287c",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.018579
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 19.662917,
+          "published": true,
+          "requireHit": false,
+          "request": 2,
+          "key": "mvk-cs2-c1e836d20d4fb539c438fade596661000bc92b8e1fee7004e2ff13ed5d4baf57",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.04831
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.116795,
+          "published": true,
+          "requireHit": false,
+          "request": 11,
+          "key": "mvk-cs2-5894433ef64dfba7dfb6835fe406422cb84d511c66fdc281d19e0c3c6ec8dadd",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.018247
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 23.559669,
+          "published": true,
+          "requireHit": false,
+          "request": 9,
+          "key": "mvk-cs2-4d47f72849098b351e6b56d9ed96d9b417ee5b217f6e72d76019054edfef94d7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.019633
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.740057,
+          "published": true,
+          "requireHit": false,
+          "request": 22,
+          "key": "mvk-cs2-5135e80f4d9cf60ff78a804f74ad24fca234e03abd1ad724c110d66d310d3821",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.024864
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 22.822668,
+          "published": true,
+          "requireHit": false,
+          "request": 26,
+          "key": "mvk-cs2-b1939da88dc92cfabbaac74d86acda8858e9d786585ec3468668cc48310e7c6f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.033271
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 22.577045,
+          "published": true,
+          "requireHit": false,
+          "request": 24,
+          "key": "mvk-cs2-fbce315121e45ff613a3e05f2c30a95feb12e210b173173f4aca7914f5c18cfc",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.026368
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.654738,
+          "published": true,
+          "requireHit": false,
+          "request": 31,
+          "key": "mvk-cs2-3b2f4c07f8c869b6bca2995471e3cab9ca3cc5590abaf35690157526635c1382",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.018233
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.229198,
+          "published": true,
+          "requireHit": false,
+          "request": 16,
+          "key": "mvk-cs2-8c4413335b8893f28ea83dd5a19cb9d2d0a0508a71fafdc1be3102f73d6dfe3f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.02298
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 21.138134,
+          "published": true,
+          "requireHit": false,
+          "request": 1,
+          "key": "mvk-cs2-0cc41e15bf21066ca65383b27e60ccd1b18566bea5206a950c275b57b216253d",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.017808
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 17.911112,
+          "published": true,
+          "requireHit": false,
+          "request": 12,
+          "key": "mvk-cs2-a75281313b682abc52462d3fde78c0247b737df0e3f38f6d6fa61631c0c0ffac",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.018893
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 19.556071,
+          "published": true,
+          "requireHit": false,
+          "request": 14,
+          "key": "mvk-cs2-7802e8908bd9d95f40c9220fb903734d71771e2e59142a096f02e08935505244",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.019453
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 19.376172,
+          "published": true,
+          "requireHit": false,
+          "request": 6,
+          "key": "mvk-cs2-d3ab9d09362696a2a96d0040700b8b47ea3a0319823d88877a7219b5615971ed",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.019272
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 17.62354,
+          "published": true,
+          "requireHit": false,
+          "request": 25,
+          "key": "mvk-cs2-53a705125b75fc9cfc1d67aba047f15486f6f20ac9be8935960a5ea6346f57ab",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.023688
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.737428,
+          "published": true,
+          "requireHit": false,
+          "request": 23,
+          "key": "mvk-cs2-3971c9fca3415b29dcac46690612e36540b99b5de7567e3eb617f1e0d5db5d62",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.02226
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.521875,
+          "published": true,
+          "requireHit": false,
+          "request": 32,
+          "key": "mvk-cs2-ac0b4bcf2312dc51f5a1384cfebe59d2d774adbc980dbf14066410205baec4f1",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.018974
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 24.218412,
+          "published": true,
+          "requireHit": false,
+          "request": 13,
+          "key": "mvk-cs2-5fee8f13cdbf166fe35ca239e944328340f86018feab101f17339fce3dcfd315",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.019355
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 89.318482,
+          "published": true,
+          "requireHit": false,
+          "request": 0,
+          "key": "mvk-cs2-6c3d406c104d14ab3fc701bc368b636f14c4c0488764311f14efe1a5d210e55b",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.021739
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 22.607353,
+          "published": true,
+          "requireHit": false,
+          "request": 15,
+          "key": "mvk-cs2-3618a99797273aa304fa14f0a24491070b645d92193392ee35887cff10370fb5",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.01916
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 20.155315,
+          "published": true,
+          "requireHit": false,
+          "request": 5,
+          "key": "mvk-cs2-f42783bc4ec985ff2cc3b9aa0d64df39ce8b547e2a3b98aff106383ca6cd3fd9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.020133
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 19.304259,
+          "published": true,
+          "requireHit": false,
+          "request": 29,
+          "key": "mvk-cs2-e9005464a625674a3f64e50d84c61a143205bc1f182e18fccf00d88c93c6e5ff",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.024882
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 19.057174,
+          "published": true,
+          "requireHit": false,
+          "request": 28,
+          "key": "mvk-cs2-2db73b5db7ae0331ee5a4655326acb2adaeb478f6e4951f40b1bc7ffe9ea714a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.02284
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 16.722375,
+          "published": true,
+          "requireHit": false,
+          "request": 20,
+          "key": "mvk-cs2-658d87884aa0aeab5816ea66b57a7155aeb33da7155d94335c8cfc0ee7ad64f7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.021431
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.181151,
+          "published": true,
+          "requireHit": false,
+          "request": 8,
+          "key": "mvk-cs2-49063ef494fe95eb289f0effd18076492c3cc11fa7dc6872422539e740131327",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.018989
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 18.016586,
+          "published": true,
+          "requireHit": false,
+          "request": 10,
+          "key": "mvk-cs2-14a606a47206cfa2dcc5d4164a1626fa2485d22ef69a40d5cbc35b072a1e3cc9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.01891
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 23.986669,
+          "published": true,
+          "requireHit": false,
+          "request": 3,
+          "key": "mvk-cs2-1055b8fab265b983cb8908478710c02d1d783542e7926a370ef1a4b7ad31da48",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.028629
+        },
+        {
+          "loaded": false,
+          "postCompilePublishMilliseconds": 16.116589,
+          "published": true,
+          "requireHit": false,
+          "request": 18,
+          "key": "mvk-cs2-10930028f675c565a4a22b680063603a335a85d76a524cd9742b9569f9d5ec36",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.023389
+        }
+      ],
+      "nativeArchiveHitVerified": false,
+      "passed": true
+    },
+    "compute-load": {
+      "pid": 14052,
+      "exitCode": 0,
+      "timedOut": false,
+      "actualGPUOutputPassed": true,
+      "privateCandidateMapped": true,
+      "privateProxyMapped": true,
+      "assetGuardReady": true,
+      "sharedGameCandidateMapped": false,
+      "nativeCacheBytes": 0,
+      "computeArchiveRecords": [
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003425,
+          "published": false,
+          "requireHit": true,
+          "request": 16,
+          "key": "mvk-cs2-8c4413335b8893f28ea83dd5a19cb9d2d0a0508a71fafdc1be3102f73d6dfe3f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.438035
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003582,
+          "published": false,
+          "requireHit": true,
+          "request": 12,
+          "key": "mvk-cs2-a75281313b682abc52462d3fde78c0247b737df0e3f38f6d6fa61631c0c0ffac",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.598119
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003265,
+          "published": false,
+          "requireHit": true,
+          "request": 14,
+          "key": "mvk-cs2-7802e8908bd9d95f40c9220fb903734d71771e2e59142a096f02e08935505244",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.50406
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005417,
+          "published": false,
+          "requireHit": true,
+          "request": 6,
+          "key": "mvk-cs2-d3ab9d09362696a2a96d0040700b8b47ea3a0319823d88877a7219b5615971ed",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.458365
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00623,
+          "published": false,
+          "requireHit": true,
+          "request": 22,
+          "key": "mvk-cs2-5135e80f4d9cf60ff78a804f74ad24fca234e03abd1ad724c110d66d310d3821",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.486316
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00585,
+          "published": false,
+          "requireHit": true,
+          "request": 26,
+          "key": "mvk-cs2-b1939da88dc92cfabbaac74d86acda8858e9d786585ec3468668cc48310e7c6f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.486027
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.009735,
+          "published": false,
+          "requireHit": true,
+          "request": 0,
+          "key": "mvk-cs2-6c3d406c104d14ab3fc701bc368b636f14c4c0488764311f14efe1a5d210e55b",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.700379
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00317,
+          "published": false,
+          "requireHit": true,
+          "request": 24,
+          "key": "mvk-cs2-fbce315121e45ff613a3e05f2c30a95feb12e210b173173f4aca7914f5c18cfc",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.488519
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003984,
+          "published": false,
+          "requireHit": true,
+          "request": 31,
+          "key": "mvk-cs2-3b2f4c07f8c869b6bca2995471e3cab9ca3cc5590abaf35690157526635c1382",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.554899
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006266,
+          "published": false,
+          "requireHit": true,
+          "request": 19,
+          "key": "mvk-cs2-f1f79d809770f99a53554fc308aed80a6314cde04f30fa7ccfd5834eaad1f961",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.433205
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00512,
+          "published": false,
+          "requireHit": true,
+          "request": 7,
+          "key": "mvk-cs2-03ee36c3e5488940f36711ea8986db678204d2eaf21830152dd2fbb6678f7d46",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.438918
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004484,
+          "published": false,
+          "requireHit": true,
+          "request": 17,
+          "key": "mvk-cs2-d9c22cb6954bc8ef903496b9988b3c0c7bf1b41b3afa3713094e7fcb8383287c",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.422878
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005534,
+          "published": false,
+          "requireHit": true,
+          "request": 11,
+          "key": "mvk-cs2-5894433ef64dfba7dfb6835fe406422cb84d511c66fdc281d19e0c3c6ec8dadd",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.532938
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003345,
+          "published": false,
+          "requireHit": true,
+          "request": 9,
+          "key": "mvk-cs2-4d47f72849098b351e6b56d9ed96d9b417ee5b217f6e72d76019054edfef94d7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.454744
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006047,
+          "published": false,
+          "requireHit": true,
+          "request": 3,
+          "key": "mvk-cs2-1055b8fab265b983cb8908478710c02d1d783542e7926a370ef1a4b7ad31da48",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.495496
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003719,
+          "published": false,
+          "requireHit": true,
+          "request": 30,
+          "key": "mvk-cs2-3bc138a6abbeac91f5f27daa0637c0af4b5454d155a9c7769d7fda30935a56ea",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.512692
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00579,
+          "published": false,
+          "requireHit": true,
+          "request": 21,
+          "key": "mvk-cs2-cb6d45ccf1d687f5bedb309cde847f9d0cf502398527240a833adad3db8154a1",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.632034
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003549,
+          "published": false,
+          "requireHit": true,
+          "request": 27,
+          "key": "mvk-cs2-b8066271f8fd94acc5884b2308c887a0653bda6edcbdf9e9df8fe3968e5f184a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.884487
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005241,
+          "published": false,
+          "requireHit": true,
+          "request": 8,
+          "key": "mvk-cs2-49063ef494fe95eb289f0effd18076492c3cc11fa7dc6872422539e740131327",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.440877
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003645,
+          "published": false,
+          "requireHit": true,
+          "request": 10,
+          "key": "mvk-cs2-14a606a47206cfa2dcc5d4164a1626fa2485d22ef69a40d5cbc35b072a1e3cc9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.44965
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005573,
+          "published": false,
+          "requireHit": true,
+          "request": 18,
+          "key": "mvk-cs2-10930028f675c565a4a22b680063603a335a85d76a524cd9742b9569f9d5ec36",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.498288
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.008066,
+          "published": false,
+          "requireHit": true,
+          "request": 29,
+          "key": "mvk-cs2-e9005464a625674a3f64e50d84c61a143205bc1f182e18fccf00d88c93c6e5ff",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.808575
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005109,
+          "published": false,
+          "requireHit": true,
+          "request": 2,
+          "key": "mvk-cs2-c1e836d20d4fb539c438fade596661000bc92b8e1fee7004e2ff13ed5d4baf57",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.490469
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003303,
+          "published": false,
+          "requireHit": true,
+          "request": 28,
+          "key": "mvk-cs2-2db73b5db7ae0331ee5a4655326acb2adaeb478f6e4951f40b1bc7ffe9ea714a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.57148
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003291,
+          "published": false,
+          "requireHit": true,
+          "request": 4,
+          "key": "mvk-cs2-4dd64087a497b244cd5a3b082fa1fe3b7a46fa68fe2003350678a2476d581e9a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.466069
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006026,
+          "published": false,
+          "requireHit": true,
+          "request": 20,
+          "key": "mvk-cs2-658d87884aa0aeab5816ea66b57a7155aeb33da7155d94335c8cfc0ee7ad64f7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.829536
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005846,
+          "published": false,
+          "requireHit": true,
+          "request": 13,
+          "key": "mvk-cs2-5fee8f13cdbf166fe35ca239e944328340f86018feab101f17339fce3dcfd315",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.49631
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004492,
+          "published": false,
+          "requireHit": true,
+          "request": 15,
+          "key": "mvk-cs2-3618a99797273aa304fa14f0a24491070b645d92193392ee35887cff10370fb5",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.575503
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005238,
+          "published": false,
+          "requireHit": true,
+          "request": 5,
+          "key": "mvk-cs2-f42783bc4ec985ff2cc3b9aa0d64df39ce8b547e2a3b98aff106383ca6cd3fd9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.45008
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006539,
+          "published": false,
+          "requireHit": true,
+          "request": 25,
+          "key": "mvk-cs2-53a705125b75fc9cfc1d67aba047f15486f6f20ac9be8935960a5ea6346f57ab",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.648393
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005431,
+          "published": false,
+          "requireHit": true,
+          "request": 23,
+          "key": "mvk-cs2-3971c9fca3415b29dcac46690612e36540b99b5de7567e3eb617f1e0d5db5d62",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.449344
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003541,
+          "published": false,
+          "requireHit": true,
+          "request": 32,
+          "key": "mvk-cs2-ac0b4bcf2312dc51f5a1384cfebe59d2d774adbc980dbf14066410205baec4f1",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.53636
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005751,
+          "published": false,
+          "requireHit": true,
+          "request": 1,
+          "key": "mvk-cs2-0cc41e15bf21066ca65383b27e60ccd1b18566bea5206a950c275b57b216253d",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.490431
+        }
+      ],
+      "nativeArchiveHitVerified": true,
+      "passed": true
+    },
+    "present-seed": {
+      "pid": 14053,
+      "exitCode": 0,
+      "timedOut": false,
+      "actualGPUOutputPassed": true,
+      "privateCandidateMapped": true,
+      "privateProxyMapped": true,
+      "assetGuardReady": true,
+      "sharedGameCandidateMapped": false,
+      "nativeCacheBytes": 0,
+      "computeArchiveRecords": [
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003511,
+          "published": false,
+          "requireHit": false,
+          "request": 24,
+          "key": "mvk-cs2-fbce315121e45ff613a3e05f2c30a95feb12e210b173173f4aca7914f5c18cfc",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.561763
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005632,
+          "published": false,
+          "requireHit": false,
+          "request": 31,
+          "key": "mvk-cs2-3b2f4c07f8c869b6bca2995471e3cab9ca3cc5590abaf35690157526635c1382",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.833115
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004049,
+          "published": false,
+          "requireHit": false,
+          "request": 22,
+          "key": "mvk-cs2-5135e80f4d9cf60ff78a804f74ad24fca234e03abd1ad724c110d66d310d3821",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.679355
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00737,
+          "published": false,
+          "requireHit": false,
+          "request": 26,
+          "key": "mvk-cs2-b1939da88dc92cfabbaac74d86acda8858e9d786585ec3468668cc48310e7c6f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.818604
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003512,
+          "published": false,
+          "requireHit": false,
+          "request": 14,
+          "key": "mvk-cs2-7802e8908bd9d95f40c9220fb903734d71771e2e59142a096f02e08935505244",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.511969
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00447,
+          "published": false,
+          "requireHit": false,
+          "request": 4,
+          "key": "mvk-cs2-4dd64087a497b244cd5a3b082fa1fe3b7a46fa68fe2003350678a2476d581e9a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.58172
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005539,
+          "published": false,
+          "requireHit": false,
+          "request": 6,
+          "key": "mvk-cs2-d3ab9d09362696a2a96d0040700b8b47ea3a0319823d88877a7219b5615971ed",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.455438
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005389,
+          "published": false,
+          "requireHit": false,
+          "request": 16,
+          "key": "mvk-cs2-8c4413335b8893f28ea83dd5a19cb9d2d0a0508a71fafdc1be3102f73d6dfe3f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.726906
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005944,
+          "published": false,
+          "requireHit": false,
+          "request": 2,
+          "key": "mvk-cs2-c1e836d20d4fb539c438fade596661000bc92b8e1fee7004e2ff13ed5d4baf57",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.697005
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005762,
+          "published": false,
+          "requireHit": false,
+          "request": 12,
+          "key": "mvk-cs2-a75281313b682abc52462d3fde78c0247b737df0e3f38f6d6fa61631c0c0ffac",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.528923
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00525,
+          "published": false,
+          "requireHit": false,
+          "request": 21,
+          "key": "mvk-cs2-cb6d45ccf1d687f5bedb309cde847f9d0cf502398527240a833adad3db8154a1",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.564063
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00419,
+          "published": false,
+          "requireHit": false,
+          "request": 27,
+          "key": "mvk-cs2-b8066271f8fd94acc5884b2308c887a0653bda6edcbdf9e9df8fe3968e5f184a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.882049
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005349,
+          "published": false,
+          "requireHit": false,
+          "request": 30,
+          "key": "mvk-cs2-3bc138a6abbeac91f5f27daa0637c0af4b5454d155a9c7769d7fda30935a56ea",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.48398
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005892,
+          "published": false,
+          "requireHit": false,
+          "request": 17,
+          "key": "mvk-cs2-d9c22cb6954bc8ef903496b9988b3c0c7bf1b41b3afa3713094e7fcb8383287c",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.705318
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00486,
+          "published": false,
+          "requireHit": false,
+          "request": 1,
+          "key": "mvk-cs2-0cc41e15bf21066ca65383b27e60ccd1b18566bea5206a950c275b57b216253d",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.562379
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.018309,
+          "published": false,
+          "requireHit": false,
+          "request": 11,
+          "key": "mvk-cs2-5894433ef64dfba7dfb6835fe406422cb84d511c66fdc281d19e0c3c6ec8dadd",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.749871
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004282,
+          "published": false,
+          "requireHit": false,
+          "request": 9,
+          "key": "mvk-cs2-4d47f72849098b351e6b56d9ed96d9b417ee5b217f6e72d76019054edfef94d7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.491045
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00588,
+          "published": false,
+          "requireHit": false,
+          "request": 19,
+          "key": "mvk-cs2-f1f79d809770f99a53554fc308aed80a6314cde04f30fa7ccfd5834eaad1f961",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.774631
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004151,
+          "published": false,
+          "requireHit": false,
+          "request": 7,
+          "key": "mvk-cs2-03ee36c3e5488940f36711ea8986db678204d2eaf21830152dd2fbb6678f7d46",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.460253
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005221,
+          "published": false,
+          "requireHit": false,
+          "request": 28,
+          "key": "mvk-cs2-2db73b5db7ae0331ee5a4655326acb2adaeb478f6e4951f40b1bc7ffe9ea714a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.543587
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006028,
+          "published": false,
+          "requireHit": false,
+          "request": 20,
+          "key": "mvk-cs2-658d87884aa0aeab5816ea66b57a7155aeb33da7155d94335c8cfc0ee7ad64f7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.503104
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003533,
+          "published": false,
+          "requireHit": false,
+          "request": 29,
+          "key": "mvk-cs2-e9005464a625674a3f64e50d84c61a143205bc1f182e18fccf00d88c93c6e5ff",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.486263
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.007375,
+          "published": false,
+          "requireHit": false,
+          "request": 0,
+          "key": "mvk-cs2-6c3d406c104d14ab3fc701bc368b636f14c4c0488764311f14efe1a5d210e55b",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.719149
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006332,
+          "published": false,
+          "requireHit": false,
+          "request": 10,
+          "key": "mvk-cs2-14a606a47206cfa2dcc5d4164a1626fa2485d22ef69a40d5cbc35b072a1e3cc9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.743001
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006424,
+          "published": false,
+          "requireHit": false,
+          "request": 18,
+          "key": "mvk-cs2-10930028f675c565a4a22b680063603a335a85d76a524cd9742b9569f9d5ec36",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.759022
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00348,
+          "published": false,
+          "requireHit": false,
+          "request": 8,
+          "key": "mvk-cs2-49063ef494fe95eb289f0effd18076492c3cc11fa7dc6872422539e740131327",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.446323
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005585,
+          "published": false,
+          "requireHit": false,
+          "request": 25,
+          "key": "mvk-cs2-53a705125b75fc9cfc1d67aba047f15486f6f20ac9be8935960a5ea6346f57ab",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.517793
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003083,
+          "published": false,
+          "requireHit": false,
+          "request": 23,
+          "key": "mvk-cs2-3971c9fca3415b29dcac46690612e36540b99b5de7567e3eb617f1e0d5db5d62",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.460841
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006015,
+          "published": false,
+          "requireHit": false,
+          "request": 5,
+          "key": "mvk-cs2-f42783bc4ec985ff2cc3b9aa0d64df39ce8b547e2a3b98aff106383ca6cd3fd9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.730214
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006637,
+          "published": false,
+          "requireHit": false,
+          "request": 3,
+          "key": "mvk-cs2-1055b8fab265b983cb8908478710c02d1d783542e7926a370ef1a4b7ad31da48",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.825286
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005611,
+          "published": false,
+          "requireHit": false,
+          "request": 13,
+          "key": "mvk-cs2-5fee8f13cdbf166fe35ca239e944328340f86018feab101f17339fce3dcfd315",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.83679
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005906,
+          "published": false,
+          "requireHit": false,
+          "request": 15,
+          "key": "mvk-cs2-3618a99797273aa304fa14f0a24491070b645d92193392ee35887cff10370fb5",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.801382
+        }
+      ],
+      "nativeArchiveHitVerified": false,
+      "passed": true,
+      "renderArchiveRecords": [
+        {
+          "shard": "rs1-1190dd6cf2545e717baed476242148740c413fd099f0180ebbae83006679f01d.metalar",
+          "loaded": false,
+          "published": true,
+          "strictArchiveHit": false,
+          "requireHit": false,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.022358,
+          "pipelineMilliseconds": 0.41766400000000004,
+          "publishMilliseconds": 27.334309,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-59891904b9b199bf04e7b11a72e8ca817945ae6ab83bdf4171dc22d596152b08.metalar",
+          "loaded": true,
+          "published": false,
+          "strictArchiveHit": true,
+          "requireHit": false,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.780463,
+          "pipelineMilliseconds": 0.3194389999999999,
+          "publishMilliseconds": 0.00751,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-f4acb1fb4cf8850e6a1d98fe9ca2e5b28f4fa3bc2f1e1743bbb36a1a4342e035.metalar",
+          "loaded": true,
+          "published": false,
+          "strictArchiveHit": true,
+          "requireHit": false,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 1.664137,
+          "pipelineMilliseconds": 0.6878400000000002,
+          "publishMilliseconds": 0.007915,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-b27c9664cdbad5850f4a11e49f70b115de433874dce0699c1277d5eeb8481598.metalar",
+          "loaded": false,
+          "published": true,
+          "strictArchiveHit": false,
+          "requireHit": false,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.021887,
+          "pipelineMilliseconds": 0.338527,
+          "publishMilliseconds": 24.610488,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-fc333757f3a676e8b9aa9bf3bb66323c9d339af1fd331aa881963ec82e24d3ba.metalar",
+          "loaded": false,
+          "published": true,
+          "strictArchiveHit": false,
+          "requireHit": false,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.026694,
+          "pipelineMilliseconds": 4.7652,
+          "publishMilliseconds": 100.329604,
+          "archiveErrorCode": 0
+        }
+      ],
+      "strictNativeRenderHitVerified": false
+    },
+    "present-warm": {
+      "pid": 14077,
+      "exitCode": 0,
+      "timedOut": false,
+      "actualGPUOutputPassed": true,
+      "privateCandidateMapped": true,
+      "privateProxyMapped": true,
+      "assetGuardReady": true,
+      "sharedGameCandidateMapped": false,
+      "nativeCacheBytes": 0,
+      "computeArchiveRecords": [
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004017,
+          "published": false,
+          "requireHit": false,
+          "request": 7,
+          "key": "mvk-cs2-03ee36c3e5488940f36711ea8986db678204d2eaf21830152dd2fbb6678f7d46",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.55403
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004054,
+          "published": false,
+          "requireHit": false,
+          "request": 19,
+          "key": "mvk-cs2-f1f79d809770f99a53554fc308aed80a6314cde04f30fa7ccfd5834eaad1f961",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.446714
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00583,
+          "published": false,
+          "requireHit": false,
+          "request": 9,
+          "key": "mvk-cs2-4d47f72849098b351e6b56d9ed96d9b417ee5b217f6e72d76019054edfef94d7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.469966
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005786,
+          "published": false,
+          "requireHit": false,
+          "request": 17,
+          "key": "mvk-cs2-d9c22cb6954bc8ef903496b9988b3c0c7bf1b41b3afa3713094e7fcb8383287c",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.475333
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006149,
+          "published": false,
+          "requireHit": false,
+          "request": 11,
+          "key": "mvk-cs2-5894433ef64dfba7dfb6835fe406422cb84d511c66fdc281d19e0c3c6ec8dadd",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.48303
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005365,
+          "published": false,
+          "requireHit": false,
+          "request": 30,
+          "key": "mvk-cs2-3bc138a6abbeac91f5f27daa0637c0af4b5454d155a9c7769d7fda30935a56ea",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.550545
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005292,
+          "published": false,
+          "requireHit": false,
+          "request": 4,
+          "key": "mvk-cs2-4dd64087a497b244cd5a3b082fa1fe3b7a46fa68fe2003350678a2476d581e9a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.714083
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.00636,
+          "published": false,
+          "requireHit": false,
+          "request": 21,
+          "key": "mvk-cs2-cb6d45ccf1d687f5bedb309cde847f9d0cf502398527240a833adad3db8154a1",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.724556
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005275,
+          "published": false,
+          "requireHit": false,
+          "request": 27,
+          "key": "mvk-cs2-b8066271f8fd94acc5884b2308c887a0653bda6edcbdf9e9df8fe3968e5f184a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 1.021175
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005652,
+          "published": false,
+          "requireHit": false,
+          "request": 2,
+          "key": "mvk-cs2-c1e836d20d4fb539c438fade596661000bc92b8e1fee7004e2ff13ed5d4baf57",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.459337
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.020307,
+          "published": false,
+          "requireHit": false,
+          "request": 16,
+          "key": "mvk-cs2-8c4413335b8893f28ea83dd5a19cb9d2d0a0508a71fafdc1be3102f73d6dfe3f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.511731
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006279,
+          "published": false,
+          "requireHit": false,
+          "request": 12,
+          "key": "mvk-cs2-a75281313b682abc52462d3fde78c0247b737df0e3f38f6d6fa61631c0c0ffac",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.763758
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005858,
+          "published": false,
+          "requireHit": false,
+          "request": 6,
+          "key": "mvk-cs2-d3ab9d09362696a2a96d0040700b8b47ea3a0319823d88877a7219b5615971ed",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.547515
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005618,
+          "published": false,
+          "requireHit": false,
+          "request": 14,
+          "key": "mvk-cs2-7802e8908bd9d95f40c9220fb903734d71771e2e59142a096f02e08935505244",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.492921
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005083,
+          "published": false,
+          "requireHit": false,
+          "request": 22,
+          "key": "mvk-cs2-5135e80f4d9cf60ff78a804f74ad24fca234e03abd1ad724c110d66d310d3821",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.752844
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005352,
+          "published": false,
+          "requireHit": false,
+          "request": 26,
+          "key": "mvk-cs2-b1939da88dc92cfabbaac74d86acda8858e9d786585ec3468668cc48310e7c6f",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.474883
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.004089,
+          "published": false,
+          "requireHit": false,
+          "request": 1,
+          "key": "mvk-cs2-0cc41e15bf21066ca65383b27e60ccd1b18566bea5206a950c275b57b216253d",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.456208
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003717,
+          "published": false,
+          "requireHit": false,
+          "request": 31,
+          "key": "mvk-cs2-3b2f4c07f8c869b6bca2995471e3cab9ca3cc5590abaf35690157526635c1382",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.645861
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005858,
+          "published": false,
+          "requireHit": false,
+          "request": 24,
+          "key": "mvk-cs2-fbce315121e45ff613a3e05f2c30a95feb12e210b173173f4aca7914f5c18cfc",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.491136
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005926,
+          "published": false,
+          "requireHit": false,
+          "request": 13,
+          "key": "mvk-cs2-5fee8f13cdbf166fe35ca239e944328340f86018feab101f17339fce3dcfd315",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.486511
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.014763,
+          "published": false,
+          "requireHit": false,
+          "request": 15,
+          "key": "mvk-cs2-3618a99797273aa304fa14f0a24491070b645d92193392ee35887cff10370fb5",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.510632
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005272,
+          "published": false,
+          "requireHit": false,
+          "request": 5,
+          "key": "mvk-cs2-f42783bc4ec985ff2cc3b9aa0d64df39ce8b547e2a3b98aff106383ca6cd3fd9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.474851
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.008726,
+          "published": false,
+          "requireHit": false,
+          "request": 0,
+          "key": "mvk-cs2-6c3d406c104d14ab3fc701bc368b636f14c4c0488764311f14efe1a5d210e55b",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.732569
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005441,
+          "published": false,
+          "requireHit": false,
+          "request": 25,
+          "key": "mvk-cs2-53a705125b75fc9cfc1d67aba047f15486f6f20ac9be8935960a5ea6346f57ab",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.681199
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.003706,
+          "published": false,
+          "requireHit": false,
+          "request": 23,
+          "key": "mvk-cs2-3971c9fca3415b29dcac46690612e36540b99b5de7567e3eb617f1e0d5db5d62",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.47235
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005929,
+          "published": false,
+          "requireHit": false,
+          "request": 8,
+          "key": "mvk-cs2-49063ef494fe95eb289f0effd18076492c3cc11fa7dc6872422539e740131327",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.452955
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006615,
+          "published": false,
+          "requireHit": false,
+          "request": 10,
+          "key": "mvk-cs2-14a606a47206cfa2dcc5d4164a1626fa2485d22ef69a40d5cbc35b072a1e3cc9",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.489326
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005099,
+          "published": false,
+          "requireHit": false,
+          "request": 18,
+          "key": "mvk-cs2-10930028f675c565a4a22b680063603a335a85d76a524cd9742b9569f9d5ec36",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.495252
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.007443,
+          "published": false,
+          "requireHit": false,
+          "request": 29,
+          "key": "mvk-cs2-e9005464a625674a3f64e50d84c61a143205bc1f182e18fccf00d88c93c6e5ff",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.766454
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005965,
+          "published": false,
+          "requireHit": false,
+          "request": 3,
+          "key": "mvk-cs2-1055b8fab265b983cb8908478710c02d1d783542e7926a370ef1a4b7ad31da48",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.643099
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.005183,
+          "published": false,
+          "requireHit": false,
+          "request": 28,
+          "key": "mvk-cs2-2db73b5db7ae0331ee5a4655326acb2adaeb478f6e4951f40b1bc7ffe9ea714a",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.570946
+        },
+        {
+          "loaded": true,
+          "postCompilePublishMilliseconds": 0.006006,
+          "published": false,
+          "requireHit": false,
+          "request": 20,
+          "key": "mvk-cs2-658d87884aa0aeab5816ea66b57a7155aeb33da7155d94335c8cfc0ee7ad64f7",
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.753748
+        }
+      ],
+      "nativeArchiveHitVerified": false,
+      "passed": true,
+      "renderArchiveRecords": [
+        {
+          "shard": "rs1-f4acb1fb4cf8850e6a1d98fe9ca2e5b28f4fa3bc2f1e1743bbb36a1a4342e035.metalar",
+          "loaded": true,
+          "published": false,
+          "strictArchiveHit": true,
+          "requireHit": true,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.885454,
+          "pipelineMilliseconds": 0.43874900000000006,
+          "publishMilliseconds": 0.007778,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-59891904b9b199bf04e7b11a72e8ca817945ae6ab83bdf4171dc22d596152b08.metalar",
+          "loaded": true,
+          "published": false,
+          "strictArchiveHit": true,
+          "requireHit": true,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 1.398407,
+          "pipelineMilliseconds": 0.45734300000000006,
+          "publishMilliseconds": 0.00927,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-1190dd6cf2545e717baed476242148740c413fd099f0180ebbae83006679f01d.metalar",
+          "loaded": true,
+          "published": false,
+          "strictArchiveHit": true,
+          "requireHit": true,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.896397,
+          "pipelineMilliseconds": 0.348413,
+          "publishMilliseconds": 0.006899,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-fc333757f3a676e8b9aa9bf3bb66323c9d339af1fd331aa881963ec82e24d3ba.metalar",
+          "loaded": true,
+          "published": false,
+          "strictArchiveHit": true,
+          "requireHit": true,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.689711,
+          "pipelineMilliseconds": 0.36004000000000014,
+          "publishMilliseconds": 0.009553,
+          "archiveErrorCode": 0
+        },
+        {
+          "shard": "rs1-b27c9664cdbad5850f4a11e49f70b115de433874dce0699c1277d5eeb8481598.metalar",
+          "loaded": true,
+          "published": false,
+          "strictArchiveHit": true,
+          "requireHit": true,
+          "fallback": false,
+          "pipelineCreated": true,
+          "loadMilliseconds": 0.707397,
+          "pipelineMilliseconds": 0.301941,
+          "publishMilliseconds": 0.008106,
+          "archiveErrorCode": 0
+        }
+      ],
+      "strictNativeRenderHitVerified": true
+    }
+  },
+  "sharedGameCandidateUnchanged": true,
+  "passed": true,
+  "nativeArchiveHitRateMeasured": true,
+  "actualGamePerformanceMeasured": false
+}

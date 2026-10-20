@@ -106,7 +106,7 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 			if (entry != _specializationVariants.end()) {
 				lib = entry->second->_mtlLibrary;
 			} else {
-				MVKShaderLibrary *new_mvklib = new MVKShaderLibrary(_owner, _shaderConversionResultInfo, _compressedMSL, &spec_list);
+				MVKShaderLibrary *new_mvklib = new MVKShaderLibrary(_owner, _shaderConversionResultInfo, _compressedMSL, &spec_list, _conservativeMeshLibrary);
 				_specializationVariants[spec_list] = new_mvklib;
 				lib = new_mvklib->_mtlLibrary;
 			}
@@ -223,10 +223,12 @@ MVKShaderLibrary::MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
 MVKShaderLibrary::MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
 								   const SPIRVToMSLConversionResultInfo& resultInfo,
 								   const MVKCompressor<std::string> compressedMSL,
-								   const vector<pair<uint32_t, MVKShaderMacroValue> >* specializationMacroDef) :
+								   const vector<pair<uint32_t, MVKShaderMacroValue> >* specializationMacroDef,
+                                   bool conservativeMeshLibrary) :
 	MVKBaseDeviceObject(owner->getDevice()),
 	_owner(owner),
-	_maySpecializeWithMacro(specializationMacroDef == nullptr) {
+	_maySpecializeWithMacro(specializationMacroDef == nullptr),
+    _conservativeMeshLibrary(conservativeMeshLibrary) {
 
 	_shaderConversionResultInfo = resultInfo;
 	_compressedMSL = compressedMSL;
@@ -251,7 +253,7 @@ void MVKShaderLibrary::compileLibrary(const string& msl,
 		}
 	}
 
-	_mtlLibrary = slc->newMTLLibrary(nsSrc, _shaderConversionResultInfo, macro_def);	// retained
+	_mtlLibrary = slc->newMTLLibrary(nsSrc, _shaderConversionResultInfo, macro_def, _conservativeMeshLibrary);	// retained
 	[nsSrc release];														// release temp string
 	slc->destroy();
 }
@@ -281,6 +283,7 @@ MVKShaderLibrary::MVKShaderLibrary(const MVKShaderLibrary& other) :
 	MVKBaseDeviceObject(other._device),
 	_owner(other._owner),
 	_maySpecializeWithMacro(other._maySpecializeWithMacro),
+    _conservativeMeshLibrary(other._conservativeMeshLibrary),
 	_specializationVariants(other._specializationVariants) {
 
 	_mtlLibrary = [other._mtlLibrary retain];
@@ -294,6 +297,7 @@ MVKShaderLibrary& MVKShaderLibrary::operator=(const MVKShaderLibrary& other) {
 		_mtlLibrary = [other._mtlLibrary retain];
 	}
 	_owner = other._owner;
+    _conservativeMeshLibrary = other._conservativeMeshLibrary;
 	_shaderConversionResultInfo = other._shaderConversionResultInfo;
 	_compressedMSL = other._compressedMSL;
 	return *this;
@@ -432,7 +436,36 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
 		pShaderConfig->markAllInterfaceVarsAndResourcesUsed();
 	}
 
-	MVKMTLFunction result = mvkLib ? mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this) : MVKMTLFunctionNull;
+    // Per-pipeline source-backed libraries isolate a narrow AMD geometry
+    // compilation policy. Fresh ownership alone did not cure the game failure;
+    // the separate safe option applies conservative math used by the successful
+    // diagnostic rebuild. Macros and specialization values stay unchanged.
+    // No file replay or successful-error substitution is involved.
+    const char* freshOption = getenv("MVK_AMD_FRESH_MESH_LIBRARIES");
+    bool freshMesh = freshOption && !strcmp(freshOption, "1") &&
+        getPhysicalDevice()->isAMDHardware() && !_directMSLLibrary &&
+        (pShaderConfig->options.mslOptions.for_mesh_pipeline || forceReplaySource);
+    // A fresh source-backed library requires compilation. Respect Vulkan
+    // pipeline-cache-control rather than compiling behind a no-compile request.
+    if (freshMesh && pipeline->shouldFailOnPipelineCompileRequired()) return MVKMTLFunctionNull;
+    const char* safeOption = getenv("MVK_AMD_SAFE_MESH_LIBRARIES");
+    bool safeMesh = freshMesh && safeOption && !strcmp(safeOption, "1");
+    MVKMTLFunction result = MVKMTLFunctionNull;
+    if (mvkLib && freshMesh) {
+        auto compileInfo = mvkLib->_shaderConversionResultInfo;
+        if (safeMesh) {
+            compileInfo.entryPoint.fpFastMathFlags = spv::FPFastMathModeMaskNone;
+            compileInfo.isPositionInvariant = pShaderConfig->options.entryPointStage != spv::ExecutionModelFragment;
+        }
+        MVKShaderLibrary freshLibrary(pipeline, compileInfo,
+                                      mvkLib->getCompressedMSL(), nullptr, safeMesh);
+        result = freshLibrary.getMTLFunction(pSpecializationInfo, pShaderFeedback, this);
+        mvkWriteRuntimeTrace(getMVKConfig(), @"fresh-mesh-function", @{
+            @"stage":@((unsigned)pShaderConfig->options.entryPointStage),
+            @"created":@(result.getMTLFunction() != nil),
+            @"specializationPassedUnchanged":@YES, @"conservativeMeshMath":@(safeMesh),
+            @"function":mvkTraceFunction(result.getMTLFunction())});
+    } else if (mvkLib) result = mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this);
     const char* shardRoot = getenv("MVK_AMD_COMPUTE_ARCHIVE_DIR");
     const char* renderShardRoot = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");
     bool computeShard = shardRoot && shardRoot[0] == '/' &&
@@ -508,7 +541,7 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
             NSString* key = [NSString stringWithFormat:@"mvk-cs2-%s", hex];
             static_cast<MVKComputePipeline*>(pipeline)->setNativeComputeArchiveKey(key.UTF8String);
         }
-        if (renderShard) mvkSetFunctionRecipe(result.getMTLFunction(), @(hex));
+        if (renderShard) mvkSetFunctionRecipe(result.getMTLFunction(), safeMesh ? [@"safe-mesh-v1|" stringByAppendingString:@(hex)] : @(hex));
     }
 	if ((trace || replaySource || mvkGPUTimeoutTraceEnabled()) && mvkLib) {
 		std::string source;
@@ -520,7 +553,7 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
 		NSString* path = [@(getMVKConfig().shaderDumpDir) stringByAppendingPathComponent:[NSString stringWithFormat:@"source-%016zx.metal",sourceHash]];
         if (!mvkGPUTimeoutTraceEnabled() || ![[NSFileManager defaultManager] fileExistsAtPath:path])
 		[[NSData dataWithBytes:source.data() length:source.size()] writeToFile:path options:NSDataWritingAtomic error:nil];
-		if (trace) mvkWriteRuntimeTrace(getMVKConfig(), @"function", @{@"shader":[NSString stringWithFormat:@"%016zx",_key.codeHash],@"sourceHash":[NSString stringWithFormat:@"%016zx",sourceHash],@"requested":requestedConfig,@"selected":mvkTraceConfig(*pShaderConfig),@"function":mvkTraceFunction(function),@"pipelineCache":@(pipeline->getPipelineCache()!=nullptr),@"fpFastMathFlags":@(mvkLib->_shaderConversionResultInfo.entryPoint.fpFastMathFlags),@"positionInvariant":@(mvkLib->_shaderConversionResultInfo.isPositionInvariant)});
+		if (trace) mvkWriteRuntimeTrace(getMVKConfig(), @"function", @{@"shader":[NSString stringWithFormat:@"%016zx",_key.codeHash],@"sourceHash":[NSString stringWithFormat:@"%016zx",sourceHash],@"requested":requestedConfig,@"selected":mvkTraceConfig(*pShaderConfig),@"function":mvkTraceFunction(function),@"pipelineCache":@(pipeline->getPipelineCache()!=nullptr),@"fpFastMathFlags":@(result.shaderConversionResults.entryPoint.fpFastMathFlags),@"positionInvariant":@(result.shaderConversionResults.isPositionInvariant)});
 	}
 	return result;
 }
@@ -666,7 +699,8 @@ MVKShaderModule::~MVKShaderModule() {
 
 id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 													   const SPIRVToMSLConversionResultInfo& shaderConversionResults,
-													   const vector<pair<MSLSpecializationMacroInfo, MVKShaderMacroValue>>& specializationMacroDef) {
+													   const vector<pair<MSLSpecializationMacroInfo, MVKShaderMacroValue>>& specializationMacroDef,
+                                                     bool conservativeMeshLibrary) {
 	unique_lock<mutex> lock(_completionLock);
 	_mslSourceCode = mslSourceCode;		// For logMSLSource(), from handleError() within compile().
 
@@ -676,6 +710,18 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 			@autoreleasepool {
 				auto mtlCompileOptions = getDevice()->getMTLCompileOptions(shaderConversionResults.entryPoint.fpFastMathFlags,
 																		   shaderConversionResults.isPositionInvariant);
+                if (conservativeMeshLibrary) {
+                    // Scope conservative compilation to the opted-in geometry
+                    // chain. Override the global fast-math preference here;
+                    // all specialization macros/values below are preserved.
+                    mtlCompileOptions.fastMathEnabled = NO;
+#if MVK_XCODE_16
+                    if ([mtlCompileOptions respondsToSelector:@selector(mathMode)]) {
+                        mtlCompileOptions.mathMode = MTLMathModeSafe;
+                        mtlCompileOptions.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsPrecise;
+                    }
+#endif
+                }
 				if (!specializationMacroDef.empty()) {
 					size_t macro_count = specializationMacroDef.size();
 					NSString *macro_names[macro_count];

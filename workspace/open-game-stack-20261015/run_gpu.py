@@ -10,6 +10,8 @@ parser.add_argument('--library',type=pathlib.Path)
 parser.add_argument('--runtime-trace',action='store_true')
 parser.add_argument('--gpu-timeout-trace',action='store_true')
 parser.add_argument('--specialized-queues',action='store_true')
+parser.add_argument('--fresh-mesh-libraries',action='store_true')
+parser.add_argument('--safe-mesh-libraries',action='store_true')
 parser.add_argument('--replay-only',action='store_true')
 parser.add_argument('--replay-failed-mesh',action='store_true')
 parser.add_argument('--serialize-pipeline-link',action='store_true')
@@ -50,6 +52,10 @@ env.update(PATH='/nonexistent',VK_ICD_FILENAMES=str(icd),MTL_DEBUG_LAYER='1',MVK
 if args.runtime_trace:env['MVK_AMD_RUNTIME_TRACE']='1'
 if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
 if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
+if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
+if args.safe_mesh_libraries:
+    if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
+    env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
 if args.replay_only:
     if not args.runtime_trace or not args.replay_failed_mesh:parser.error('--replay-only requires runtime trace and mesh replay')
     env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
@@ -133,6 +139,9 @@ elif args.suite=='descriptors':
 else:cmd=[reference/'build/reference_robust_access',reference/'build/spv']
 record={'timeUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'librarySHA256':hashlib.sha256(lib.read_bytes()).hexdigest(),'command':[str(a)for a in cmd],'suite':args.suite,'gameStarted':False,'featureBitsModified':False,'privateCompilerOptionsOnly':True,'serializePipelineLink':args.serialize_pipeline_link,'coherentAtomics':args.coherent_atomics,'encoderLiveCache':args.encoder_live_cache}
 record['specializedQueues']=args.specialized_queues
+record['freshMeshLibraries']=args.fresh_mesh_libraries
+record['safeMeshLibraries']=args.safe_mesh_libraries
+record['failedMeshReplayEnabled']=args.replay_failed_mesh
 record['gpuTimeoutTrace']=args.gpu_timeout_trace
 record['liveLookupFastCache']=args.live_lookup_fast_cache
 record['descriptorUseCache']=args.descriptor_use_cache

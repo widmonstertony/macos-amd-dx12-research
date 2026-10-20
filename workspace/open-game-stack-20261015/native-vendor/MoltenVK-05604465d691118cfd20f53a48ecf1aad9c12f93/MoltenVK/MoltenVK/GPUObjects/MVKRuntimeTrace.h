@@ -41,6 +41,7 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
     // on games with tens of thousands of PSOs.
     if (mvkRuntimeReplayOnly() && ![kind isEqualToString:@"mesh-replay"] &&
         ![kind isEqualToString:@"pipeline-failure"] &&
+        ![kind isEqualToString:@"fresh-mesh-function"] &&
         ![kind isEqualToString:@"compute-failure"] &&
         ![kind isEqualToString:@"slow-compute"] &&
         !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&

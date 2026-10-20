@@ -29,6 +29,9 @@ def main():
     parser.add_argument('--compute-shards', action='store_true')
     parser.add_argument('--render-shards', action='store_true')
     parser.add_argument('--replay-only', action='store_true')
+    parser.add_argument('--fresh-mesh-libraries', action='store_true')
+    parser.add_argument('--safe-mesh-libraries', action='store_true')
+    parser.add_argument('--disable-mesh-replay', action='store_true')
     parser.add_argument('--gpu-timeout-trace', action='store_true')
     parser.add_argument('--specialized-queues', action='store_true')
     args = parser.parse_args()
@@ -64,6 +67,11 @@ def main():
     if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
     if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
     if args.replay_only:env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
+    if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
+    if args.safe_mesh_libraries:
+        if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
+        env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
+    if args.disable_mesh_replay:env.pop('MVK_AMD_REPLAY_FAILED_MESH', None)
     if args.render_shards:
         env.pop('MVK_AMD_RENDER_BINARY_ARCHIVE_PATH', None)
         render_directory = out / 'render-shards'

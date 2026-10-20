@@ -17,7 +17,7 @@ int main(int argc, const char** argv) { @autoreleasepool {
     if (!device) return 4;
     NSMutableArray* rows = [NSMutableArray array];
     NSArray* stages = @[@"object", @"mesh", @"fragment"];
-    for (unsigned math = 0; math < 3; ++math) for (unsigned invariant = 0; invariant < 2; ++invariant) {
+    for (unsigned math = 0; math < 3; ++math) for (unsigned invariant = 0; invariant < 8; ++invariant) {
         @autoreleasepool {
             NSMutableArray* functions = [NSMutableArray array];
             NSError* failure = nil;
@@ -32,7 +32,7 @@ int main(int argc, const char** argv) { @autoreleasepool {
                 bool fast = math == 1 || (math == 2 && index == 2);
                 options.mathMode = fast ? MTLMathModeFast : MTLMathModeSafe;
                 options.mathFloatingPointFunctions = fast ? MTLMathFloatingPointFunctionsFast : MTLMathFloatingPointFunctionsPrecise;
-                options.preserveInvariance = invariant && index < 2;
+                options.preserveInvariance = (invariant >> index) & 1;
                 id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&failure];
                 [options release];
                 id<MTLFunction> function = library ? [library newFunctionWithName:stage[@"entry"]] : nil;
@@ -55,7 +55,7 @@ int main(int argc, const char** argv) { @autoreleasepool {
                     options:MTLPipelineOptionNone reflection:nil error:&failure];
                 [descriptor release];
             }
-            NSDictionary* row = @{@"mathVariant":@(math), @"preserveObjectMeshInvariance":@(invariant),
+            NSDictionary* row = @{@"mathVariant":@(math), @"stageInvarianceMask":@(invariant),
                 @"functionCount":@(functions.count), @"pipelineCreated":@(pipeline != nil),
                 @"elapsedSeconds":@([NSDate timeIntervalSinceReferenceDate] - started),
                 @"error":failure.localizedDescription ?: @"", @"errorCode":@(failure.code)};

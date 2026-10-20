@@ -1,4 +1,150 @@
 {
+  "current_checkpoint_20261020_safe_mesh_serialized_failed": {
+    "timeUTC": "2026-10-20T16:45:13.363524+00:00",
+    "gamePID": 15420,
+    "gameExited": true,
+    "candidateSHA256": "b9ceea9fa85b2bc033f6f3046fbf46c517d691fa818fa3c50ccaeadebc787699",
+    "firstPassCompilationPassed": false,
+    "gamePlayable": false,
+    "physicalVRAMExhaustionProven": false,
+    "userPopup": "Out of video memory",
+    "linkFailureCount": 2,
+    "linkFailures": [
+      {
+        "file": "trace-pipeline-failure-15420-738.json",
+        "error": "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+        "object": {
+          "label": "43492086ee9f9a0f:73f79fc7bc56bae7:0",
+          "identity": "0x7fa38b54bb00",
+          "compileProvenance": {
+            "optimizationLevel": 0,
+            "mathMode": 0,
+            "sourceSHA256": "3284acc2869fcdb6348a41378670bbe19d2b40b4489b7e88b1c3bcd1b4f55463",
+            "languageVersion": 262144,
+            "preserveInvariance": true,
+            "fastMathEnabled": false,
+            "preprocessorMacros": {},
+            "sourceBytes": 21037,
+            "mathFloatingPointFunctions": 1
+          },
+          "name": "main0",
+          "type": 8
+        },
+        "mesh": {
+          "label": "57b6f407fc3004fa:8c9bffea4441f742:3",
+          "identity": "0x7fa2eae0e3c0",
+          "compileProvenance": {
+            "optimizationLevel": 0,
+            "mathMode": 0,
+            "sourceSHA256": "c13d7efec55d700bd44813278e169a04fe215f3f82cf1c795af02c0126ffe2d8",
+            "languageVersion": 262144,
+            "preserveInvariance": true,
+            "fastMathEnabled": false,
+            "preprocessorMacros": {},
+            "sourceBytes": 55595,
+            "mathFloatingPointFunctions": 1
+          },
+          "name": "main0",
+          "type": 7
+        },
+        "fragment": {
+          "label": "1437de8a4190f694:b14ea80dc84193df:4",
+          "identity": "0x7fa2ec019cd0",
+          "compileProvenance": {
+            "optimizationLevel": 0,
+            "mathMode": 0,
+            "sourceSHA256": "04d981744a2fdb2a8a0c6fcc53da08948b7212a972e249e113505af42a35a27c",
+            "languageVersion": 262144,
+            "preserveInvariance": false,
+            "fastMathEnabled": false,
+            "preprocessorMacros": {},
+            "sourceBytes": 1095,
+            "mathFloatingPointFunctions": 1
+          },
+          "name": "main0",
+          "type": 2
+        }
+      },
+      {
+        "file": "trace-pipeline-failure-15420-739.json",
+        "error": "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+        "object": {
+          "label": "43492086ee9f9a0f:73f79fc7bc56bae7:0",
+          "identity": "0x7fa38b54bb00",
+          "compileProvenance": {
+            "optimizationLevel": 0,
+            "mathMode": 0,
+            "sourceSHA256": "3284acc2869fcdb6348a41378670bbe19d2b40b4489b7e88b1c3bcd1b4f55463",
+            "languageVersion": 262144,
+            "preserveInvariance": true,
+            "fastMathEnabled": false,
+            "preprocessorMacros": {},
+            "sourceBytes": 21037,
+            "mathFloatingPointFunctions": 1
+          },
+          "name": "main0",
+          "type": 8
+        },
+        "mesh": {
+          "label": "57b6f407fc3004fa:8c9bffea4441f742:3",
+          "identity": "0x7fa2eae0e3c0",
+          "compileProvenance": {
+            "optimizationLevel": 0,
+            "mathMode": 0,
+            "sourceSHA256": "c13d7efec55d700bd44813278e169a04fe215f3f82cf1c795af02c0126ffe2d8",
+            "languageVersion": 262144,
+            "preserveInvariance": true,
+            "fastMathEnabled": false,
+            "preprocessorMacros": {},
+            "sourceBytes": 55595,
+            "mathFloatingPointFunctions": 1
+          },
+          "name": "main0",
+          "type": 7
+        },
+        "fragment": {
+          "label": "1437de8a4190f694:b14ea80dc84193df:4",
+          "identity": "0x7fa2ec019cd0",
+          "compileProvenance": {
+            "optimizationLevel": 0,
+            "mathMode": 0,
+            "sourceSHA256": "04d981744a2fdb2a8a0c6fcc53da08948b7212a972e249e113505af42a35a27c",
+            "languageVersion": 262144,
+            "preserveInvariance": false,
+            "fastMathEnabled": false,
+            "preprocessorMacros": {},
+            "sourceBytes": 1095,
+            "mathFloatingPointFunctions": 1
+          },
+          "name": "main0",
+          "type": 2
+        }
+      }
+    ],
+    "gameGuardExplicitSerializeLinkSetter": true,
+    "gateAcquisitionIndividuallyTraced": false,
+    "replayEnabled": false,
+    "cachesDeleted": false,
+    "next": "Do not relaunch unchanged configuration. Reproduce source/descriptor/context link error in isolated controls and qualify a concrete change before another normal Steam trial."
+  },
+  "current_checkpoint_20261020_fresh_mesh_no_retry_failed": {
+    "timeUTC": "2026-10-20T16:32:54.036279+00:00",
+    "freshOnlyTrialFailed": true,
+    "failureEvidence": "evidence/fresh-mesh-no-retry-game-20261020/failure-summary.json",
+    "gamePIDAtFailure": 13176,
+    "candidateSHA256": "e895710029a1e0507eeb2eddd72520b9074d3d348840e70de299ce876a0df0af",
+    "gameRunning": false,
+    "gamePlayable": false,
+    "firstPassCompilationPassed": false,
+    "linkErrors": 4,
+    "userPopup": "Out of video memory",
+    "actualVRAMExhaustionProven": false,
+    "allFailureSourceDigestsMatchedSavedSources": true,
+    "isolatedExactOptionsMatrixCases": 24,
+    "isolatedExactOptionsAllLinked": true,
+    "isolatedRuntimeFailureReproduced": false,
+    "next": "Qualify conservative math only for source-backed AMD geometry chain using same complete source, original specialization values and native API results, with failure replay disabled; then directly normal Steam restart. Do not silently restore retry or claim zero errors."
+  },
   "current_checkpoint_20261020_compilation_audit": {
     "timeUTC": "2026-10-20T16:10:30.200784+00:00",
     "gamePID": 3767,

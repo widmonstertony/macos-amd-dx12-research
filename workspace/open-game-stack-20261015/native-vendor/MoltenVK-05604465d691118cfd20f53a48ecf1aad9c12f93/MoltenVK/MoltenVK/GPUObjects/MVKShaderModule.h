@@ -122,7 +122,8 @@ public:
 	MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
 					 const mvk::SPIRVToMSLConversionResultInfo& resultInfo,
 					 const MVKCompressor<std::string> compressedMSL,
-					 const std::vector<std::pair<uint32_t, MVKShaderMacroValue>>* specializationMacroDef = nullptr);
+					 const std::vector<std::pair<uint32_t, MVKShaderMacroValue>>* specializationMacroDef = nullptr,
+                     bool conservativeMeshLibrary = false);
 
 	MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
 					 const void* mslCompiledCodeData,
@@ -157,6 +158,7 @@ protected:
 
 	/** When true, representing a library created with source, but never specialized */
 	bool _maySpecializeWithMacro;
+    bool _conservativeMeshLibrary = false;
 	/** Can only be populated when _maySpecializeWithMacro is true */
 	std::map<std::vector<std::pair<uint32_t, MVKShaderMacroValue>>, MVKShaderLibrary *> _specializationVariants;
 };
@@ -304,7 +306,8 @@ public:
 	 */
 	id<MTLLibrary> newMTLLibrary(NSString* mslSourceCode,
 								 const mvk::SPIRVToMSLConversionResultInfo& shaderConversionResults,
-								 const std::vector<std::pair<mvk::MSLSpecializationMacroInfo, MVKShaderMacroValue>>& macroDef);
+								 const std::vector<std::pair<mvk::MSLSpecializationMacroInfo, MVKShaderMacroValue>>& macroDef,
+                                 bool conservativeMeshLibrary = false);
 
 
 #pragma mark Construction

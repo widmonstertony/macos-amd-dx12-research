@@ -1,0 +1,25 @@
+{
+  "timeUTC": "2026-10-20T16:39:52.723620+00:00",
+  "nativeRegressionPassed": true,
+  "originalTencentPresentationPassed": true,
+  "deferredGameGuardPassed": true,
+  "gamePlayable": false,
+  "firstPassCompilationPassed": false,
+  "GPUTimeoutFixed": false,
+  "cacheDeleted": false,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-safe-mesh-serialized-game/libCandidate.dylib",
+    "candidateSHA256": "b9ceea9fa85b2bc033f6f3046fbf46c517d691fa818fa3c50ccaeadebc787699",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-safe-mesh-serialized-game/libProbeGuard.dylib",
+    "proxySHA256": "ad0370f41b98eb7179462e568e87ec8a26539836e07067d7d1d391f284b75f03",
+    "presentationPassed": true
+  },
+  "evidence": [
+    "evidence/safe-mesh-first-pass-20261020/qualification.json",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T163335Z/run.json"
+  ],
+  "failedMeshReplayEnabled": false,
+  "safeGeometryMathOnly": true,
+  "meshLinkSerializationEnforcedInGameGuard": true,
+  "gameFirstPassCompilationPassed": false
+}

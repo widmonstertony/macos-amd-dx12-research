@@ -1,0 +1,475 @@
+--- a/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.h
++++ b/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.h
+@@ -122,7 +122,8 @@
+ 	MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
+ 					 const mvk::SPIRVToMSLConversionResultInfo& resultInfo,
+ 					 const MVKCompressor<std::string> compressedMSL,
+-					 const std::vector<std::pair<uint32_t, MVKShaderMacroValue>>* specializationMacroDef = nullptr);
++					 const std::vector<std::pair<uint32_t, MVKShaderMacroValue>>* specializationMacroDef = nullptr,
++                     bool conservativeMeshLibrary = false);
+ 
+ 	MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
+ 					 const void* mslCompiledCodeData,
+@@ -157,6 +158,7 @@
+ 
+ 	/** When true, representing a library created with source, but never specialized */
+ 	bool _maySpecializeWithMacro;
++    bool _conservativeMeshLibrary = false;
+ 	/** Can only be populated when _maySpecializeWithMacro is true */
+ 	std::map<std::vector<std::pair<uint32_t, MVKShaderMacroValue>>, MVKShaderLibrary *> _specializationVariants;
+ };
+@@ -304,7 +306,8 @@
+ 	 */
+ 	id<MTLLibrary> newMTLLibrary(NSString* mslSourceCode,
+ 								 const mvk::SPIRVToMSLConversionResultInfo& shaderConversionResults,
+-								 const std::vector<std::pair<mvk::MSLSpecializationMacroInfo, MVKShaderMacroValue>>& macroDef);
++								 const std::vector<std::pair<mvk::MSLSpecializationMacroInfo, MVKShaderMacroValue>>& macroDef,
++                                 bool conservativeMeshLibrary = false);
+ 
+ 
+ #pragma mark Construction
+--- a/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm
++++ b/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm
+@@ -106,7 +106,7 @@
+ 			if (entry != _specializationVariants.end()) {
+ 				lib = entry->second->_mtlLibrary;
+ 			} else {
+-				MVKShaderLibrary *new_mvklib = new MVKShaderLibrary(_owner, _shaderConversionResultInfo, _compressedMSL, &spec_list);
++				MVKShaderLibrary *new_mvklib = new MVKShaderLibrary(_owner, _shaderConversionResultInfo, _compressedMSL, &spec_list, _conservativeMeshLibrary);
+ 				_specializationVariants[spec_list] = new_mvklib;
+ 				lib = new_mvklib->_mtlLibrary;
+ 			}
+@@ -223,10 +223,12 @@
+ MVKShaderLibrary::MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
+ 								   const SPIRVToMSLConversionResultInfo& resultInfo,
+ 								   const MVKCompressor<std::string> compressedMSL,
+-								   const vector<pair<uint32_t, MVKShaderMacroValue> >* specializationMacroDef) :
++								   const vector<pair<uint32_t, MVKShaderMacroValue> >* specializationMacroDef,
++                                   bool conservativeMeshLibrary) :
+ 	MVKBaseDeviceObject(owner->getDevice()),
+ 	_owner(owner),
+-	_maySpecializeWithMacro(specializationMacroDef == nullptr) {
++	_maySpecializeWithMacro(specializationMacroDef == nullptr),
++    _conservativeMeshLibrary(conservativeMeshLibrary) {
+ 
+ 	_shaderConversionResultInfo = resultInfo;
+ 	_compressedMSL = compressedMSL;
+@@ -251,7 +253,7 @@
+ 		}
+ 	}
+ 
+-	_mtlLibrary = slc->newMTLLibrary(nsSrc, _shaderConversionResultInfo, macro_def);	// retained
++	_mtlLibrary = slc->newMTLLibrary(nsSrc, _shaderConversionResultInfo, macro_def, _conservativeMeshLibrary);	// retained
+ 	[nsSrc release];														// release temp string
+ 	slc->destroy();
+ }
+@@ -281,6 +283,7 @@
+ 	MVKBaseDeviceObject(other._device),
+ 	_owner(other._owner),
+ 	_maySpecializeWithMacro(other._maySpecializeWithMacro),
++    _conservativeMeshLibrary(other._conservativeMeshLibrary),
+ 	_specializationVariants(other._specializationVariants) {
+ 
+ 	_mtlLibrary = [other._mtlLibrary retain];
+@@ -294,6 +297,7 @@
+ 		_mtlLibrary = [other._mtlLibrary retain];
+ 	}
+ 	_owner = other._owner;
++    _conservativeMeshLibrary = other._conservativeMeshLibrary;
+ 	_shaderConversionResultInfo = other._shaderConversionResultInfo;
+ 	_compressedMSL = other._compressedMSL;
+ 	return *this;
+@@ -432,7 +436,36 @@
+ 		pShaderConfig->markAllInterfaceVarsAndResourcesUsed();
+ 	}
+ 
+-	MVKMTLFunction result = mvkLib ? mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this) : MVKMTLFunctionNull;
++    // Per-pipeline source-backed libraries isolate a narrow AMD geometry
++    // compilation policy. Fresh ownership alone did not cure the game failure;
++    // the separate safe option applies conservative math used by the successful
++    // diagnostic rebuild. Macros and specialization values stay unchanged.
++    // No file replay or successful-error substitution is involved.
++    const char* freshOption = getenv("MVK_AMD_FRESH_MESH_LIBRARIES");
++    bool freshMesh = freshOption && !strcmp(freshOption, "1") &&
++        getPhysicalDevice()->isAMDHardware() && !_directMSLLibrary &&
++        (pShaderConfig->options.mslOptions.for_mesh_pipeline || forceReplaySource);
++    // A fresh source-backed library requires compilation. Respect Vulkan
++    // pipeline-cache-control rather than compiling behind a no-compile request.
++    if (freshMesh && pipeline->shouldFailOnPipelineCompileRequired()) return MVKMTLFunctionNull;
++    const char* safeOption = getenv("MVK_AMD_SAFE_MESH_LIBRARIES");
++    bool safeMesh = freshMesh && safeOption && !strcmp(safeOption, "1");
++    MVKMTLFunction result = MVKMTLFunctionNull;
++    if (mvkLib && freshMesh) {
++        auto compileInfo = mvkLib->_shaderConversionResultInfo;
++        if (safeMesh) {
++            compileInfo.entryPoint.fpFastMathFlags = spv::FPFastMathModeMaskNone;
++            compileInfo.isPositionInvariant = pShaderConfig->options.entryPointStage != spv::ExecutionModelFragment;
++        }
++        MVKShaderLibrary freshLibrary(pipeline, compileInfo,
++                                      mvkLib->getCompressedMSL(), nullptr, safeMesh);
++        result = freshLibrary.getMTLFunction(pSpecializationInfo, pShaderFeedback, this);
++        mvkWriteRuntimeTrace(getMVKConfig(), @"fresh-mesh-function", @{
++            @"stage":@((unsigned)pShaderConfig->options.entryPointStage),
++            @"created":@(result.getMTLFunction() != nil),
++            @"specializationPassedUnchanged":@YES, @"conservativeMeshMath":@(safeMesh),
++            @"function":mvkTraceFunction(result.getMTLFunction())});
++    } else if (mvkLib) result = mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this);
+     const char* shardRoot = getenv("MVK_AMD_COMPUTE_ARCHIVE_DIR");
+     const char* renderShardRoot = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");
+     bool computeShard = shardRoot && shardRoot[0] == '/' &&
+@@ -508,7 +541,7 @@
+             NSString* key = [NSString stringWithFormat:@"mvk-cs2-%s", hex];
+             static_cast<MVKComputePipeline*>(pipeline)->setNativeComputeArchiveKey(key.UTF8String);
+         }
+-        if (renderShard) mvkSetFunctionRecipe(result.getMTLFunction(), @(hex));
++        if (renderShard) mvkSetFunctionRecipe(result.getMTLFunction(), safeMesh ? [@"safe-mesh-v1|" stringByAppendingString:@(hex)] : @(hex));
+     }
+ 	if ((trace || replaySource || mvkGPUTimeoutTraceEnabled()) && mvkLib) {
+ 		std::string source;
+@@ -520,7 +553,7 @@
+ 		NSString* path = [@(getMVKConfig().shaderDumpDir) stringByAppendingPathComponent:[NSString stringWithFormat:@"source-%016zx.metal",sourceHash]];
+         if (!mvkGPUTimeoutTraceEnabled() || ![[NSFileManager defaultManager] fileExistsAtPath:path])
+ 		[[NSData dataWithBytes:source.data() length:source.size()] writeToFile:path options:NSDataWritingAtomic error:nil];
+-		if (trace) mvkWriteRuntimeTrace(getMVKConfig(), @"function", @{@"shader":[NSString stringWithFormat:@"%016zx",_key.codeHash],@"sourceHash":[NSString stringWithFormat:@"%016zx",sourceHash],@"requested":requestedConfig,@"selected":mvkTraceConfig(*pShaderConfig),@"function":mvkTraceFunction(function),@"pipelineCache":@(pipeline->getPipelineCache()!=nullptr),@"fpFastMathFlags":@(mvkLib->_shaderConversionResultInfo.entryPoint.fpFastMathFlags),@"positionInvariant":@(mvkLib->_shaderConversionResultInfo.isPositionInvariant)});
++		if (trace) mvkWriteRuntimeTrace(getMVKConfig(), @"function", @{@"shader":[NSString stringWithFormat:@"%016zx",_key.codeHash],@"sourceHash":[NSString stringWithFormat:@"%016zx",sourceHash],@"requested":requestedConfig,@"selected":mvkTraceConfig(*pShaderConfig),@"function":mvkTraceFunction(function),@"pipelineCache":@(pipeline->getPipelineCache()!=nullptr),@"fpFastMathFlags":@(result.shaderConversionResults.entryPoint.fpFastMathFlags),@"positionInvariant":@(result.shaderConversionResults.isPositionInvariant)});
+ 	}
+ 	return result;
+ }
+@@ -666,7 +699,8 @@
+ 
+ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
+ 													   const SPIRVToMSLConversionResultInfo& shaderConversionResults,
+-													   const vector<pair<MSLSpecializationMacroInfo, MVKShaderMacroValue>>& specializationMacroDef) {
++													   const vector<pair<MSLSpecializationMacroInfo, MVKShaderMacroValue>>& specializationMacroDef,
++                                                     bool conservativeMeshLibrary) {
+ 	unique_lock<mutex> lock(_completionLock);
+ 	_mslSourceCode = mslSourceCode;		// For logMSLSource(), from handleError() within compile().
+ 
+@@ -676,6 +710,18 @@
+ 			@autoreleasepool {
+ 				auto mtlCompileOptions = getDevice()->getMTLCompileOptions(shaderConversionResults.entryPoint.fpFastMathFlags,
+ 																		   shaderConversionResults.isPositionInvariant);
++                if (conservativeMeshLibrary) {
++                    // Scope conservative compilation to the opted-in geometry
++                    // chain. Override the global fast-math preference here;
++                    // all specialization macros/values below are preserved.
++                    mtlCompileOptions.fastMathEnabled = NO;
++#if MVK_XCODE_16
++                    if ([mtlCompileOptions respondsToSelector:@selector(mathMode)]) {
++                        mtlCompileOptions.mathMode = MTLMathModeSafe;
++                        mtlCompileOptions.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsPrecise;
++                    }
++#endif
++                }
+ 				if (!specializationMacroDef.empty()) {
+ 					size_t macro_count = specializationMacroDef.size();
+ 					NSString *macro_names[macro_count];
+--- a/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRuntimeTrace.h
++++ b/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRuntimeTrace.h
+@@ -41,6 +41,7 @@
+     // on games with tens of thousands of PSOs.
+     if (mvkRuntimeReplayOnly() && ![kind isEqualToString:@"mesh-replay"] &&
+         ![kind isEqualToString:@"pipeline-failure"] &&
++        ![kind isEqualToString:@"fresh-mesh-function"] &&
+         ![kind isEqualToString:@"compute-failure"] &&
+         ![kind isEqualToString:@"slow-compute"] &&
+         !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
+--- a/open-game-stack-20261015/run_gpu.py
++++ b/open-game-stack-20261015/run_gpu.py
+@@ -10,6 +10,8 @@
+ parser.add_argument('--runtime-trace',action='store_true')
+ parser.add_argument('--gpu-timeout-trace',action='store_true')
+ parser.add_argument('--specialized-queues',action='store_true')
++parser.add_argument('--fresh-mesh-libraries',action='store_true')
++parser.add_argument('--safe-mesh-libraries',action='store_true')
+ parser.add_argument('--replay-only',action='store_true')
+ parser.add_argument('--replay-failed-mesh',action='store_true')
+ parser.add_argument('--serialize-pipeline-link',action='store_true')
+@@ -50,6 +52,10 @@
+ if args.runtime_trace:env['MVK_AMD_RUNTIME_TRACE']='1'
+ if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
+ if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
++if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
++if args.safe_mesh_libraries:
++    if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
++    env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
+ if args.replay_only:
+     if not args.runtime_trace or not args.replay_failed_mesh:parser.error('--replay-only requires runtime trace and mesh replay')
+     env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
+@@ -133,6 +139,9 @@
+ else:cmd=[reference/'build/reference_robust_access',reference/'build/spv']
+ record={'timeUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'librarySHA256':hashlib.sha256(lib.read_bytes()).hexdigest(),'command':[str(a)for a in cmd],'suite':args.suite,'gameStarted':False,'featureBitsModified':False,'privateCompilerOptionsOnly':True,'serializePipelineLink':args.serialize_pipeline_link,'coherentAtomics':args.coherent_atomics,'encoderLiveCache':args.encoder_live_cache}
+ record['specializedQueues']=args.specialized_queues
++record['freshMeshLibraries']=args.fresh_mesh_libraries
++record['safeMeshLibraries']=args.safe_mesh_libraries
++record['failedMeshReplayEnabled']=args.replay_failed_mesh
+ record['gpuTimeoutTrace']=args.gpu_timeout_trace
+ record['liveLookupFastCache']=args.live_lookup_fast_cache
+ record['descriptorUseCache']=args.descriptor_use_cache
+--- a/open-game-stack-20261015/tools/qualify_private_cache_candidate.py
++++ b/open-game-stack-20261015/tools/qualify_private_cache_candidate.py
+@@ -29,6 +29,9 @@
+     parser.add_argument('--compute-shards', action='store_true')
+     parser.add_argument('--render-shards', action='store_true')
+     parser.add_argument('--replay-only', action='store_true')
++    parser.add_argument('--fresh-mesh-libraries', action='store_true')
++    parser.add_argument('--safe-mesh-libraries', action='store_true')
++    parser.add_argument('--disable-mesh-replay', action='store_true')
+     parser.add_argument('--gpu-timeout-trace', action='store_true')
+     parser.add_argument('--specialized-queues', action='store_true')
+     args = parser.parse_args()
+@@ -64,6 +67,11 @@
+     if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
+     if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
+     if args.replay_only:env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
++    if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
++    if args.safe_mesh_libraries:
++        if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
++        env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
++    if args.disable_mesh_replay:env.pop('MVK_AMD_REPLAY_FAILED_MESH', None)
+     if args.render_shards:
+         env.pop('MVK_AMD_RENDER_BINARY_ARCHIVE_PATH', None)
+         render_directory = out / 'render-shards'
+--- a/open-game-stack-20261015/src/mesh_link_matrix.mm
++++ b/open-game-stack-20261015/src/mesh_link_matrix.mm
+@@ -17,7 +17,7 @@
+     if (!device) return 4;
+     NSMutableArray* rows = [NSMutableArray array];
+     NSArray* stages = @[@"object", @"mesh", @"fragment"];
+-    for (unsigned math = 0; math < 3; ++math) for (unsigned invariant = 0; invariant < 2; ++invariant) {
++    for (unsigned math = 0; math < 3; ++math) for (unsigned invariant = 0; invariant < 8; ++invariant) {
+         @autoreleasepool {
+             NSMutableArray* functions = [NSMutableArray array];
+             NSError* failure = nil;
+@@ -32,7 +32,7 @@
+                 bool fast = math == 1 || (math == 2 && index == 2);
+                 options.mathMode = fast ? MTLMathModeFast : MTLMathModeSafe;
+                 options.mathFloatingPointFunctions = fast ? MTLMathFloatingPointFunctionsFast : MTLMathFloatingPointFunctionsPrecise;
+-                options.preserveInvariance = invariant && index < 2;
++                options.preserveInvariance = (invariant >> index) & 1;
+                 id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&failure];
+                 [options release];
+                 id<MTLFunction> function = library ? [library newFunctionWithName:stage[@"entry"]] : nil;
+@@ -55,7 +55,7 @@
+                     options:MTLPipelineOptionNone reflection:nil error:&failure];
+                 [descriptor release];
+             }
+-            NSDictionary* row = @{@"mathVariant":@(math), @"preserveObjectMeshInvariance":@(invariant),
++            NSDictionary* row = @{@"mathVariant":@(math), @"stageInvarianceMask":@(invariant),
+                 @"functionCount":@(functions.count), @"pipelineCreated":@(pipeline != nil),
+                 @"elapsedSeconds":@([NSDate timeIntervalSinceReferenceDate] - started),
+                 @"error":failure.localizedDescription ?: @"", @"errorCode":@(failure.code)};
+--- a/open-game-stack-20261015/src/mesh_link_context.mm
++++ b/open-game-stack-20261015/src/mesh_link_context.mm
+@@ -0,0 +1,119 @@
++#import <Foundation/Foundation.h>
++#import <Metal/Metal.h>
++#include <atomic>
++#include <cstdio>
++#include <mutex>
++
++// Compile/link control only. Reads explicitly supplied local sources. The
++// fixture must be a depth-only, single-sample mesh pipeline. No game launch,
++// GPU shader dispatch, retries, or proprietary driver modifications.
++int main(int argc, const char** argv) { @autoreleasepool {
++    if (argc != 4) return 2;
++    NSError* error = nil;
++    NSDictionary* input = [NSJSONSerialization JSONObjectWithData:
++        [NSData dataWithContentsOfFile:@(argv[1])] options:0 error:&error];
++    if (!input) return 3;
++    NSString* mode = @(argv[2]);
++    bool mixed = ![mode isEqualToString:@"mesh-only"];
++    bool allGate = [mode isEqualToString:@"all-gated"];
++    bool synchronous = [mode isEqualToString:@"synchronous"];
++    id<MTLDevice> device = nil;
++    NSArray* devices = MTLCopyAllDevices();
++    for (id<MTLDevice> d in devices)
++        if ([d.name isEqualToString:@"AMD Radeon Pro 5600M"]) device = d;
++    if (!device) return 4;
++    NSString* text = input[@"descriptorText"];
++    if (![text containsString:@"depthAttachmentPixelFormat = MTLPixelFormatDepth16Unorm"] ||
++        ![text containsString:@"stencilAttachmentPixelFormat = MTLPixelFormatInvalid"]) return 5;
++    NSMutableArray* meshFunctions = [NSMutableArray array];
++    for (NSString* stage in @[@"object", @"mesh", @"fragment"]) {
++        NSDictionary* item = input[@"functions"][stage];
++        NSString* source = [NSString stringWithContentsOfFile:item[@"source"]
++            encoding:NSUTF8StringEncoding error:&error];
++        if (!source) return 6;
++        NSDictionary* provenance = item[@"compileProvenance"];
++        MTLCompileOptions* options = [MTLCompileOptions new];
++        options.languageVersion = (MTLLanguageVersion)[provenance[@"languageVersion"] unsignedIntegerValue];
++        options.mathMode = (MTLMathMode)[provenance[@"mathMode"] unsignedIntegerValue];
++        options.mathFloatingPointFunctions = (MTLMathFloatingPointFunctions)[provenance[@"mathFloatingPointFunctions"] unsignedIntegerValue];
++        options.preserveInvariance = [provenance[@"preserveInvariance"] boolValue];
++        id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
++        id<MTLFunction> f = [library newFunctionWithName:item[@"entry"]];
++        [library release]; [options release];
++        if (!f) { fprintf(stderr,"%s\n",error.localizedDescription.UTF8String); return 7; }
++        [meshFunctions addObject:f]; [f release];
++    }
++    NSMutableArray* vertexFunctions = [NSMutableArray array];
++    if (mixed) for (unsigned i = 0; i < 8; ++i) {
++        // Same common generated type/entry names, different valid interfaces.
++        NSString* vertex = [NSString stringWithFormat:
++            @"#include <metal_stdlib>\nusing namespace metal;\nstruct main0_out { float4 p [[position]]; float4 c [[user(locn%u)]]; };\nvertex main0_out main0(uint id [[vertex_id]]) { main0_out o; o.p=float4(float(id),0,0,1); o.c=float4(%u.0); return o; }",i,i];
++        NSString* fragment = [NSString stringWithFormat:
++            @"#include <metal_stdlib>\nusing namespace metal;\nstruct main0_in { float4 c [[user(locn%u)]]; };\nfragment float4 main0(main0_in in [[stage_in]]) { return in.c; }",i];
++        NSMutableArray* pair = [NSMutableArray array];
++        for (NSString* source in @[vertex,fragment]) {
++            MTLCompileOptions* options = [MTLCompileOptions new];
++            options.languageVersion = MTLLanguageVersion4_0;
++            id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
++            id<MTLFunction> f = [library newFunctionWithName:@"main0"];
++            [library release]; [options release];
++            if (!f) return 8;
++            [pair addObject:f]; [f release];
++        }
++        [vertexFunctions addObject:pair];
++    }
++    dispatch_semaphore_t meshGate = dispatch_semaphore_create(1);
++    dispatch_semaphore_t slots = dispatch_semaphore_create(8);
++    NSMutableArray* rows = [NSMutableArray array];
++    unsigned requests = mixed ? 128 : 32;
++    dispatch_apply(requests, dispatch_get_global_queue(QOS_CLASS_DEFAULT,0), ^(size_t i) { @autoreleasepool {
++        dispatch_semaphore_wait(slots, DISPATCH_TIME_FOREVER);
++        bool mesh = !mixed || i % 2 == 0;
++        bool gated = mesh || allGate;
++        if (gated) dispatch_semaphore_wait(meshGate,DISPATCH_TIME_FOREVER);
++        __block id<MTLRenderPipelineState> pipeline = nil;
++        __block NSError* failure = nil;
++        dispatch_semaphore_t done = dispatch_semaphore_create(0);
++        if (mesh) {
++            MTLMeshRenderPipelineDescriptor* descriptor = [MTLMeshRenderPipelineDescriptor new];
++            descriptor.objectFunction = meshFunctions[0]; descriptor.meshFunction = meshFunctions[1];
++            descriptor.fragmentFunction = meshFunctions[2];
++            descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth16Unorm;
++            descriptor.rasterSampleCount = 1;
++            if (synchronous) pipeline = [device newRenderPipelineStateWithMeshDescriptor:descriptor options:MTLPipelineOptionNone reflection:nil error:&failure];
++            else [device newRenderPipelineStateWithMeshDescriptor:descriptor options:MTLPipelineOptionNone
++                completionHandler:^(id<MTLRenderPipelineState> p, MTLRenderPipelineReflection* reflection, NSError* e) {
++                    pipeline = [p retain]; failure = [e retain]; dispatch_semaphore_signal(done);
++                }];
++            [descriptor release];
++        } else {
++            NSArray* pair = vertexFunctions[(i / 2) % vertexFunctions.count];
++            MTLRenderPipelineDescriptor* descriptor = [MTLRenderPipelineDescriptor new];
++            descriptor.vertexFunction = pair[0]; descriptor.fragmentFunction = pair[1];
++            descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA8Unorm;
++            if (synchronous) pipeline = [device newRenderPipelineStateWithDescriptor:descriptor options:MTLPipelineOptionNone reflection:nil error:&failure];
++            else [device newRenderPipelineStateWithDescriptor:descriptor options:MTLPipelineOptionNone
++                completionHandler:^(id<MTLRenderPipelineState> p, MTLRenderPipelineReflection* reflection, NSError* e) {
++                    pipeline = [p retain]; failure = [e retain]; dispatch_semaphore_signal(done);
++                }];
++            [descriptor release];
++        }
++        if (!synchronous) dispatch_semaphore_wait(done,DISPATCH_TIME_FOREVER);
++        if (gated) dispatch_semaphore_signal(meshGate);
++        NSDictionary* row = @{@"request":@(i),@"mesh":@(mesh),@"created":@(pipeline != nil),
++            @"error":failure.localizedDescription ?: @""};
++        @synchronized(rows) { [rows addObject:row]; }
++        [pipeline release]; if (!synchronous) [failure release];
++        dispatch_release(done); dispatch_semaphore_signal(slots);
++    }});
++    unsigned failures = 0;
++    for (NSDictionary* row in rows) if (![row[@"created"] boolValue]) ++failures;
++    NSDictionary* report = @{@"mode":mode,@"device":device.name,@"requests":@(requests),
++        @"failures":@(failures),@"rows":rows,@"GPUWorkDispatched":@NO,
++        @"descriptorStateApproximate":@YES,@"runtimeFailureEquivalenceProven":@NO};
++    NSData* output = [NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:&error];
++    bool saved = [output writeToFile:@(argv[3]) options:NSDataWritingAtomic error:&error];
++    printf("requests=%u failures=%u\n",requests,failures);
++    dispatch_release(meshGate); dispatch_release(slots); [devices release];
++    return saved ? 0 : 9;
++} }
+--- a/open-game-stack-20261015/repro-geometry-interface-20261015/geometry_specialization_gpu.cpp
++++ b/open-game-stack-20261015/repro-geometry-interface-20261015/geometry_specialization_gpu.cpp
+@@ -0,0 +1,20 @@
++#include "geometry_gpu_common.hpp"
++#include <future>
++#include <filesystem>
++int main(int argc,char**argv) { try {
++ if(argc!=3)throw std::runtime_error("geometry_gpu shader_directory report.json");
++ GPU g;std::filesystem::path dir(argv[1]);constexpr unsigned count=8;
++ auto shader=[&](std::string name){std::ifstream f(dir/name,std::ios::binary|std::ios::ate);if(!f)throw std::runtime_error("Missing shader");size_t n=f.tellg();f.seekg(0);std::vector<uint32_t>w(n/4);f.read((char*)w.data(),n);VkShaderModuleCreateInfo ci{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};ci.codeSize=n;ci.pCode=w.data();VkShaderModule m;CHECK(vkCreateShaderModule(g.device,&ci,nullptr,&m));return m;};
++ VkShaderModule vs=shader("test.vert.spv"),fs=shader("test.frag.spv"),gs[count];for(unsigned i=0;i<count;i++)gs[i]=shader("case"+std::to_string(i)+".geom.spv");
++ VkPipelineLayoutCreateInfo pli{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};VkPipelineLayout layout;CHECK(vkCreatePipelineLayout(g.device,&pli,nullptr,&layout));
++ Img image;VkImageCreateInfo ii{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};ii.imageType=VK_IMAGE_TYPE_2D;ii.format=VK_FORMAT_R8G8B8A8_UNORM;ii.extent={8,8,1};ii.mipLevels=1;ii.arrayLayers=1;ii.samples=VK_SAMPLE_COUNT_1_BIT;ii.tiling=VK_IMAGE_TILING_OPTIMAL;ii.usage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT;CHECK(vkCreateImage(g.device,&ii,nullptr,&image.image));VkMemoryRequirements req;vkGetImageMemoryRequirements(g.device,image.image,&req);VkMemoryAllocateInfo ma{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};ma.allocationSize=req.size;ma.memoryTypeIndex=g.memoryType(req.memoryTypeBits,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);CHECK(vkAllocateMemory(g.device,&ma,nullptr,&image.memory));CHECK(vkBindImageMemory(g.device,image.image,image.memory,0));VkImageViewCreateInfo iv{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};iv.image=image.image;iv.viewType=VK_IMAGE_VIEW_TYPE_2D;iv.format=ii.format;iv.subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};CHECK(vkCreateImageView(g.device,&iv,nullptr,&image.view));
++ VkAttachmentDescription a{};a.format=ii.format;a.samples=VK_SAMPLE_COUNT_1_BIT;a.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;a.storeOp=VK_ATTACHMENT_STORE_OP_STORE;a.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;a.finalLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;VkAttachmentReference ref{0,VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};VkSubpassDescription sub{};sub.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS;sub.colorAttachmentCount=1;sub.pColorAttachments=&ref;VkSubpassDependency dep{0,VK_SUBPASS_EXTERNAL,VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,VK_ACCESS_TRANSFER_READ_BIT,0};VkRenderPassCreateInfo rp{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};rp.attachmentCount=1;rp.pAttachments=&a;rp.subpassCount=1;rp.pSubpasses=&sub;rp.dependencyCount=1;rp.pDependencies=&dep;VkRenderPass renderPass;CHECK(vkCreateRenderPass(g.device,&rp,nullptr,&renderPass));VkFramebufferCreateInfo fb{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};fb.renderPass=renderPass;fb.attachmentCount=1;fb.pAttachments=&image.view;fb.width=fb.height=8;fb.layers=1;VkFramebuffer framebuffer;CHECK(vkCreateFramebuffer(g.device,&fb,nullptr,&framebuffer));
++ VkVertexInputBindingDescription binding{0,8,VK_VERTEX_INPUT_RATE_VERTEX};VkVertexInputAttributeDescription attr{0,0,VK_FORMAT_R32G32_SFLOAT,0};VkPipelineVertexInputStateCreateInfo vi{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};vi.vertexBindingDescriptionCount=1;vi.pVertexBindingDescriptions=&binding;vi.vertexAttributeDescriptionCount=1;vi.pVertexAttributeDescriptions=&attr;VkPipelineInputAssemblyStateCreateInfo ia{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;VkViewport viewport{0,0,8,8,0,1};VkRect2D scissor{{0,0},{8,8}};VkPipelineViewportStateCreateInfo vp{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};vp.viewportCount=1;vp.pViewports=&viewport;vp.scissorCount=1;vp.pScissors=&scissor;VkPipelineRasterizationStateCreateInfo rs{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};rs.polygonMode=VK_POLYGON_MODE_FILL;rs.cullMode=VK_CULL_MODE_NONE;rs.lineWidth=1;VkPipelineMultisampleStateCreateInfo ms{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;VkPipelineColorBlendAttachmentState blend{};blend.colorWriteMask=15;VkPipelineColorBlendStateCreateInfo cb{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};cb.attachmentCount=1;cb.pAttachments=&blend;
++ VkPipeline pipelines[count]{};std::vector<std::future<VkResult>> jobs;
++ for(unsigned i=0;i<count;i++)jobs.push_back(std::async(std::launch::async,[&,i]{VkPipelineShaderStageCreateInfo stages[3]{};for(unsigned j=0;j<3;j++){stages[j].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;stages[j].pName="main";}stages[0].stage=VK_SHADER_STAGE_VERTEX_BIT;stages[0].module=vs;stages[1].stage=VK_SHADER_STAGE_GEOMETRY_BIT;stages[1].module=gs[i];stages[2].stage=VK_SHADER_STAGE_FRAGMENT_BIT;stages[2].module=fs;float scale=(i%2)?0.5f:1.0f;VkSpecializationMapEntry map{7,0,sizeof(scale)};VkSpecializationInfo spec{1,&map,sizeof(scale),&scale};stages[2].pSpecializationInfo=&spec;VkGraphicsPipelineCreateInfo ci{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};ci.stageCount=3;ci.pStages=stages;ci.pVertexInputState=&vi;ci.pInputAssemblyState=&ia;ci.pViewportState=&vp;ci.pRasterizationState=&rs;ci.pMultisampleState=&ms;ci.pColorBlendState=&cb;ci.layout=layout;ci.renderPass=renderPass;return vkCreateGraphicsPipelines(g.device,VK_NULL_HANDLE,1,&ci,nullptr,&pipelines[i]);}));
++ unsigned failed=0;for(auto& job:jobs)if(job.get()!=VK_SUCCESS)failed++;if(failed)throw std::runtime_error("Pipeline failures="+std::to_string(failed));
++ Buf vertices=g.buffer(24,VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),pixels=g.buffer(256,VK_BUFFER_USAGE_TRANSFER_DST_BIT);float positions[]={-1,-1,3,-1,-1,3};memcpy(vertices.p,positions,24);unsigned mismatches=0;
++ for(unsigned i=0;i<count;i++){memset(pixels.p,0xcd,256);g.run([&](VkCommandBuffer cmd){VkMemoryBarrier mb{VK_STRUCTURE_TYPE_MEMORY_BARRIER};mb.srcAccessMask=VK_ACCESS_HOST_WRITE_BIT;mb.dstAccessMask=VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_HOST_BIT,VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,0,1,&mb,0,nullptr,0,nullptr);VkClearValue clear{};VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};begin.renderPass=renderPass;begin.framebuffer=framebuffer;begin.renderArea={{0,0},{8,8}};begin.clearValueCount=1;begin.pClearValues=&clear;vkCmdBeginRenderPass(cmd,&begin,VK_SUBPASS_CONTENTS_INLINE);vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,pipelines[i]);VkDeviceSize zero=0;vkCmdBindVertexBuffers(cmd,0,1,&vertices.b,&zero);vkCmdDraw(cmd,3,1,0,0);vkCmdEndRenderPass(cmd);VkBufferImageCopy copy{};copy.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};copy.imageExtent={8,8,1};vkCmdCopyImageToBuffer(cmd,image.image,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,pixels.b,1,&copy);mb.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;mb.dstAccessMask=VK_ACCESS_HOST_READ_BIT;vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_HOST_BIT,0,1,&mb,0,nullptr,0,nullptr);});float scale=(i%2)?0.5f:1.0f;unsigned char expected[]={static_cast<unsigned char>((32+16*i)*scale),static_cast<unsigned char>((64+8*i)*scale),static_cast<unsigned char>(192*scale),255};for(unsigned pixel=0;pixel<64;pixel++)for(unsigned c=0;c<4;c++)if(abs(int(static_cast<unsigned char*>(pixels.p)[pixel*4+c])-int(expected[c]))>1)mismatches++;}
++ std::ofstream report(argv[2]);report<<"{\"passed\":"<<(mismatches?"false":"true")<<",\"actualDraws\":8,\"concurrentPipelineRequests\":8,\"checkedPixels\":512,\"mismatchedComponents\":"<<mismatches<<",\"geometryToMesh\":true}\n";std::cout<<"GEOMETRY draws=8 checkedPixels=512 mismatches="<<mismatches<<"\n";
++ g.destroy(vertices);g.destroy(pixels);for(auto x:pipelines)vkDestroyPipeline(g.device,x,nullptr);for(auto x:gs)vkDestroyShaderModule(g.device,x,nullptr);vkDestroyShaderModule(g.device,vs,nullptr);vkDestroyShaderModule(g.device,fs,nullptr);vkDestroyFramebuffer(g.device,framebuffer,nullptr);vkDestroyRenderPass(g.device,renderPass,nullptr);vkDestroyPipelineLayout(g.device,layout,nullptr);g.destroy(image);return mismatches?4:0;
++ }catch(const std::exception& e){std::cerr<<e.what()<<"\n";return 1;}}
+--- a/open-game-stack-20261015/src/fresh-mesh-specialization.frag
++++ b/open-game-stack-20261015/src/fresh-mesh-specialization.frag
+@@ -0,0 +1,3 @@
++#version 450
++layout(constant_id=7) const float SCALE=0.25;
++layout(location=2) in vec4 color;layout(location=0)out vec4 outputColor;void main(){outputColor=vec4(color.rgb*SCALE,1);}
+--- a/open-game-stack-20261015/tools/qualify_geometry_specialization.py
++++ b/open-game-stack-20261015/tools/qualify_geometry_specialization.py
+@@ -0,0 +1,60 @@
++#!/usr/bin/env python3
++"""Owned geometry/fragment-specialization GPU readback, with no mesh retry."""
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import re
++import subprocess
++import time
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument('--library', type=Path, required=True)
++    ap.add_argument('--label', required=True)
++    ap.add_argument('--shaders', type=Path, required=True)
++    ap.add_argument('--safe-math', action='store_true')
++    args = ap.parse_args()
++    lib, shaders = args.library.resolve(), args.shaders.resolve()
++    assert lib.is_relative_to(ROOT / 'build') and lib.is_file()
++    assert shaders.is_relative_to(ROOT) and shaders.is_dir()
++    assert re.fullmatch(r'[A-Za-z0-9_-]{1,64}', args.label)
++    out = ROOT / 'evidence' / args.label
++    out.mkdir()
++    (out / 'msl').mkdir()
++    icd = out / 'icd.json'
++    icd.write_text(json.dumps({'file_format_version': '1.0.0', 'ICD': {
++        'library_path': str(lib), 'api_version': '1.4.0', 'is_portability_driver': True}}))
++    env = {k: v for k, v in os.environ.items()
++           if not k.startswith(('DYLD_', 'VK_', 'MVK_', 'MTL_', 'R2_'))}
++    env.update(VK_ICD_FILENAMES=str(icd), MTL_DEBUG_LAYER='1', MVK_CONFIG_LOG_LEVEL='2',
++               MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS='1', MVK_AMD_REFERENCE_RBA2='1',
++               MVK_AMD_REFERENCE_RIA2='1', MVK_AMD_REFERENCE_NULL='1', MVK_AMD_BYTE_GUARDS='1',
++               MVK_AMD_RUNTIME_TRACE='1', MVK_AMD_GPU_TIMEOUT_TRACE='1',
++               MVK_CONFIG_SHADER_DUMP_DIR=str(out / 'msl'),
++               MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES='1', MVK_AMD_FRESH_MESH_LIBRARIES='1',
++               MVK_AMD_SERIALIZE_PIPELINE_LINK='1')
++    if args.safe_math:
++        env['MVK_AMD_SAFE_MESH_LIBRARIES'] = '1'
++    command = [str(ROOT / 'build/probes/geometry_specialization_gpu'), str(shaders), str(out / 'output.json')]
++    start = time.monotonic()
++    p = subprocess.run(command, env=env, capture_output=True, text=True, timeout=35)
++    (out / 'stdout.log').write_text(p.stdout)
++    (out / 'stderr.log').write_text(p.stderr)
++    result = json.loads((out / 'output.json').read_text()) if (out / 'output.json').exists() else {}
++    row = {'command': command, 'exitCode': p.returncode, 'elapsedSeconds': time.monotonic() - start,
++           'candidateSHA256': hashlib.sha256(lib.read_bytes()).hexdigest(), 'result': result,
++           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math,
++           'metalValidationEnabled': 'Metal API Validation Enabled' in p.stderr}
++    row['passed'] = p.returncode == 0 and result.get('passed', False)
++    (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')
++    print(json.dumps(row))
++    return 0 if row['passed'] else 1
++
++
++if __name__ == '__main__':
++    raise SystemExit(main())

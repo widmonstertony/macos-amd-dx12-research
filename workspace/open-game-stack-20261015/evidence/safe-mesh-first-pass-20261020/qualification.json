@@ -1,0 +1,27 @@
+{
+  "timeUTC": "2026-10-20T16:34:51.932932+00:00",
+  "native": [
+    {
+      "case": "safe-mesh-geometry",
+      "firstPassFailures": 0,
+      "retries": 0,
+      "checkedPixels": 512,
+      "mismatches": 0,
+      "actualSafePreciseOptionsVerified": true,
+      "freshFunctions": 24
+    },
+    {
+      "case": "safe-mesh-specialization",
+      "firstPassFailures": 0,
+      "retries": 0,
+      "checkedPixels": 512,
+      "mismatches": 0,
+      "actualSafePreciseOptionsVerified": true,
+      "freshFunctions": 24
+    }
+  ],
+  "originalWinePassed": true,
+  "originalWineEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T163335Z/run.json",
+  "gameFirstPassCompilationPassed": false,
+  "gamePlayable": false
+}

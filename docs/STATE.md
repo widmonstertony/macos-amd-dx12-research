@@ -93,3 +93,26 @@ The original Wine strict graphics-cache test exposed missing identities for inte
 最新线程采样已不在原生编译调用，正在编码图形/计算命令；游戏实际菜单/场景状态仍待用户反馈。单窗口截图失败，不把它推断成游戏黑屏或驱动失败。没有将“管线创建成功”当作可玩验收。
 
 Compilation audit found no unrecovered pipeline-creation failure in the observed records, but 50 initial mesh-link errors were recovered and remain disclosed. Six isolated option combinations linked the extracted recipe successfully, so the initial runtime error was not reproduced. A prospective, GPU-qualified diagnostic candidate records actual compiler provenance and fixes presentation tracing in replay-only mode; it is **not deployed**. Current game and caches remain intact. Sustained scene correctness and performance are unverified.
+
+
+## 首次链接仍失败：保留失败对照（2026-10-20 09:41 本地）
+
+用户对旧 PID3767 的实际反馈是“进去了，可以玩了，但是卡的飞起”，随后授权重启验证并要求编译无错误。这只证明曾进入可操作场景，**不代表已经达到可玩帧率**。
+
+新开关只作用于来源可追溯的 AMD geometry object/mesh/fragment 链：每条管线重建原生库和函数，原样传递 Vulkan 特化值；另设保守数学选项对照。直接原生库输入不改；带 FAIL_ON_PIPELINE_COMPILE_REQUIRED 的请求不偷做编译。默认关闭这些试验开关，失败重放也在本次游戏试验中关闭，避免把恢复成功写成初次零错误。未修改闭源驱动、游戏资产或现有应用宝引擎。
+
+真实 GPU 回归：普通 geometry 与特化值变体各 8 个并发请求、512 像素、0 差异；检查实际函数来源及数学选项。原应用宝 Wine 的计算、33 条严格计算归档命中、5 条严格图形归档命中及呈现也通过。这些微测试未覆盖完整游戏，不能据此保证游戏通过。
+
+实机失败均保留：
+
+- 原数学的独立函数候选 `e895710029a1e0507eeb2eddd72520b9074d3d348840e70de299ce876a0df0af`：PID13176，4 次 mesh 链接失败后退出。
+- 保守数学候选 `b9ceea9fa85b2bc033f6f3046fbf46c517d691fa818fa3c50ccaeadebc787699`：PID14258，2 次相同链接错误后退出。
+- 同一候选、游戏代理内明确设置串行 mesh 链接：PID15420，仍 2 次相同错误后退出。代理设置值可追溯，但本轮未逐次记录 gate 获取过程。
+
+错误为 `fragment input user(locn2) was not found in vertex shader outputs`。对应 mesh 源码实际声明并写入 locn2；错误前后显示 Out of video memory，**没有证明物理显存耗尽**。不能以降低画质代替修复此链接错误。原 Steam 和 Wine 服务继续保留，所有缓存均保留；当前没有游戏进程运行，也没有重复启动相同失败配置。
+
+两份实际失败源码各做 24 组数学/三阶段 invariance 对照，全部链接成功；新一份进一步做 32 次 mesh-only、三种各 128 次混合/门控/同步链接，也未复现失败。它们是有边界的编译/链接控制，不执行游戏 GPU 着色器，描述符未完全覆盖实机，不能声称已复现或修复根因。下一步需要缩小真实运行时与隔离控制的差异，而非继续按猜测重启。
+
+这些源码、测试和精确候选运行库已存入附加快照 `runtime-first-pass-controls-20261020.tar.gz`；它们是**失败试验及研究恢复材料**，不是推荐给用户的可玩版本。游戏派生源码、SPIR-V、原始转储和用户截图未发布。历史下载版 v0.1.0 保持诊断基线。
+
+The user confirmed the previous run entered a controllable scene with unusably low performance. New fresh-function and conservative-math controls passed owned GPU readback tests, but **all three normal-Steam trials failed initial mesh linkage** (4, 2, and 2 errors). The last proxy explicitly enables mesh-link serialization; this did not eliminate the failure. The generic out-of-video-memory dialog does not establish physical VRAM exhaustion. Exact failed source/options link successfully in isolated controls, so the runtime cause remains unproven. Failed candidates and tests are preserved for recovery, not promoted as a playable release. Caches, saves, original Steam and the YYB engine are preserved. No game is currently running.

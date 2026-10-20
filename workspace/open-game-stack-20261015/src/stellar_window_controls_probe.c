@@ -6,6 +6,7 @@
 #include <string.h>
 
 static int refresh_frame;
+static int show_window;
 
 static BOOL CALLBACK inspect(HWND hwnd, LPARAM ignored)
 {
@@ -34,6 +35,13 @@ static BOOL CALLBACK inspect(HWND hwnd, LPARAM ignored)
     constraints.ptMaxSize.y=GetSystemMetrics(SM_CYMAXIMIZED);
     LRESULT limits=SendMessageTimeoutW(hwnd,WM_GETMINMAXINFO,0,(LPARAM)&constraints,SMTO_ABORTIFHUNG|SMTO_BLOCK,250,&reply);
     printf("constraints returned=%lld minTrack=%ld,%ld maxTrack=%ld,%ld\n",(long long)limits,constraints.ptMinTrackSize.x,constraints.ptMinTrackSize.y,constraints.ptMaxTrackSize.x,constraints.ptMaxTrackSize.y);
+    if (show_window) {
+        show_window=0;
+        AllowSetForegroundWindow(ASFW_ANY);
+        BOOL top=BringWindowToTop(hwnd);
+        BOOL foreground=SetForegroundWindow(hwnd);
+        printf("bringToTop=%d setForeground=%d error=%lu\n",top,foreground,GetLastError());
+    }
     if (refresh_frame) {
         refresh_frame=0;
         SetLastError(0);
@@ -45,6 +53,7 @@ static BOOL CALLBACK inspect(HWND hwnd, LPARAM ignored)
 int main(int argc,char **argv)
 {
     refresh_frame=argc==2 && !strcmp(argv[1],"--refresh");
+    show_window=argc==2 && !strcmp(argv[1],"--show");
     DPI_AWARENESS_CONTEXT (WINAPI *setDpi)(DPI_AWARENESS_CONTEXT) =
         (void *)GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetThreadDpiAwarenessContext");
     if (setDpi) setDpi(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);

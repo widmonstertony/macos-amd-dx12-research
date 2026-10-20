@@ -33442,8 +33442,8 @@
     },
     {
       "path": "open-game-stack-20261015/src/stellar_window_controls_probe.c",
-      "bytes": 3300,
-      "sha256": "78e90300305f2c55fe76c172f94068cfa81e7028695a2a933a04efaf280cfa25",
+      "bytes": 3658,
+      "sha256": "833968375ae4ebf9ea0d7e8d737c39e29a37cc963db0afde6f0a49ba3e28aedd",
       "executable": false
     },
     {
@@ -33664,8 +33664,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/run_window_controls.py",
-      "bytes": 1887,
-      "sha256": "659359f927319b6b1e1b59633878472c34a694c3a5e2155b078b9f17019430ce",
+      "bytes": 1978,
+      "sha256": "c1f9f630419b7f346a82fa5f744e6727988e78e07846877acf1e0ad1b160d810",
       "executable": false
     },
     {

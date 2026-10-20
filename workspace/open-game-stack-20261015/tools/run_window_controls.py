@@ -6,6 +6,7 @@ import argparse, datetime, json, os, subprocess
 ROOT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser()
 parser.add_argument('--refresh', action='store_true')
+parser.add_argument('--show', action='store_true')
 parser.add_argument('--once', action='store_true')
 args=parser.parse_args()
 support=Path.home()/'Library/Application Support/YYBIntelLauncher'
@@ -21,7 +22,8 @@ env.update(WINEPREFIX=str(Path.home()/'Library/Application Support/com.tencent.y
  DYLD_LIBRARY_PATH=str(ROOT/'build/winemac-lockfix-leaf-select')+':/private/tmp/mvk-guard-proxy-select',
  DYLD_FALLBACK_LIBRARY_PATH=str(contents/'Frameworks'),WINEDEBUG='-all')
 command=[str(support/'wine-loader'),str(out/'window_controls_probe.exe')]
-if args.refresh:command.append('--refresh')
+if args.show:command.append('--show')
+elif args.refresh:command.append('--refresh')
 elif args.once:command.append('--once')
 with (out/f'{stamp}-stdout.log').open('w') as stdout,(out/f'{stamp}-stderr.log').open('w') as stderr:
  process=subprocess.run(command,cwd=out,env=env,stdout=stdout,stderr=stderr,timeout=40)

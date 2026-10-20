@@ -1,0 +1,87 @@
+{
+  "version": "v0.1.0-experimental",
+  "librarySHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "results": [
+    {
+      "fixture": "queue-probe",
+      "mode": "default",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          0,
+          0,
+          0
+        ],
+        "rounds": 64,
+        "checkedWords": 262144,
+        "mismatches": 0,
+        "totalMilliseconds": 85.2397,
+        "slowestRoundMilliseconds": 45.9689
+      },
+      "passed": true
+    },
+    {
+      "fixture": "queue-probe",
+      "mode": "specialized",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          3,
+          2,
+          0
+        ],
+        "rounds": 64,
+        "checkedWords": 262144,
+        "mismatches": 0,
+        "totalMilliseconds": 85.9948,
+        "slowestRoundMilliseconds": 49.0275
+      },
+      "passed": true
+    },
+    {
+      "fixture": "queue-burst-probe",
+      "mode": "default",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          0,
+          0,
+          0
+        ],
+        "rounds": 2048,
+        "checkedWords": 8388608,
+        "mismatches": 0,
+        "totalMilliseconds": 1076.12,
+        "slowestRoundMilliseconds": 12.0274
+      },
+      "passed": true
+    },
+    {
+      "fixture": "queue-burst-probe",
+      "mode": "specialized",
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          3,
+          2,
+          0
+        ],
+        "rounds": 2048,
+        "checkedWords": 8388608,
+        "mismatches": 0,
+        "totalMilliseconds": 1271.96,
+        "slowestRoundMilliseconds": 47.9466
+      },
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "gamePlayable": false,
+  "gameStarted": false,
+  "existingEnvironmentChanged": false,
+  "limits": "Queue/readback checks only; do not establish shaders, rendering, FSR3, or game compatibility"
+}

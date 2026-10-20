@@ -1,0 +1,30 @@
+{
+  "timeUTC": "2026-10-20T08:44:52.977958+00:00",
+  "archive": "amd-dx12-macos-x86_64-v0.1.0-experimental.tar.gz",
+  "archiveSHA256": "2b76dd71256ada6177660d781ee63abc2a315a82a62a79b04d58db325b76e7ec",
+  "bytes": 4533623,
+  "relocatedVerificationPassed": true,
+  "GPUQualifiedPayloads": [
+    {
+      "path": "bin/queue-probe",
+      "sha256": "829b8ac6d73779bb8a05475cfba4ceccbabcf04f7db5e666f9011d10f82abd75",
+      "identicalToGPUQualifiedR2": true
+    },
+    {
+      "path": "bin/queue-burst-probe",
+      "sha256": "df661bfbd4fa21116ee522cad395cf1511ae226a53573e4915f146187929c5d7",
+      "identicalToGPUQualifiedR2": true
+    },
+    {
+      "path": "lib/libMoltenVK.dylib",
+      "sha256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+      "identicalToGPUQualifiedR2": true
+    }
+  ],
+  "testedNativeModes": 4,
+  "actualCheckedWords": 17301504,
+  "gamePlayable": false,
+  "latestGame70174": "Compute and graphics native GPU timeout 2026-10-20T08:27:27Z; self-exited; no frame-rate or game correctness pass",
+  "previousPackagingFailure": "An initial direct-link fixture incorrectly enabled the Vulkan Loader portability enumeration extension; removed that loader-only request, rebuilt, then reran actual GPU readback.",
+  "inProgressNativeQueueLeaseFixIncluded": false
+}

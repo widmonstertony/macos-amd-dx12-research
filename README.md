@@ -1,29 +1,70 @@
-# Intel / AMD macOS DX12 研究恢复快照
+# Intel / AMD macOS DX12 Research
 
-这是 2026-10-20 的代码和运行库备份。目标环境是 Intel Mac、AMD Radeon Pro 5600M、macOS，以及应用宝原来的 Wine / Windows Steam。**当前没有达到稳定可玩**：已进入过《剑星》场景，但仍有低帧率、蓝色矩形遮挡和 GPU 超时，最新版本正在正常 Steam 启动链中验证。
+**中文** · [English](README.en.md)
 
-## 已保存的内容
+面向 Intel Mac / AMD GPU 的开源 D3D12 → Vulkan → Metal 兼容研究，以正版 Windows Steam《剑星》为主要复现案例。欢迎协助着色器转换、GPU 同步、缓存、Wine 窗口与性能分析。
 
-- `workspace/open-game-stack-20261015/native-vendor/`：修改后的完整 MoltenVK、SPIRV-Cross 及固定版本依赖源码，包括保护规则、资源绑定、缓存、队列和超时诊断。
-- `workspace/open-game-stack-20261015/vendor/`：修改后的 vkd3d-proton、DXIL/DXBC 转换器源码，以及窗口修复涉及的 Wine 模块和头文件。
-- `workspace/` 中的原生 / Windows GPU 探针、构建和资格检查脚本、正常 Steam 启动脚本、原始游戏写保护配置及较早的 D3DMetal 研究源码。
-- `patches/`：与固定上游源码比较生成的累计补丁；历史实验补丁留在对应 `evidence` 路径，**不能把全部历史补丁依次应用**。
-- `artifacts/runtime-20261020.tar.gz`：当前及上一轮研究候选库、对应加载代理、窗口修复模块和本研究源码构建的 D3D12 DLL。逐文件哈希在 `snapshot-manifest.json`。
-- `docs/STATE.md`、`docs/RESTORE.md`：最后状态、依赖边界、恢复步骤与已知问题。
+> **实验项目，尚未可玩。** 曾进入可操作场景，但仍有严重低帧率、蓝色矩形遮挡和 GPU 超时；最近的完整游戏回放失败。下载包是开发者测试包，**不是能让所有 Mac 直接玩《剑星》的成品**。探针通过不代表游戏兼容、FSR3 或其他 DX12 游戏可用。
 
-游戏资产、Steam 客户端和登录信息、Wine 用户前缀、存档、Apple / 应用宝闭源引擎、原始崩溃转储以及大体积游戏着色器缓存未上传。原有本机缓存保留在原路径；此备份可恢复代码和列出的运行库，**不包含完整可迁移游戏环境**。
+## 下载与测试
 
-## 校验与恢复
+[实验版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.1.0-experimental) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)
+
+实验包包含可移动目录的研究运行库、原生 GPU 读回探针、环境检查和校验工具。不包含游戏、Steam、应用宝 / Apple 引擎、存档或登录状态。探针独立运行；游戏集成仍需要正版游戏和兼容 Wine 环境，目前不提供一键游戏安装器。
+
+```sh
+tar -xzf amd-dx12-macos-x86_64-v0.1.0-experimental.tar.gz
+cd amd-dx12-macos-x86_64-v0.1.0-experimental
+python3 runtime.py verify
+python3 runtime.py doctor
+python3 runtime.py test --stress
+```
+
+需要 Python 3 和 x86_64 macOS。唯一实际验证过的 GPU / 系统组合是 Radeon Pro 5600M / macOS 26.7.1。欢迎其他 AMD GPU 提交实验结果，但不承诺兼容。包内工具不会修改 Wine、Steam、游戏资产或现有缓存。
+
+## 实现与范围
+
+```mermaid
+flowchart LR
+  A[正版 Windows Steam 游戏 / D3D12] --> B[vkd3d-proton / DXIL-DXBC 转换]
+  B --> C[Vulkan / SPIR-V]
+  C --> D[MoltenVK + SPIRV-Cross / MSL]
+  D --> E[Metal / macOS AMD 驱动]
+  F[Wine 窗口与输入] -.-> A
+```
+
+- 固定上游版本与修改见 [UPSTREAM.json](docs/UPSTREAM.json)、`patches/`。
+- 工作涉及部分越界 / 空资源保护、设备地址和图形阶段、3D 切片、资源绑定、分片缓存及多队列诊断，采用真实 GPU 输出验证。
+- 私有保护约定不是完整 Robustness2、Vulkan CTS 或 DX12 合规声明；没有伪报硬件功能。
+- Wine 请求编号修复只针对审计过的应用宝引擎，不能随意替换其他版本模块。
+- 未修改或分发 Apple / 应用宝闭源引擎，不提供 DRM 绕过；游戏测试使用正常正版 Steam 启动。
+
+## 证据与限制
+
+| 检查 | 结果 | 不能据此得出的结论 |
+|---|---|---|
+| 单队列 / 三独立队列读回 | 每模式 2,048 轮、8,388,608 words、0 差异 | 游戏全部同步正确 |
+| 计算 / 图形保护探针 | 有 GPU 读回及像素核对 | 完整 DX12 / Robustness2 合规 |
+| 计算归档 | 独立 Wine 探针 33 次严格命中 | 游戏不再重复编译 |
+| 正常 Steam 启动和场景进入 | 曾达到；帧率和画面异常 | 《剑星》已稳定可玩 |
+| 最新游戏完整回放 | 计算 / 图形队列 GPU timeout | 已确定具体致错着色器或驱动 |
+
+详细事实见 [STATE.md](docs/STATE.md)。优先任务是定位最早未完成的图形信号生产者、原生提交顺序、资源声明开销和蓝色遮挡。不能仅修改 feature bit 或只验证 device 创建。
+
+## 源码、构建和恢复
+
+`workspace/` 保留研究源码结构；历史脚本和证据包含原机器路径，不是公众入口。`public/` 是可移动实验包工具。`artifacts/runtime-20261020.tar.gz` 为历史恢复包，代理内有旧绝对路径，不能直接作为公众安装包部署。
 
 ```sh
 python3 scripts/restore_snapshot.py --verify-only
-python3 scripts/restore_snapshot.py --target /新的空目录/gptk-intel-research-restored
+python3 scripts/restore_snapshot.py --target /新的空目录/research-restored
+bash scripts/build_native.sh /恢复后的研究根目录
 ```
 
-目标必须尚不存在，恢复脚本不会覆盖现有工作，不会启动游戏、切换运行库或修改应用宝环境。恢复后需要按照 [恢复说明](docs/RESTORE.md) 重新生成本机路径和加载代理；不要把原机器的绝对路径直接用于另一台机器。
+[恢复说明](docs/RESTORE.md) · [English recovery guide](docs/RESTORE.en.md) · [双语构建说明](docs/BUILD.md)。文件恢复和 CMake 配置已验证，完整跨机器构建与可玩性没有被验证。
 
-## 构建与许可
+## 许可与致谢
 
-原生编译入口是 `scripts/build_native.sh`。需要 macOS、Xcode Command Line Tools 和 CMake；独立 Windows 组件还需要 Meson / Ninja、固定 llvm-mingw 和 Wine 的 widl。恢复文件及构建配置已保存，完整跨机器重建不在此次备份验证范围内。
+上游许可保持不变，不是把全部代码统一改成 MIT。新增公开工具和文档为 MIT，第三方衍生代码沿用各自许可。详见 [LICENSE](LICENSE)、[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 `LICENSES/`。发布时提供对应源码及固定 Wine 基线源码。
 
-这是混合许可源码快照，不为整个仓库重新指定统一许可。各第三方源码原有 LICENSE / COPYING / NOTICE 文件保留；组件来源和固定版本见 [依赖清单](docs/UPSTREAM.json)。备份不代表完整 Vulkan / DX12 合规，也不代表 FSR3 或其他游戏已通过。
+感谢上游项目和 fxgl/steamac 的公开研究。Apple Silicon 试玩版先例不代表此 Intel / AMD 正式版已通过。项目与游戏发行商、Apple、腾讯、Valve 无隶属关系。

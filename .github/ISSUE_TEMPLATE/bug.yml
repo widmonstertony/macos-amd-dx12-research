@@ -1,0 +1,32 @@
+name: Reproduction / 复现报告
+description: Report measured behavior / 提交可核对的结果
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: GPU, macOS, Wine, commit/runtime SHA-256.
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Furthest verified stage / 实际阶段
+      options:
+        - Native probe / 原生探针
+        - D3D12 probe / D3D12 探针
+        - Shader compilation / 着色器编译
+        - Menu / 菜单
+        - Scene with defects / 场景有异常
+        - Sustained gameplay / 持续可玩
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps and actual results / 步骤和结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and timing / 证据与耗时
+      description: No credentials, full dumps, or extracted game assets/shaders. 请勿上传凭据、完整转储或游戏提取资产/着色器。

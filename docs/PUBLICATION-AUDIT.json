@@ -1,0 +1,10 @@
+{
+  "historyBlobsScanned": 9907,
+  "bytesScanned": 210053418,
+  "highConfidenceCredentialPatternLocations": [],
+  "historicalMachinePathsPresent": true,
+  "accountOrGameDataUploaded": false,
+  "scope": "All prior Git history blobs and newly staged public files. No secret values printed. Historical machine-specific paths remain. No game assets, prefixes, raw dumps or game-derived shader sources included.",
+  "stagedTreeFilesScanned": 28,
+  "stagedHighConfidenceCredentialPatternLocations": []
+}

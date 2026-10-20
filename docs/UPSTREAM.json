@@ -130,7 +130,7 @@
     "component": "Wine/CrossOver public sources",
     "sourceURL": "https://media.codeweavers.com/pub/crossover/source/crossover-sources-26.3.0.tar.gz",
     "baselineArchiveSHA256": "ac99c8ca4b3848f3e81784135f023df266b61c2345726ea55a50b3e030dd6872",
-    "baselineArchiveUploaded": false,
+    "baselineArchiveUploaded": true,
     "snapshotScope": "Window driver module and include tree only",
     "changedOrAddedFiles": [
       "include/wine/gdi_driver.h",
@@ -139,6 +139,7 @@
       "dlls/winemac.drv/mouse.c",
       "dlls/winemac.drv/yyb_server_protocol.h"
     ],
-    "patch": "patches/Wine-window-module-cumulative.patch"
+    "patch": "patches/Wine-window-module-cumulative.patch",
+    "baselineReleaseAsset": "crossover-sources-26.3.0.tar.gz"
   }
 ]

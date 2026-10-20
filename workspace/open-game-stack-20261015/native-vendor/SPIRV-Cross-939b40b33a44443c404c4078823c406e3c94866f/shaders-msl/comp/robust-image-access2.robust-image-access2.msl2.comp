@@ -1,0 +1,34 @@
+#version 450
+#extension GL_EXT_shader_image_load_formatted : require
+layout(local_size_x = 1) in;
+
+layout(rgba32f, binding = 0) uniform readonly image2D readImage;
+layout(rgba32f, binding = 1) uniform writeonly image2D writeImage;
+layout(r32ui, binding = 2) uniform uimage2D atomicImage;
+
+layout(std430, binding = 3) buffer OutputSSBO
+{
+    vec4 out_value;
+    uint out_atomic;
+    ivec2 out_size;
+};
+
+void main()
+{
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+
+    // Test image read with potential OOB coordinates
+    // With robustImageAccess2, OOB reads should return (0,0,0,1) for 4-component formats
+    out_value = imageLoad(readImage, coord);
+
+    // Test image write with potential OOB coordinates
+    // With robustImageAccess2, OOB writes should be discarded
+    imageStore(writeImage, coord, vec4(1.0, 2.0, 3.0, 4.0));
+
+    // Test image atomic with potential OOB coordinates
+    // With robustImageAccess2, OOB atomics should return 0 and not modify memory
+    out_atomic = imageAtomicAdd(atomicImage, coord, 1u);
+
+    // Test image size query (should handle null textures)
+    out_size = imageSize(readImage);
+}

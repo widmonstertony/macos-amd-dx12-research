@@ -1,0 +1,341 @@
+--- before/MVKPipeline.mm
++++ after/MVKPipeline.mm
+@@ -47,6 +47,7 @@
+ #include "MVKMeshReplay.h"
+ #include "MVKPipelineLinkGate.h"
+ #include "MVKComputeArchive.h"
++#include "MVKRenderArchive.h"
+ 
+ 
+ #pragma mark - MVKPipelineLayout
+@@ -4031,18 +4032,67 @@
+     if (mvkGPUTimeoutTraceEnabled()) mtlRPLDesc.label = [NSString stringWithFormat:@"vs=%@;fs=%@", mtlRPLDesc.vertexFunction.label ?: @"", mtlRPLDesc.fragmentFunction.label ?: @""];
+ 
+ 	unique_lock<mutex> lock(_completionLock);
++	const char* root = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");
++	bool useShards = getPhysicalDevice()->isAMDHardware() && root && root[0] == '/';
++	NSString* shardPath = useShards && !mvkRenderBinaryArchiveDenied(mtlRPLDesc, true)
++		? mvkRenderShardPath(getMTLDevice(), mtlRPLDesc) : nil;
++	uint64_t started = mvkGetTimestamp();
++	bool loaded = shardPath && mvkLoadRenderShard(getMTLDevice(), mtlRPLDesc, shardPath);
++	double loadMS = mvkGetElapsedNanoseconds(started) / 1e6;
++	bool requireHit = useShards && getenv("MVK_AMD_RENDER_ARCHIVE_REQUIRE_HIT") &&
++		!strcmp(getenv("MVK_AMD_RENDER_ARCHIVE_REQUIRE_HIT"), "1");
++	__block bool strictHit = false;
++	__block bool fallback = false;
++	__block NSInteger archiveErrorCode = 0;
+ 
+ 	compile(lock, ^{
+ 		auto mtlDev = getMTLDevice();
+ 		@synchronized (mtlDev) {
+-			mvkPrepareRenderBinaryArchive(mtlDev, mtlRPLDesc, getPhysicalDevice()->isAMDHardware());
+-			[mtlDev newRenderPipelineStateWithDescriptor: mtlRPLDesc
++			if (!useShards) mvkPrepareRenderBinaryArchive(mtlDev, mtlRPLDesc, getPhysicalDevice()->isAMDHardware());
++			if (loaded || requireHit) {
++				// Loading a file alone does not prove reuse. Ask Metal to reject a
++				// miss before permitting the normal, correctness-preserving fallback.
++				[mtlDev newRenderPipelineStateWithDescriptor:mtlRPLDesc
++					options:MTLPipelineOptionFailOnBinaryArchiveMiss
++					completionHandler:^(id<MTLRenderPipelineState> ps, MTLRenderPipelineReflection*, NSError* error) {
++						strictHit = ps != nil;
++						archiveErrorCode = error.code;
++						if (!ps && !requireHit) {
++							fallback = true;
++							MTLRenderPipelineDescriptor* cold = [mtlRPLDesc copy];
++							cold.binaryArchives = nil;
++							@synchronized (mtlDev) {
++								[mtlDev newRenderPipelineStateWithDescriptor:cold
++									completionHandler:^(id<MTLRenderPipelineState> normal, NSError* normalError) {
++										bool isLate = compileComplete(normal, normalError);
++										if (isLate) destroy();
++									}];
++							}
++							[cold release];
++						} else {
++							bool isLate = compileComplete(ps, error);
++							if (isLate) destroy();
++						}
++					}];
++			} else [mtlDev newRenderPipelineStateWithDescriptor: mtlRPLDesc
+ 									   completionHandler: ^(id<MTLRenderPipelineState> ps, NSError* error) {
+ 										   bool isLate = compileComplete(ps, error);
+ 										   if (isLate) { destroy(); }
+ 									   }];
+ 		}
+ 	});
++	double pipelineMS = mvkGetElapsedNanoseconds(started) / 1e6 - loadMS;
++	uint64_t publishStart = mvkGetTimestamp();
++	bool published = shardPath && !loaded && !requireHit && _mtlRenderPipelineState &&
++		mvkStoreRenderShard(getMTLDevice(), mtlRPLDesc, shardPath);
++	if (useShards && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE"))
++		mvkWriteRuntimeTrace(getMVKConfig(), @"render-archive", @{
++			@"shard":shardPath.lastPathComponent ?: @"", @"loaded":@(loaded),
++			@"strictArchiveHit":@(strictHit), @"requireHit":@(requireHit),
++			@"fallback":@(fallback), @"archiveErrorCode":@(archiveErrorCode),
++			@"published":@(published), @"pipelineCreated":@(_mtlRenderPipelineState != nil),
++			@"loadMilliseconds":@(loadMS), @"pipelineMilliseconds":@(pipelineMS),
++			@"publishMilliseconds":@(mvkGetElapsedNanoseconds(publishStart) / 1e6)});
+ 
+ 	if (mvkRuntimeTraceEnabled(getMVKConfig()) && (!mvkRuntimeReplayOnly() || !_mtlRenderPipelineState))
+ 		mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"pipeline-failure" : @"pipeline", @{@"kind":@"vertex",@"vertex":mvkTraceFunction(mtlRPLDesc.vertexFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil),@"error":_compileError.localizedDescription?:@"",@"errorCode":@(_compileError.code)});
+--- before/MVKShaderModule.mm
++++ after/MVKShaderModule.mm
+@@ -22,6 +22,7 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ #include <CommonCrypto/CommonDigest.h>
++#include "MVKRenderArchive.h"
+ 
+ using namespace std;
+ using namespace mvk;
+@@ -431,17 +432,30 @@
+ 
+ 	MVKMTLFunction result = mvkLib ? mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this) : MVKMTLFunctionNull;
+     const char* shardRoot = getenv("MVK_AMD_COMPUTE_ARCHIVE_DIR");
+-    if (mvkLib && result.getMTLFunction() && shardRoot && shardRoot[0] == '/' &&
+-        getPhysicalDevice()->isAMDHardware() && pShaderConfig->options.entryPointStage == spv::ExecutionModelGLCompute) {
++    const char* renderShardRoot = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");
++    bool computeShard = shardRoot && shardRoot[0] == '/' &&
++        pShaderConfig->options.entryPointStage == spv::ExecutionModelGLCompute;
++    bool renderShard = renderShardRoot && renderShardRoot[0] == '/' &&
++        (pShaderConfig->options.entryPointStage == spv::ExecutionModelVertex ||
++         pShaderConfig->options.entryPointStage == spv::ExecutionModelFragment);
++    if (mvkLib && result.getMTLFunction() && (computeShard || renderShard) &&
++        getPhysicalDevice()->isAMDHardware()) {
+         std::string source;
+         mvkLib->decompressMSL(source);
+         // Include generated code, entry point, compiler options, and complete
+         // specialization values. Hash object bytes explicitly: mvkHash<T>'s
+         // count is in elements, not bytes.
+-        std::string recipe(source);
++        std::string recipe;
+         auto append = [&](const void* bytes, size_t count) {
+             if (count) recipe.append(static_cast<const char*>(bytes), count);
+         };
++        // Preserve the existing compute namespace, including legacy keys.
++        // Render recipes are new: frame variable-length source explicitly.
++        if (renderShard) {
++            uint64_t sourceBytes = source.size();
++            append(&sourceBytes, sizeof(sourceBytes));
++        }
++        append(source.data(), source.size());
+         NSString* functionName = [result.getMTLFunction() name];
+         const char* name = functionName.UTF8String;
+         uint64_t nameBytes = name ? strlen(name) : 0;
+@@ -457,22 +471,42 @@
+         append(&version, sizeof(version));
+         uint64_t dataBytes = pSpecializationInfo ? pSpecializationInfo->dataSize : 0;
+         uint32_t mapCount = pSpecializationInfo ? pSpecializationInfo->mapEntryCount : 0;
+-        append(&dataBytes, sizeof(dataBytes));
+-        if (pSpecializationInfo) append(pSpecializationInfo->pData, dataBytes);
+-        append(&mapCount, sizeof(mapCount));
+-        for (uint32_t index = 0; index < mapCount; ++index) {
+-            const auto& entry = pSpecializationInfo->pMapEntries[index];
+-            append(&entry.constantID, sizeof(entry.constantID));
+-            append(&entry.offset, sizeof(entry.offset));
+-            append(&entry.size, sizeof(entry.size));
++        if (computeShard) {
++            append(&dataBytes, sizeof(dataBytes));
++            if (pSpecializationInfo) append(pSpecializationInfo->pData, dataBytes);
++            append(&mapCount, sizeof(mapCount));
++            for (uint32_t index = 0; index < mapCount; ++index) {
++                const auto& entry = pSpecializationInfo->pMapEntries[index];
++                append(&entry.constantID, sizeof(entry.constantID));
++                append(&entry.offset, sizeof(entry.offset));
++                append(&entry.size, sizeof(entry.size));
++            }
++        } else {
++            // Offsets, mapping order, unused data and padding are not shader
++            // semantics. Equivalent API layouts must not force another compile.
++            std::vector<const VkSpecializationMapEntry*> entries;
++            for (uint32_t index = 0; index < mapCount; ++index)
++                entries.push_back(&pSpecializationInfo->pMapEntries[index]);
++            std::sort(entries.begin(), entries.end(), [](auto a, auto b) { return a->constantID < b->constantID; });
++            append(&mapCount, sizeof(mapCount));
++            for (auto entry : entries) {
++                if (entry->offset > dataBytes || entry->size > dataBytes - entry->offset ||
++                    (entry->size && !pSpecializationInfo->pData)) { renderShard = false; break; }
++                append(&entry->constantID, sizeof(entry->constantID));
++                append(&entry->size, sizeof(entry->size));
++                if (entry->size) append(static_cast<const char*>(pSpecializationInfo->pData) + entry->offset, entry->size);
++            }
+         }
+         unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+         CC_SHA256(recipe.data(), (CC_LONG)recipe.size(), digest);
+         char hex[CC_SHA256_DIGEST_LENGTH * 2 + 1];
+         for (size_t index = 0; index < CC_SHA256_DIGEST_LENGTH; ++index)
+             snprintf(hex + index * 2, 3, "%02x", digest[index]);
+-        NSString* key = [NSString stringWithFormat:@"mvk-cs2-%s", hex];
+-        static_cast<MVKComputePipeline*>(pipeline)->setNativeComputeArchiveKey(key.UTF8String);
++        if (computeShard) {
++            NSString* key = [NSString stringWithFormat:@"mvk-cs2-%s", hex];
++            static_cast<MVKComputePipeline*>(pipeline)->setNativeComputeArchiveKey(key.UTF8String);
++        }
++        if (renderShard) mvkSetFunctionRecipe(result.getMTLFunction(), @(hex));
+     }
+ 	if ((trace || replaySource || mvkGPUTimeoutTraceEnabled()) && mvkLib) {
+ 		std::string source;
+--- before/MVKComputeArchive.h
++++ after/MVKComputeArchive.h
+@@ -54,17 +54,19 @@
+ // A process-local admission budget includes existing owned shard files. No cache
+ // eviction or deletion is performed. Separate processes sharing one directory
+ // can exceed this admission budget, so callers should use a per-game directory.
+-static bool mvkPublishComputeShard(NSString* temporary, NSString* path, uint64_t bytes) {
++static bool mvkPublishComputeShard(NSString* temporary, NSString* path, uint64_t bytes,
++                                  NSString* prefix = @"cs2-",
++                                  const char* budgetName = "MVK_AMD_COMPUTE_ARCHIVE_MAX_TOTAL_BYTES") {
+     static std::mutex budgetLock;
+     static std::unordered_map<std::string, uint64_t> usage;
+     std::lock_guard<std::mutex> lock(budgetLock);
+     NSString* root = path.stringByDeletingLastPathComponent;
+-    std::string rootKey(root.fileSystemRepresentation);
++    std::string rootKey = std::string(root.fileSystemRepresentation) + ":" + prefix.UTF8String;
+     auto entry = usage.find(rootKey);
+     if (entry == usage.end()) {
+         uint64_t existing = 0;
+         for (NSString* name in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:root error:nil]) {
+-            if (![name hasPrefix:@"cs2-"] || ![name hasSuffix:@".metalar"]) continue;
++            if (![name hasPrefix:prefix] || ![name hasSuffix:@".metalar"]) continue;
+             struct stat info {};
+             NSString* file = [root stringByAppendingPathComponent:name];
+             if (!lstat(file.fileSystemRepresentation, &info) && S_ISREG(info.st_mode) && info.st_size > 0)
+@@ -72,7 +74,7 @@
+         }
+         entry = usage.emplace(rootKey, existing).first;
+     }
+-    uint64_t maximum = mvkComputeArchiveLimit("MVK_AMD_COMPUTE_ARCHIVE_MAX_TOTAL_BYTES", 2ull << 30);
++    uint64_t maximum = mvkComputeArchiveLimit(budgetName, 2ull << 30);
+     if (entry->second > maximum || bytes > maximum - entry->second) return false;
+     // Atomic create-only publication. Concurrent writers never overwrite an
+     // existing archive, including an incompatible one retained for diagnosis.
+--- before/MVKRuntimeTrace.h
++++ after/MVKRuntimeTrace.h
+@@ -41,6 +41,8 @@
+         ![kind isEqualToString:@"pipeline-failure"] &&
+         ![kind isEqualToString:@"compute-failure"] &&
+         ![kind isEqualToString:@"slow-compute"] &&
++        !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
++        !([kind isEqualToString:@"compute-archive"] && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
+         !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"]))) return;
+     static std::atomic<uint64_t> sequence{0};
+     NSString* dir = @(config.shaderDumpDir);
+--- before/MVKRenderArchive.h
++++ after/MVKRenderArchive.h
+@@ -0,0 +1,116 @@
++// Opt-in bounded native vertex/fragment archives. Metal validates the complete
++// descriptor on every warm load; a stale/incomplete archive falls back to normal
++// compilation. No mesh archive support is implied by this path.
++#pragma once
++#include <CommonCrypto/CommonDigest.h>
++#include <objc/runtime.h>
++#include "MVKComputeArchive.h"
++
++static const void* mvkFunctionRecipeAssociation() {
++    return sel_registerName("mvkNativeFunctionRecipeV1");
++}
++static void mvkSetFunctionRecipe(id<MTLFunction> function, NSString* recipe) {
++    objc_setAssociatedObject(function, mvkFunctionRecipeAssociation(), recipe, OBJC_ASSOCIATION_COPY);
++}
++static NSString* mvkFunctionRecipe(id<MTLFunction> function) {
++    return objc_getAssociatedObject(function, mvkFunctionRecipeAssociation());
++}
++static bool mvkHasLinkedFunctions(MTLLinkedFunctions* linked) {
++    return linked.functions.count || linked.binaryFunctions.count || linked.groups.count;
++}
++
++static NSString* mvkRenderShardPath(id<MTLDevice> device, MTLRenderPipelineDescriptor* d) {
++    const char* rootC = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");
++    if (!rootC || rootC[0] != '/') return nil;
++    NSString* vertex = mvkFunctionRecipe(d.vertexFunction);
++    NSString* fragment = d.fragmentFunction ? mvkFunctionRecipe(d.fragmentFunction) : @"none";
++    if (!vertex || !fragment) return nil;
++    // Dynamic/linked libraries need their own reproducible compilation recipe.
++    // Refuse this cache subset rather than keying opaque object addresses.
++    if (d.vertexPreloadedLibraries.count || d.fragmentPreloadedLibraries.count ||
++        mvkHasLinkedFunctions(d.vertexLinkedFunctions) || mvkHasLinkedFunctions(d.fragmentLinkedFunctions)) return nil;
++    BOOL directory = NO;
++    NSString* root = @(rootC);
++    if (![[NSFileManager defaultManager] fileExistsAtPath:root isDirectory:&directory] || !directory) return nil;
++    NSMutableString* recipe = [NSMutableString stringWithFormat:@"rs1|%@|%llu|%@|%@|",
++        NSProcessInfo.processInfo.operatingSystemVersionString,
++        (unsigned long long)device.registryID, vertex, fragment];
++    auto add = [&](uint64_t value) { [recipe appendFormat:@"%llu,", (unsigned long long)value]; };
++    add(d.rasterSampleCount); add(d.alphaToCoverageEnabled); add(d.alphaToOneEnabled);
++    add(d.rasterizationEnabled); add(d.maxVertexAmplificationCount);
++    add(d.depthAttachmentPixelFormat); add(d.stencilAttachmentPixelFormat);
++    add(d.inputPrimitiveTopology); add(d.supportIndirectCommandBuffers);
++    add(d.tessellationPartitionMode); add(d.maxTessellationFactor);
++    add(d.tessellationFactorScaleEnabled); add(d.tessellationFactorFormat);
++    add(d.tessellationControlPointIndexType); add(d.tessellationFactorStepFunction);
++    add(d.tessellationOutputWindingOrder);
++    add(d.supportAddingVertexBinaryFunctions); add(d.supportAddingFragmentBinaryFunctions);
++    add(d.maxVertexCallStackDepth); add(d.maxFragmentCallStackDepth);
++    if (@available(macOS 15.0, iOS 18.0, *)) add(d.shaderValidation);
++    for (NSUInteger i = 0; i < 8; ++i) {
++        auto a = d.colorAttachments[i];
++        add(a.pixelFormat); add(a.blendingEnabled); add(a.writeMask);
++        add(a.sourceRGBBlendFactor); add(a.destinationRGBBlendFactor); add(a.rgbBlendOperation);
++        add(a.sourceAlphaBlendFactor); add(a.destinationAlphaBlendFactor); add(a.alphaBlendOperation);
++    }
++    for (NSUInteger i = 0; i < 31; ++i) {
++        auto a = d.vertexDescriptor.attributes[i];
++        auto l = d.vertexDescriptor.layouts[i];
++        add(a.format); add(a.offset); add(a.bufferIndex);
++        add(l.stride); add(l.stepFunction); add(l.stepRate);
++        add(d.vertexBuffers[i].mutability); add(d.fragmentBuffers[i].mutability);
++    }
++    NSData* bytes = [recipe dataUsingEncoding:NSUTF8StringEncoding];
++    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
++    CC_SHA256(bytes.bytes, (CC_LONG)bytes.length, digest);
++    char hex[CC_SHA256_DIGEST_LENGTH * 2 + 1];
++    for (size_t i = 0; i < CC_SHA256_DIGEST_LENGTH; ++i) snprintf(hex + i * 2, 3, "%02x", digest[i]);
++    return [root stringByAppendingPathComponent:[NSString stringWithFormat:@"rs1-%s.metalar", hex]];
++}
++
++static bool mvkLoadRenderShard(id<MTLDevice> device, MTLRenderPipelineDescriptor* descriptor, NSString* path) {
++    if (!path) return false;
++    struct stat info {};
++    uint64_t limit = mvkComputeArchiveLimit("MVK_AMD_RENDER_ARCHIVE_MAX_SHARD_BYTES", 16ull << 20);
++    if (lstat(path.fileSystemRepresentation, &info) || !S_ISREG(info.st_mode) ||
++        info.st_size <= 0 || (uint64_t)info.st_size >= limit) return false;
++    MTLBinaryArchiveDescriptor* ad = [MTLBinaryArchiveDescriptor new];
++    ad.url = [NSURL fileURLWithPath:path];
++    NSError* error = nil;
++    id<MTLBinaryArchive> archive = [device newBinaryArchiveWithDescriptor:ad error:&error];
++    [ad release];
++    if (!archive) return false;
++    descriptor.binaryArchives = @[archive];
++    [archive release];
++    return true;
++}
++
++// Called only after normal compilation succeeds, outside the Metal-device
++// monitor. Each archive holds one complete descriptor, never a growing global
++// collection. Existing files are immutable, including stale/invalid ones.
++static bool mvkStoreRenderShard(id<MTLDevice> device, MTLRenderPipelineDescriptor* descriptor, NSString* path) {
++    if (!path || [[NSFileManager defaultManager] fileExistsAtPath:path]) return false;
++    MTLBinaryArchiveDescriptor* ad = [MTLBinaryArchiveDescriptor new];
++    NSError* error = nil;
++    id<MTLBinaryArchive> archive = [device newBinaryArchiveWithDescriptor:ad error:&error];
++    [ad release];
++    if (!archive) return false;
++    // A private copy leaves the successful compiler's original descriptor intact.
++    MTLRenderPipelineDescriptor* writer = [descriptor copy];
++    writer.binaryArchives = @[archive];
++    bool added = [archive addRenderPipelineFunctionsWithDescriptor:writer error:&error];
++    NSString* temporary = [path stringByAppendingFormat:@".tmp.%@", NSUUID.UUID.UUIDString];
++    bool serialized = added && [archive serializeToURL:[NSURL fileURLWithPath:temporary] error:&error];
++    bool published = false;
++    if (serialized) {
++        struct stat info {};
++        uint64_t limit = mvkComputeArchiveLimit("MVK_AMD_RENDER_ARCHIVE_MAX_SHARD_BYTES", 16ull << 20);
++        if (!lstat(temporary.fileSystemRepresentation, &info) && S_ISREG(info.st_mode) &&
++            info.st_size > 0 && (uint64_t)info.st_size < limit)
++            published = mvkPublishComputeShard(temporary, path, (uint64_t)info.st_size,
++                @"rs1-", "MVK_AMD_RENDER_ARCHIVE_MAX_TOTAL_BYTES");
++    }
++    unlink(temporary.fileSystemRepresentation);
++    [writer release]; [archive release];
++    return published;
++}

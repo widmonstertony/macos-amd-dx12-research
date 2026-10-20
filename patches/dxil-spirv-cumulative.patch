@@ -1,0 +1,7 @@
+--- a/scratch_pool.hpp
++++ b/scratch_pool.hpp
+@@ -1,3 +1,4 @@
++#include <exception>
+ /* Copyright (c) 2019-2022 Hans-Kristian Arntzen for Valve Corporation
+  *
+  * SPDX-License-Identifier: MIT

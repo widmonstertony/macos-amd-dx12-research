@@ -1,0 +1,34 @@
+--- a/spirv_msl.cpp
++++ b/spirv_msl.cpp
+@@ -11274,6 +11274,31 @@
+ 						guarded += join("(", robust_vector_component_condition(info, to_string(c)), " ? (", value, ")[", c, "] : 0)");
+ 					}
+ 					expr->expression = guarded + ")";
++
++					// A robust vector load is no longer a trivial buffer expression. Forwarding it
++					// duplicates all component and byte-range guards at each use (including each
++					// swizzle). Materialize the already guarded SSA value, not the raw load:
++					// forcing a temporary before constructing the guard could read past a tail.
++					if (forwarded_temporaries.count(id))
++					{
++						track_expression_read(id);
++						statement(declare_temporary(result_type, id), expr->expression, ";");
++						// The temporary snapshots the memory and index values now. Later stores
++						// or phi updates must not invalidate it and reintroduce an unguarded load.
++						auto remove_dependee = [&](SPIRVariable *var) {
++							if (!var) return;
++							auto &deps = var->dependees;
++							deps.erase(remove(begin(deps), end(deps), ID(id)), end(deps));
++						};
++						remove_dependee(maybe_get_backing_variable(ptr));
++						for (auto dep : expr->expression_dependencies)
++							remove_dependee(maybe_get<SPIRVariable>(dep));
++						expr->expression = to_name(id);
++						expr->expression_dependencies.clear();
++						expr->implied_read_expressions.clear();
++						forwarded_temporaries.erase(id);
++						suppressed_usage_tracking.erase(id);
++					}
+ 				}
+ 				else
+ 					expr->expression = join("(", info.bounds_check_condition, " ? ", value, " : ", robust_zero_expression(loaded), ")");

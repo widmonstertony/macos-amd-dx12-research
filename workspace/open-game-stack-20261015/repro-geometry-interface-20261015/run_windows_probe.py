@@ -1,0 +1,10 @@
+from pathlib import Path
+import subprocess,os,json,sys
+p=Path(__file__).resolve().parents[1];q=p/'repro-geometry-interface-20261015/input';out=p/'evidence/runtime-pipeline-20261015'/sys.argv[1];out.mkdir(exist_ok=False);(out/'msl').mkdir()
+support=Path.home()/'Library/Application Support/YYBIntelLauncher';c=support/'.runtime/wine-engine.app/Contents';prefix=Path.home()/'Library/Application Support/com.tencent.yybmac.wine.engine/wine'
+env={k:v for k,v in os.environ.items() if not k.startswith(('DYLD_','WINE','YYB_','VK_','VKD3D_','DXVK_','MVK_','MTL_'))};env.update(WINEPREFIX=str(prefix),YYB_NTDLL_PATH=str(c/'SharedSupport/wine/lib/wine/x86_64-unix/ntdll.so'),WINELOADER=str(support/'wine-loader'),WINESERVER=str(c/'MacOS/wineserver'),WINEDLLPATH=str(c/'SharedSupport/wine/lib/wine'),WINEDEBUG='-all',MVK_AMD_RUNTIME_TRACE='1',MVK_AMD_REFERENCE_RBA2='1',MVK_AMD_REFERENCE_RIA2='1',MVK_AMD_REFERENCE_NULL='1',MVK_AMD_BYTE_GUARDS='1',MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS='1',MVK_CONFIG_SHADER_DUMP_DIR=str(out/'msl'),MVK_CONFIG_LOG_LEVEL='2')
+paths=[q/('shader-'+s+'.spv') for s in ['vs-443695132d90c29a','gs-d3d6d9d55af0b72a','fs-6a18efc01914f966']]
+cmd=['/usr/bin/sandbox-exec','-f',str(p/'tencent-normal-original-guard.sb'),'/usr/bin/env','DYLD_LIBRARY_PATH='+str(p/'build/moltenvk-runtime-trace/MoltenVK'),'DYLD_FALLBACK_LIBRARY_PATH='+str(c/'Frameworks'),str(support/'wine-loader'),str(p/'probe-app/geometry_pipeline_probe.exe')]+['Z:\\'+str(x.relative_to(Path.home())).replace('/','\\') for x in paths]
+try:r=subprocess.run(cmd,env=env,capture_output=True,text=True,timeout=45);j={'exitCode':r.returncode,'stdout':r.stdout,'stderr':r.stderr,'normalGameStarted':False}
+except subprocess.TimeoutExpired as e:j={'timeout':True,'stdout':str(e.stdout),'stderr':str(e.stderr)}
+(out/'run.json').write_text(json.dumps(j,indent=2));print('exitCode',j.get('exitCode'),'timeout',j.get('timeout'));print(j['stdout']);print('\n'.join(x for x in j['stderr'].splitlines() if any(k in x for k in ['vkCreate','[mvk-','ERROR','Geometry','feature','Unsupported','unavailable'])))

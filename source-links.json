@@ -1,0 +1,38 @@
+[
+  {
+    "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/include/MoltenVK",
+    "targetPath": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/API"
+  },
+  {
+    "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/include/MoltenVKShaderConverter/SPIRVConversion.h",
+    "targetPath": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVConversion.h"
+  },
+  {
+    "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/include/MoltenVKShaderConverter/SPIRVToMSLConverter.h",
+    "targetPath": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVToMSLConverter.h"
+  },
+  {
+    "path": "open-game-stack-20261015/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/khronos/SPIRV-Headers",
+    "targetPath": "open-game-stack-20261015/vendor/SPIRV-Headers-f88a2d766840fc825af1fc065977953ba1fa4a91"
+  },
+  {
+    "path": "open-game-stack-20261015/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/khronos/Vulkan-Headers",
+    "targetPath": "open-game-stack-20261015/vendor/Vulkan-Headers-ad9ce1235e88dc09287e19171dfac384db8ec32c"
+  },
+  {
+    "path": "open-game-stack-20261015/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/subprojects/dxil-spirv",
+    "targetPath": "open-game-stack-20261015/vendor/dxil-spirv-219d770799606f15abb3c57a8a9b9d19c2ae94ca"
+  },
+  {
+    "path": "open-game-stack-20261015/vendor/dxil-spirv-219d770799606f15abb3c57a8a9b9d19c2ae94ca/third_party/spirv-headers",
+    "targetPath": "open-game-stack-20261015/vendor/SPIRV-Headers-f88a2d766840fc825af1fc065977953ba1fa4a91"
+  },
+  {
+    "path": "open-game-stack-20261015/vendor/dxil-spirv-219d770799606f15abb3c57a8a9b9d19c2ae94ca/subprojects/dxbc-spirv",
+    "targetPath": "open-game-stack-20261015/vendor/dxbc-spirv-29c93aeecd55533a357fdd7c95be5587d1c1f506"
+  },
+  {
+    "path": "open-game-stack-20261015/vendor/dxbc-spirv-29c93aeecd55533a357fdd7c95be5587d1c1f506/submodules/spirv_headers",
+    "targetPath": "open-game-stack-20261015/vendor/SPIRV-Headers-c8ad050fcb29e42a2f57d9f59e97488f465c436d"
+  }
+]

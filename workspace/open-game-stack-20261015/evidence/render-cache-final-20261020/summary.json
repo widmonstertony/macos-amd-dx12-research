@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "library": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/moltenvk-render-canonical-signed/MoltenVK/libMoltenVK.1.4.2.dylib",
+  "SHA256": "01062a298eff011c7f82f60b7f1afbfb62ca80461ca95cd80acc02145a985dc5",
+  "cases": [
+    "seed",
+    "warm",
+    "blend-miss",
+    "blend-seed",
+    "blend-warm",
+    "typed-seed",
+    "typed-warm",
+    "spec-a",
+    "spec-b",
+    "invalid",
+    "wrong-valid",
+    "compute-warm"
+  ],
+  "gameStartedOrRestarted": false,
+  "liveGameLibrariesChanged": false,
+  "sourceGameCacheModified": false,
+  "specializationLayoutEquivalentKeysVerified": true,
+  "actualGamePerformanceMeasured": false
+}

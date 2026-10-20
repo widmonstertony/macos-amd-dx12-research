@@ -1,0 +1,54 @@
+#pragma clang diagnostic ignored "-Wunused-variable"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+#include <metal_atomic>
+
+using namespace metal;
+
+struct OutputSSBO
+{
+    float4 out_value;
+    uint out_atomic;
+};
+
+struct ReadSSBO
+{
+    float4 read_data[1];
+};
+
+struct WriteSSBO
+{
+    float4 write_data[1];
+};
+
+struct AtomicSSBO
+{
+    uint atomic_data[1];
+};
+
+constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(1u);
+
+kernel void main0(constant uint* spvBufferSizeConstants [[buffer(25)]], device OutputSSBO& _20 [[buffer(0)]], device ReadSSBO& _26 [[buffer(1)]], device WriteSSBO& _35 [[buffer(2)]], device AtomicSSBO& _47 [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    constant uint& _20BufferSize = spvBufferSizeConstants[0];
+    constant uint& _26BufferSize = spvBufferSizeConstants[1];
+    constant uint& _35BufferSize = spvBufferSizeConstants[2];
+    constant uint& _47BufferSize = spvBufferSizeConstants[3];
+    _20.out_value = (uint(gl_GlobalInvocationID.x) < (_26BufferSize / 16u) ? _26.read_data[min(uint(gl_GlobalInvocationID.x), uint(max(int((_26BufferSize / 16u)) - 1, 0)))] : float4(0));
+    if (uint(gl_GlobalInvocationID.x) < (_35BufferSize / 16u))
+    {
+        _35.write_data[min(uint(gl_GlobalInvocationID.x), uint(max(int((_35BufferSize / 16u)) - 1, 0)))] = float4(1.0, 2.0, 3.0, 4.0);
+    }
+    uint _52;
+    if (uint(gl_GlobalInvocationID.x) < (_47BufferSize / 4u))
+    {
+        _52 = atomic_fetch_add_explicit((device atomic_uint*)&_47.atomic_data[min(uint(gl_GlobalInvocationID.x), uint(max(int((_47BufferSize / 4u)) - 1, 0)))], 1u, memory_order_relaxed);
+    }
+    else
+    {
+        _52 = {};
+    }
+    _20.out_atomic = _52;
+}
+

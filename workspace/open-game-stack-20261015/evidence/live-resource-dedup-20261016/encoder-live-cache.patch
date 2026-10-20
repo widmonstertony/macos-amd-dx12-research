@@ -1,0 +1,98 @@
+--- Commands/MVKCommandEncoderState.h.before
++++ Commands/MVKCommandEncoderState.h
+@@ -186,7 +186,16 @@
+ };
+ 
+ struct MVKUseResourceHelper {
+-	MVKUseResourceHelper() { used.reserve(1024); }
++	MVKUseResourceHelper() {
++		used.reserve(1024);
++		const char* value = getenv("MVK_AMD_ENCODER_LIVE_CACHE");
++		cacheLiveResources = value && !strcmp(value, "1");
++		value = getenv("MVK_AMD_TRACE_LIVE_CACHE");
++		traceLiveCache = value && !strcmp(value, "1");
++	}
++	MVKUseResourceHelper(const MVKUseResourceHelper&) = delete;
++	MVKUseResourceHelper& operator=(const MVKUseResourceHelper&) = delete;
++	~MVKUseResourceHelper() { releaseLiveResources(); }
+ 	struct Entry {
+ 		MVKSmallVector<id<MTLResource>> read;
+ 		MVKSmallVector<id<MTLResource>> readWrite;
+@@ -196,9 +205,17 @@
+ 		MVKResourceUsageStages stages;
+ 		bool write;
+ 		bool deferred;
++		bool liveRetained = false;
+ 	};
+ 	MVKOnePerEnumEntry<Entry, MVKResourceUsageStages> entries;
+ 	std::unordered_map<id<MTLResource>, ResourceInfo> used;
++	bool cacheLiveResources = false;
++	bool traceLiveCache = false;
++	uint64_t liveLookupCount = 0, liveReuseCount = 0;
++	MVKSmallVector<id<MTLResource>> retainedLiveResources;
++	void releaseLiveResources();
++	/** Reuse a validated object only while this helper owns a retained reference. */
++	void addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write);
+ 	/** Add a resource to the list of resources to use. */
+ 	void add(id<MTLResource> resource, MVKResourceUsageStages stage, bool write);
+ 	/**
+@@ -290,6 +307,7 @@
+ 
+ 	void reset() {
+ 		_gpuAddressableResourceStages = MVKResourceUsageStages::None;
++		_useResource.releaseLiveResources();
+ 		_useResource.used.clear();
+ 	}
+ };
+--- Commands/MVKCommandEncoderState.mm.before
++++ Commands/MVKCommandEncoderState.mm
+@@ -648,8 +648,7 @@
+ 			case MVKDescriptorBindOperationCode::UseTextureWithLiveCheck:
+ 				if (resource) {
+ 					MVKLiveList& list = Op == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck ? dev->getLiveResources().buffers : dev->getLiveResources().textures;
+-					if (auto live = list.isLive(resource))
+-						mvkEncoder.getState().mtlShared()._useResource.addImmediate(resource, encoder, binder.useResource, useResourceStage, target);
++					mvkEncoder.getState().mtlShared()._useResource.addImmediateLive(resource, list, encoder, binder.useResource, useResourceStage, target);
+ 				}
+ 				break;
+ 		}
+@@ -1055,6 +1054,39 @@
+ 	}
+ }
+ 
++void MVKUseResourceHelper::releaseLiveResources() {
++	if (traceLiveCache && (liveLookupCount || liveReuseCount)) {
++		fprintf(stderr, "MVK_LIVE_CACHE enabled=%u lookups=%llu reused=%llu retained=%zu\n",
++		        cacheLiveResources, (unsigned long long)liveLookupCount, (unsigned long long)liveReuseCount, retainedLiveResources.size());
++		liveLookupCount = liveReuseCount = 0;
++	}
++	for (id<MTLResource> resource : retainedLiveResources) [resource release];
++	retainedLiveResources.clear();
++}
++
++void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
++	if (cacheLiveResources) {
++		auto it = used.find(resource);
++		if (it != used.end() && it->second.liveRetained) {
++			if (traceLiveCache) ++liveReuseCount;
++			// Holding the Metal object prevents pointer reuse (ABA) even if its
++			// Vulkan wrapper was removed from the live list in the meantime.
++			if (!isCompatible(it->second, ResourceInfo{stage, write, false}))
++				addImmediate(resource, enc, func, stage, write);
++			return;
++		}
++	}
++	if (traceLiveCache) ++liveLookupCount;
++	if (auto live = liveList.isLive(resource)) {
++		addImmediate(resource, enc, func, stage, write);
++		if (cacheLiveResources) {
++			// The live-list guard retains it until this owned reference is taken.
++			retainedLiveResources.push_back([resource retain]);
++			used.find(resource)->second.liveRetained = true;
++		}
++	}
++}
++
+ void MVKUseResourceHelper::addImmediate(id<MTLResource> resource, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
+ 	ResourceInfo info { stage, write, false };
+ 	auto res = used.emplace(resource, info);

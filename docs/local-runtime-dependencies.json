@@ -1,0 +1,20 @@
+[
+  {
+    "path": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/stellar-overlay/SB/Binaries/Win64/dxgi.dll",
+    "sha256": "16af74bca22dfc108e94c52c21d34fe6863aaebe8a9b635385a7523bf7e5b266",
+    "bytes": 15475826,
+    "uploaded": false
+  },
+  {
+    "path": "/private/tmp/mvk-guard-proxy/tencent-normal-original-guard.sb",
+    "sha256": "b779e41cbf24284c9baba9bb4b03cfaf8653df4a94c7afe50e0741e669a85b0e",
+    "bytes": 1691,
+    "uploaded": false
+  },
+  {
+    "path": "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/MacOS/wineserver",
+    "sha256": "dd1d5e5908429157dea855e246503bf1e47cd0a3c1c4fd84efdac03374a6022a",
+    "bytes": 2441952,
+    "uploaded": false
+  }
+]

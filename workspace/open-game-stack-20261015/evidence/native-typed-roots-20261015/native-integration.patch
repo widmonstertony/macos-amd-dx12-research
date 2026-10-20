@@ -1,0 +1,466 @@
+--- a/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.cpp
++++ b/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.cpp
+@@ -2938,6 +2938,7 @@
+ 	zero_missing_vertex_attributes();
+ 
+ 	build_function_control_flow_graphs_and_analyze();
++	analyze_typed_root_pointers();
+ 	update_active_builtins();
+ 	analyze_image_and_sampler_usage();
+ 	analyze_sampled_image_usage();
+@@ -10941,7 +10942,10 @@
+ 
+ 	// Check if we need robust buffer access bounds checking
+ 	// Apply to arrays in buffers that we've tracked during preprocessing
+-	if (msl_options.robust_buffer_access2 && type)
++	// Bound the logical address-table read, not a subsequent BDA pointee.
++	bool physical_base = expression_type(base).pointer &&
++	                     expression_type(base).storage == StorageClassPhysicalStorageBuffer;
++	if (msl_options.robust_buffer_access2 && type && !physical_base)
+ 	{
+ 		auto *var = maybe_get_backing_variable(base);
+ 
+@@ -11149,6 +11153,17 @@
+ 		uint32_t result_type = ops[0];
+ 		uint32_t id = ops[1];
+ 		uint32_t ptr = ops[2];
++		if (typed_root_loads.count(id))
++		{
++			// Push constants are immutable. Keep the pointer value typed through
++			// forwarded expressions and forced temporaries alike.
++			bool forward = should_forward(ptr);
++			auto &e = emit_op(typed_root_pointer_type, id, to_dereferenced_expression(ptr, false), forward, true);
++			register_read(id, ptr, forward);
++			inherit_expression_dependencies(id, ptr);
++			if (forward) add_implied_read_expression(e, ptr);
++			break;
++		}
+ 		if (amd_emit_byte_load(result_type, id, ptr)) break;
+ 
+ 		// robustBufferAccess2: an array cannot be selected against a zero value (arrays in buffers are
+@@ -12089,7 +12104,13 @@
+ 
+ 	case OpCopyObject:
+ 	{
+-		CompilerGLSL::emit_instruction(instruction);
++		if (typed_root_values.count(ops[1]))
++		{
++			emit_op(typed_root_pointer_type, ops[1], to_unpacked_expression(ops[2]), should_forward(ops[2]));
++			inherit_expression_dependencies(ops[1], ops[2]);
++		}
++		else
++			CompilerGLSL::emit_instruction(instruction);
+ 		AMDByteAccess copied;
+ 		if (amd_get_byte_access(ops[2], copied)) amd_byte_accesses[ops[1]] = copied;
+ 		auto guarded = robust_access_chains.find(ops[2]);
+@@ -12477,6 +12498,13 @@
+ 	case OpConvertUToPtr:
+ 	case OpBitcast:
+ 	{
++		if (typed_root_values.count(ops[1]))
++		{
++			// This integer bitcast/copy is only an address representation change.
++			emit_op(typed_root_pointer_type, ops[1], to_unpacked_expression(ops[2]), should_forward(ops[2]));
++			inherit_expression_dependencies(ops[1], ops[2]);
++			break;
++		}
+ 		auto &type = get<SPIRType>(ops[0]);
+ 		auto &input_type = expression_type(ops[2]);
+ 
+@@ -15697,6 +15725,7 @@
+ }
+ 
+ #include "amd_byte_access.inc"
++#include "typed_root_pointers.inc"
+ 
+ string CompilerMSL::robust_vector_component_condition(const RobustAccessInfo &info, const string &component)
+ {
+@@ -16112,7 +16141,10 @@
+ 
+ 	// Handle HLSL-style 0-based vertex/instance index.
+ 	builtin_declaration = true;
+-	statement(to_struct_member(type, member_type_id, index, qualifier));
++	if (typed_root_members.count((uint64_t(type.self) << 32) | index))
++		statement("device uchar* ", qualifier, to_member_name(type, index), member_attribute_qualifier(type, index), "; /* address-only 64-bit root */");
++	else
++		statement(to_struct_member(type, member_type_id, index, qualifier));
+ 	builtin_declaration = false;
+ }
+ 
+@@ -19423,6 +19455,8 @@
+ // depend on a specific object's use of that type.
+ string CompilerMSL::type_to_glsl(const SPIRType &type, uint32_t id, bool member)
+ {
++	if (typed_root_pointer_type && type.self == typed_root_pointer_type)
++		return "device uchar*";
+ 	string type_name;
+ 
+ 	// Pointer?
+--- a/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.hpp
++++ b/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.hpp
+@@ -617,6 +617,10 @@
+ 		// (nil) textures must return zero. Metal does not guarantee that for nil textures.
+ 		// Implied by robust_image_access2.
+ 		bool null_descriptor = false;
++
++		// Preserve resource provenance of proven address-only 64-bit push-constant
++		// fields. Does not change SPIR-V layout, advertised features, or bounds checks.
++		bool typed_root_pointers = false;
+ 
+ 		bool is_ios() const
+ 		{
+@@ -1495,6 +1499,15 @@
+ 		bool constant = false, row_major = false, runtime = false;
+ 	};
+ 	std::unordered_map<uint32_t, AMDByteAccess> amd_byte_accesses;
++	void analyze_typed_root_pointers();
++	std::unordered_set<uint64_t> typed_root_members;
++	std::unordered_set<uint32_t> typed_root_values;
++	std::unordered_set<uint32_t> typed_root_loads;
++	uint32_t typed_root_pointer_type = 0;
++	uint32_t remap_temporary_type(uint32_t type, uint32_t id) const override
++	{
++		return typed_root_values.count(id) ? typed_root_pointer_type : type;
++	}
+ 	bool amd_byte_guards_enabled() const;
+ 	bool amd_get_byte_access(uint32_t pointer, AMDByteAccess &access);
+ 	void amd_record_byte_access(const uint32_t *ops, uint32_t length);
+--- a/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm
+@@ -2769,6 +2769,7 @@
+ 	shaderConfig.options.mslOptions.ios_support_base_vertex_instance = mtlFeats.baseVertexInstanceDrawing;
+ 	shaderConfig.options.mslOptions.texture_1D_as_2D = mvkCfg.texture1DAs2D;
+ 	shaderConfig.options.mslOptions.null_descriptor = getEnabledRobustness2Features().nullDescriptor;
++	shaderConfig.options.mslOptions.typed_root_pointers = getPhysicalDevice()->isAMDHardware();
+     if (getenv("MVK_AMD_REFERENCE_NULL") && std::string(getenv("MVK_AMD_REFERENCE_NULL")) == "1") { shaderConfig.options.mslOptions.null_descriptor = true; }
+ 	shaderConfig.options.mslOptions.enable_point_size_builtin = isRenderingPoints() || reflectData.pointMode;
+ 	shaderConfig.options.mslOptions.enable_point_size_default = shaderConfig.options.mslOptions.enable_point_size_builtin;
+@@ -3173,6 +3174,7 @@
+ 	shaderConfig.options.mslOptions.robust_buffer_access2 = shouldEnableRobustBufferAccess2(this, pCreateInfo);
+ 	shaderConfig.options.mslOptions.robust_image_access2 = shouldEnableRobustImageAccess2(this, pCreateInfo);
+ 	shaderConfig.options.mslOptions.null_descriptor = getEnabledRobustness2Features().nullDescriptor;
++	shaderConfig.options.mslOptions.typed_root_pointers = getPhysicalDevice()->isAMDHardware();
+     if (getenv("MVK_AMD_REFERENCE_NULL") && std::string(getenv("MVK_AMD_REFERENCE_NULL")) == "1") { shaderConfig.options.mslOptions.null_descriptor = true; }
+ 
+ #if MVK_MACOS
+@@ -3594,6 +3596,7 @@
+ 				opt.robust_buffer_access2,
+ 				opt.robust_image_access2,
+ 				opt.null_descriptor,
++				opt.typed_root_pointers,
+ 				opt.for_mesh_pipeline,
+ 				opt.zero_missing_vertex_attributes,
+ 				opt.input_primitive_type);
+@@ -3901,17 +3904,17 @@
+ 
+ void mvkValidateCeralArchiveDefinitions() {
+ 	[[maybe_unused]] size_t missingBytes = 0;
+-	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::CompilerMSL::Options>(9);
++	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::CompilerMSL::Options>(12);
+ 	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::MSLShaderInterfaceVariable>(3);
+ 	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::MSLResourceBinding>();
+ 	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::MSLConstexprSampler>();
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVWorkgroupSizeDimension>(3);
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVEntryPoint>(20);						// Contains string
+-	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionOptions>(31);			// Contains string
++	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionOptions>(30);			// Contains string
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLShaderInterfaceVariable>(6);
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLResourceBinding>(2);
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::DescriptorBinding>();
+-	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionConfiguration>(111);	// Contains collection
++	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionConfiguration>(110);	// Contains collection
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionResultInfo>(39);		// Contains collection
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLSpecializationMacroInfo>(22);			// Contains string
+ 	missingBytes += mvkValidateCerealArchiveSize<MVKShaderModuleKey>();
+--- a/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h
+@@ -197,6 +197,8 @@
+ 
+ 	/** Populates the specified structure with the properties of this device. */
+ 	void getProperties(VkPhysicalDeviceProperties* properties);
++	bool isAMDHardware() const { return _properties.vendorID == 0x1002; }
++	bool needsNativeAMD3DAttachment() const { return _properties.vendorID == 0x1002 && _properties.deviceID == 0x7360; }
+ 
+ 	/** Populates the specified structure with the properties of this device. */
+ 	void getProperties(VkPhysicalDeviceProperties2* properties);
+--- a/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKImage.mm
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKImage.mm
+@@ -2164,8 +2164,16 @@
+ 
+ void MVKImageView::populateMTLRenderPassAttachmentDescriptor(MTLRenderPassAttachmentDescriptor* mtlAttDesc) {
+     MVKImageViewPlane* plane = _planes[0];
+-    bool useView = plane->_useMTLTextureView;
+-    mtlAttDesc.texture = plane->getMTLTexture();
++    // AMD 3D and 2D-array textures do not have interchangeable heap layouts.
++    // For an attachment with the original format, use the actual 3D texture
++    // and the depthPlane selection below. Sampled/storage views keep their
++    // existing path; this does not advertise additional Vulkan capabilities.
++    const bool native3DSlice = getPhysicalDevice()->needsNativeAMD3DAttachment() &&
++        _image->getImageType() == VK_IMAGE_TYPE_3D &&
++        (_mtlTextureType == MTLTextureType2D || _mtlTextureType == MTLTextureType2DArray) &&
++        plane->_mtlPixFmt == _image->getMTLPixelFormat(0) && !plane->_useSwizzle;
++    bool useView = !native3DSlice && plane->_useMTLTextureView;
++    mtlAttDesc.texture = native3DSlice ? _image->getMTLTexture(0) : plane->getMTLTexture();
+     // If a swizzle is being applied, use the unswizzled parent texture.
+     // This is relevant for depth/stencil attachments that are also sampled and might have forced swizzles.
+     if (plane->_useSwizzle && mtlAttDesc.texture.parentTexture) {
+@@ -2184,8 +2192,16 @@
+ 
+ void MVKImageView::populateMTLRenderPassAttachmentDescriptorResolve(MTLRenderPassAttachmentDescriptor* mtlAttDesc) {
+     MVKImageViewPlane* plane = _planes[0];
+-    bool useView = plane->_useMTLTextureView;
+-    mtlAttDesc.resolveTexture = plane->getMTLTexture();
++    // AMD 3D and 2D-array textures do not have interchangeable heap layouts.
++    // For an attachment with the original format, use the actual 3D texture
++    // and the depthPlane selection below. Sampled/storage views keep their
++    // existing path; this does not advertise additional Vulkan capabilities.
++    const bool native3DSlice = getPhysicalDevice()->needsNativeAMD3DAttachment() &&
++        _image->getImageType() == VK_IMAGE_TYPE_3D &&
++        (_mtlTextureType == MTLTextureType2D || _mtlTextureType == MTLTextureType2DArray) &&
++        plane->_mtlPixFmt == _image->getMTLPixelFormat(0) && !plane->_useSwizzle;
++    bool useView = !native3DSlice && plane->_useMTLTextureView;
++    mtlAttDesc.resolveTexture = native3DSlice ? _image->getMTLTexture(0) : plane->getMTLTexture();
+     // If a swizzle is being applied, use the unswizzled parent texture.
+     // This is relevant for depth/stencil attachments that are also sampled and might have forced swizzles.
+     if (plane->_useSwizzle && mtlAttDesc.resolveTexture.parentTexture) {
+--- a/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_glsl.cpp
++++ b/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_glsl.cpp
+@@ -6858,6 +6858,7 @@
+ 
+ SPIRExpression &CompilerGLSL::emit_uninitialized_temporary_expression(uint32_t type, uint32_t id)
+ {
++	type = remap_temporary_type(type, id);
+ 	forced_temporaries.insert(id);
+ 	emit_uninitialized_temporary(type, id);
+ 	return set<SPIRExpression>(id, to_name(id), type, true);
+@@ -6865,6 +6866,7 @@
+ 
+ void CompilerGLSL::emit_uninitialized_temporary(uint32_t result_type, uint32_t result_id)
+ {
++	result_type = remap_temporary_type(result_type, result_id);
+ 	// If we're declaring temporaries inside continue blocks,
+ 	// we must declare the temporary in the loop header so that the continue block can avoid declaring new variables.
+ 	if (!block_temporary_hoisting && current_continue_block && !hoisted_temporaries.count(result_id))
+@@ -6908,6 +6910,7 @@
+ 
+ string CompilerGLSL::declare_temporary(uint32_t result_type, uint32_t result_id)
+ {
++	result_type = remap_temporary_type(result_type, result_id);
+ 	auto &type = get<SPIRType>(result_type);
+ 
+ 	// If we're declaring temporaries inside continue blocks,
+@@ -18176,7 +18179,8 @@
+ 
+ 	for (auto &tmp : temporaries)
+ 	{
+-		auto &type = get<SPIRType>(tmp.first);
++		uint32_t physical_type = remap_temporary_type(tmp.first, tmp.second);
++		auto &type = get<SPIRType>(physical_type);
+ 
+ 		// There are some rare scenarios where we are asked to declare pointer types as hoisted temporaries.
+ 		// This should be ignored unless we're doing actual variable pointers and backend supports it.
+@@ -18190,7 +18194,7 @@
+ 		// Not all targets support pointer literals, so don't bother with that case.
+ 		string initializer;
+ 		if (options.force_zero_initialized_variables && type_can_zero_initialize(type))
+-			initializer = join(" = ", to_zero_initialized_expression(tmp.first));
++			initializer = join(" = ", to_zero_initialized_expression(physical_type));
+ 
+ 		statement(flags_to_qualifiers_glsl(type, tmp.second, flags), variable_decl(type, to_name(tmp.second)), initializer, ";");
+ 
+--- a/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_glsl.hpp
++++ b/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_glsl.hpp
+@@ -806,6 +806,9 @@
+ 	const char *index_to_swizzle(uint32_t index);
+ 	std::string remap_swizzle(const SPIRType &result_type, uint32_t input_components, const std::string &expr);
+ 	std::string declare_temporary(uint32_t type, uint32_t id);
++	// A backend may preserve a value in a different physical representation.
++	// Keep hoisted and inline declarations consistent without changing SPIR-V.
++	virtual uint32_t remap_temporary_type(uint32_t type, uint32_t) const { return type; }
+ 	bool can_declare_inline_temporary(uint32_t id) const;
+ 	void emit_uninitialized_temporary(uint32_t type, uint32_t id);
+ 	SPIRExpression &emit_uninitialized_temporary_expression(uint32_t type, uint32_t id);
+--- a/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPatchRevision.h
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPatchRevision.h
+@@ -1 +1 @@
+-#define MVK_PATCH_REVISION 0x7a069504u
++#define MVK_PATCH_REVISION 0x54525002u
+--- /dev/null
++++ b/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/typed_root_pointers.inc
+@@ -0,0 +1,176 @@
++// Native, name-independent SPIR-V def/use analysis. No generated-text rewriting.
++// Deliberately conservative: unknown uses, component accesses, arithmetic,
++// stores, calls, and phi/select merges retain the original integer representation.
++void CompilerMSL::analyze_typed_root_pointers()
++{
++    typed_root_members.clear();
++    typed_root_values.clear();
++    typed_root_loads.clear();
++    if (!msl_options.typed_root_pointers || !msl_options.is_macos()) return;
++
++    struct Inst { Op op; const uint32_t *a; uint32_t n; bool function; };
++    vector<Inst> instructions;
++    bool in_function = false;
++    // Analyze original module words, including terminators and phi edges which
++    // the structured IR otherwise removes from SPIRBlock::ops.
++    for (size_t offset = 5; offset < ir.spirv.size();)
++    {
++        uint32_t count = ir.spirv[offset] >> 16;
++        if (!count || count > ir.spirv.size() - offset)
++            SPIRV_CROSS_THROW("Malformed module during typed root analysis");
++        Op op = Op(ir.spirv[offset] & 0xffff);
++        if (op == OpFunction) in_function = true;
++        Inst inst { op, ir.spirv.data() + offset + 1, count - 1, in_function };
++        instructions.push_back(inst);
++        if (op == OpFunctionEnd) in_function = false;
++        offset += count;
++    }
++    auto address_bits = [&](uint32_t id) {
++        const auto &t = get<SPIRType>(id);
++        return !t.pointer && t.array.empty() && t.columns == 1 &&
++            ((t.basetype == SPIRType::UInt && t.width == 32 && t.vecsize == 2) ||
++             (t.basetype == SPIRType::UInt64 && t.width == 64 && t.vecsize == 1));
++    };
++    unordered_map<uint32_t, uint32_t> roots;
++    unordered_map<uint32_t, vector<uint64_t>> structure_members;
++    unordered_set<uint64_t> candidates, rejected, has_physical_use;
++    ir.for_each_typed_id<SPIRVariable>([&](uint32_t id, const SPIRVariable &v) {
++        if (v.storage != StorageClassPushConstant) return;
++        const auto &t = get_variable_data_type(v);
++        if (t.basetype != SPIRType::Struct || !t.array.empty()) return;
++        roots[id] = t.self;
++        for (uint32_t m = 0; m < t.member_types.size(); ++m)
++        {
++            if (!address_bits(t.member_types[m]) || !has_member_decoration(t.self, m, DecorationOffset) ||
++                (get_member_decoration(t.self, m, DecorationOffset) & 7)) continue;
++            uint64_t key = (uint64_t(t.self) << 32) | m;
++            candidates.insert(key);
++            structure_members[t.self].push_back(key);
++        }
++    });
++    if (candidates.empty()) return;
++    auto literal_operand = [](const Inst &i, uint32_t k) {
++        // ExtInst's instruction number is a literal, not an SSA ID. In
++        // particular GLSL NMin/NMax/NClamp often coincide with root-load IDs.
++        return i.op == OpExtInst && k == 3;
++    };
++    auto reject_struct = [&](uint32_t type) {
++        auto i = structure_members.find(type);
++        if (i != structure_members.end()) for (auto key : i->second) rejected.insert(key);
++    };
++    // Changing the printed struct member must be safe for every use of that
++    // struct, not only the first push-constant instance we encountered.
++    for (auto &i : instructions)
++    {
++        if (i.op == OpTypePointer && i.n == 3 && i.a[1] != StorageClassPushConstant)
++            reject_struct(i.a[2]);
++        if (i.op == OpTypeStruct)
++            for (uint32_t k = 1; k < i.n; ++k) reject_struct(i.a[k]);
++    }
++    unordered_map<uint32_t, uint64_t> accesses, values, loads;
++    for (auto &i : instructions)
++    {
++        if (!i.function) continue;
++        bool chain = i.op == OpAccessChain || i.op == OpInBoundsAccessChain;
++        for (uint32_t k = 0; k < i.n; ++k)
++        {
++            if (literal_operand(i, k)) continue;
++            auto root = roots.find(i.a[k]);
++            if (root == roots.end()) continue;
++            if (!chain || k != 2 || i.n < 4)
++            {
++                reject_struct(root->second);
++                continue;
++            }
++            const auto *index = maybe_get<SPIRConstant>(i.a[3]);
++            if (!index || index->specialization)
++            {
++                reject_struct(root->second);
++                continue;
++            }
++            uint64_t key = (uint64_t(root->second) << 32) | index->scalar();
++            if (!candidates.count(key)) continue;
++            if (i.n != 4) rejected.insert(key); // whole value only, no vector-component access
++            else accesses[i.a[1]] = key;
++        }
++    }
++    for (auto &i : instructions)
++    {
++        if (!i.function) continue;
++        uint32_t rt = 0, result = 0;
++        bool defines = instruction_to_result_type(rt, result, i.op, i.a, i.n);
++        for (uint32_t k = 0; k < i.n; ++k)
++        {
++            if (literal_operand(i, k)) continue;
++            auto a = accesses.find(i.a[k]);
++            if (a == accesses.end() || (defines && k == 1)) continue;
++            if (i.op == OpLoad && k == 2 && i.n == 3 && address_bits(i.a[0]))
++            {
++                values[i.a[1]] = a->second;
++                loads[i.a[1]] = a->second;
++            }
++            else rejected.insert(a->second);
++        }
++    }
++    // Propagate only lossless, whole-value aliases. All other operations are
++    // rejected below, including mixed numeric/address uses of the same field.
++    bool changed;
++    do
++    {
++        changed = false;
++        for (auto &i : instructions)
++        {
++            if (!i.function || i.n != 3 || (i.op != OpCopyObject && i.op != OpBitcast)) continue;
++            auto v = values.find(i.a[2]);
++            if (v == values.end() || !address_bits(i.a[0]) || values.count(i.a[1])) continue;
++            values[i.a[1]] = v->second;
++            changed = true;
++        }
++    } while (changed);
++    for (auto &i : instructions)
++    {
++        if (!i.function) continue;
++        uint32_t rt = 0, result = 0;
++        bool defines = instruction_to_result_type(rt, result, i.op, i.a, i.n);
++        for (uint32_t k = 0; k < i.n; ++k)
++        {
++            if (literal_operand(i, k)) continue;
++            auto v = values.find(i.a[k]);
++            if (v == values.end() || (defines && k == 1)) continue;
++            bool alias = k == 2 && i.n == 3 && (i.op == OpCopyObject || i.op == OpBitcast) &&
++                         values.count(i.a[1]) && values.at(i.a[1]) == v->second;
++            if (alias) continue;
++            bool cast = k == 2 && i.n == 3 && (i.op == OpBitcast || i.op == OpConvertUToPtr);
++            if (cast)
++            {
++                const auto &target = get<SPIRType>(i.a[0]);
++                if (target.pointer && target.storage == StorageClassPhysicalStorageBuffer)
++                {
++                    has_physical_use.insert(v->second);
++                    continue;
++                }
++            }
++            rejected.insert(v->second);
++        }
++    }
++    for (auto key : candidates)
++        if (!rejected.count(key) && has_physical_use.count(key)) typed_root_members.insert(key);
++    for (auto &v : values)
++        if (typed_root_members.count(v.second)) typed_root_values.insert(v.first);
++    for (auto &v : loads)
++        if (typed_root_members.count(v.second)) typed_root_loads.insert(v.first);
++    if (!typed_root_values.empty() && !typed_root_pointer_type)
++    {
++        uint32_t byte = get_ubyte_type_id();
++        uint32_t id = ir.increase_bound_by(1);
++        SPIRType ptr = get<SPIRType>(byte);
++        ptr.op = OpTypePointer;
++        ptr.parent_type = byte;
++        ptr.pointer = true;
++        ptr.pointer_depth = 1;
++        ptr.storage = StorageClassPhysicalStorageBuffer;
++        auto &made = set<SPIRType>(id, ptr);
++        made.self = id;
++        typed_root_pointer_type = id;
++    }
++}

@@ -1,0 +1,59 @@
+{
+  "librarySHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "passed": true,
+  "results": {
+    "default": {
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          0,
+          0,
+          0
+        ],
+        "rounds": 64,
+        "checkedWords": 262144,
+        "mismatches": 0,
+        "totalMilliseconds": 212.852,
+        "slowestRoundMilliseconds": 42.7758
+      },
+      "traceRecords": 193,
+      "waitEvents": 128,
+      "signalEvents": 192,
+      "observedCompletedWaitsSatisfied": true,
+      "queueFamilies": [
+        0
+      ],
+      "MetalValidationEnabled": true
+    },
+    "specialized": {
+      "exitCode": 0,
+      "GPUResult": {
+        "passed": true,
+        "selectedFamilies": [
+          3,
+          2,
+          0
+        ],
+        "rounds": 64,
+        "checkedWords": 262144,
+        "mismatches": 0,
+        "totalMilliseconds": 115.409,
+        "slowestRoundMilliseconds": 36.7227
+      },
+      "traceRecords": 195,
+      "waitEvents": 128,
+      "signalEvents": 192,
+      "observedCompletedWaitsSatisfied": true,
+      "queueFamilies": [
+        0,
+        2,
+        3
+      ],
+      "MetalValidationEnabled": true
+    }
+  },
+  "forcedGPUHang": false,
+  "gameStarted": false,
+  "gameFixProven": false
+}

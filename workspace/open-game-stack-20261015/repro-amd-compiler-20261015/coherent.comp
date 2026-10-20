@@ -1,0 +1,17 @@
+#version 450
+#ifndef SCALAR
+#define SCALAR uint
+#endif
+layout(local_size_x=64) in;
+layout(set=0,binding=0,std430) coherent buffer Data { SCALAR value[]; } data;
+layout(set=0,binding=1,std430) buffer Output { uint value[]; } outputData;
+layout(push_constant) uniform Params { uint mode, index, count, value; } pc;
+void main() {
+    uint gid=gl_GlobalInvocationID.x;
+    if (pc.mode==0u && gid<pc.count)
+        data.value[gid]=SCALAR((gid*1664525u+1013904223u) ^ (gid<<17u));
+    else if(pc.mode==1u && gid<pc.count)
+        outputData.value[gid]=uint(data.value[(gid*40503u)&(pc.count-1u)]);
+    else if(pc.mode==2u && gid==0u) data.value[pc.index]=SCALAR(pc.value);
+    else if(pc.mode==3u && gid==0u) outputData.value[0]=uint(data.value[pc.index]);
+}

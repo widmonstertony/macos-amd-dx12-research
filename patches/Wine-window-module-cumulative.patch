@@ -1,0 +1,154 @@
+--- a/include/wine/gdi_driver.h
++++ b/include/wine/gdi_driver.h
+@@ -443,6 +443,11 @@
+     /* CW Hack 22310 */
+     NTSTATUS (*pSetCurrentProcessExplicitAppUserModelID)(LPCWSTR);
+     NTSTATUS (*pGetCurrentProcessExplicitAppUserModelID)(LPWSTR,INT);
++    /* Tencent's interface-108 host appends two optional native UI hooks.
++     * Reserve the observed slots; this research driver supplies neither.
++     * Do not let its table copy read past the source driver's allocation. */
++    void (*yyb_reserved_open_folder)(void);
++    void (*yyb_reserved_message_box)(void);
+ };
+ 
+ W32KAPI void __wine_set_user_driver( const struct user_driver_funcs *funcs, UINT version );
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -36,6 +36,7 @@
+ 
+ #include "macdrv.h"
+ #include "wine/server.h"
++#include "yyb_server_protocol.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(macdrv);
+ 
+@@ -244,6 +245,30 @@
+ void release_win_data(struct macdrv_win_data *data)
+ {
+     if (data) pthread_mutex_unlock(&win_data_mutex);
++}
++
++/* win32u calls these surface callbacks while holding surfaces_lock. Never wait
++ * here on a window lock retained by its owner during reentrant window updates:
++ * that owner may itself need surfaces_lock. Defer only the view operation and
++ * let the owner update or next present retry. surfaces_lock still protects the
++ * surface's lifetime. Mandatory window operations retain their blocking locks.
++ */
++static struct macdrv_win_data *get_surface_win_data(HWND hwnd)
++{
++    struct macdrv_win_data *data;
++    static LONG deferred_count;
++
++    if (!hwnd) return NULL;
++    if (pthread_mutex_trylock(&win_data_mutex))
++    {
++        if (InterlockedIncrement(&deferred_count) == 1 && getenv("WINE_MACDRV_LOCK_DIAGNOSTICS"))
++            fprintf(stderr, "macdrv-lockfix: deferred surface window update under contention\n");
++        return NULL;
++    }
++    if (win_datas && (data = (struct macdrv_win_data *)CFDictionaryGetValue(win_datas, hwnd)))
++        return data;
++    pthread_mutex_unlock(&win_data_mutex);
++    return NULL;
+ }
+ 
+ 
+@@ -883,6 +908,7 @@
+ 
+     SERVER_START_REQ(set_capture_window)
+     {
++        MACDRV_YYB_SERVER_REQUEST(set_capture_window, req);
+         req->handle = wine_server_user_handle(hwnd);
+         req->flags  = CAPTURE_MOVESIZE;
+         if ((ret = !wine_server_call_err(req)))
+@@ -1183,7 +1209,7 @@
+     NtUserGetClientRect(hwnd, &rect, NtUserGetWinMonitorDpi(hwnd, MDT_RAW_DPI));
+     NtUserMapWindowPoints(hwnd, toplevel, (POINT *)&rect, 2, NtUserGetWinMonitorDpi(toplevel, MDT_RAW_DPI));
+ 
+-    if (!(data = get_win_data(toplevel))) return;
++    if (!(data = get_surface_win_data(toplevel))) return;
+     OffsetRect(&rect, data->rects.client.left - data->rects.visible.left, data->rects.client.top - data->rects.visible.top);
+     macdrv_set_view_frame(surface->cocoa_view, cgrect_from_rect(rect));
+     macdrv_set_view_superview(surface->cocoa_view, toplevel == hwnd ? NULL : data->client_view, data->cocoa_window, NULL, NULL);
+@@ -1197,7 +1223,7 @@
+ 
+     TRACE("%s\n", debugstr_client_surface(client));
+ 
+-    if (!(data = get_win_data(surface->client.hwnd))) return;
++    if (!(data = get_surface_win_data(surface->client.hwnd))) return;
+     if (data->client_view != surface->cocoa_view)
+     {
+         if (data->client_view) macdrv_set_view_hidden(data->client_view, TRUE);
+@@ -1249,6 +1275,7 @@
+     /* retrieve the real size of the desktop */
+     SERVER_START_REQ(get_window_rectangles)
+     {
++        MACDRV_YYB_SERVER_REQUEST(get_window_rectangles, req);
+         req->handle = wine_server_user_handle(hwnd);
+         req->relative = COORDS_CLIENT;
+         wine_server_call(req);
+@@ -1263,6 +1290,7 @@
+ 
+         SERVER_START_REQ(set_window_pos)
+         {
++            MACDRV_YYB_SERVER_REQUEST(set_window_pos, req);
+             req->handle        = wine_server_user_handle(hwnd);
+             req->previous      = 0;
+             req->swp_flags     = SWP_NOZORDER;
+--- a/dlls/winemac.drv/macdrv_main.c
++++ b/dlls/winemac.drv/macdrv_main.c
+@@ -34,6 +34,7 @@
+ #include "macdrv.h"
+ #include "shellapi.h"
+ #include "wine/server.h"
++#include "yyb_server_protocol.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(macdrv);
+ 
+@@ -508,6 +509,7 @@
+     }
+     SERVER_START_REQ(set_queue_fd)
+     {
++        MACDRV_YYB_SERVER_REQUEST(set_queue_fd, req);
+         req->handle = wine_server_obj_handle(handle);
+         ret = wine_server_call(req);
+     }
+--- a/dlls/winemac.drv/mouse.c
++++ b/dlls/winemac.drv/mouse.c
+@@ -29,6 +29,7 @@
+ #define OEMRESOURCE
+ #include "macdrv.h"
+ #include "wine/server.h"
++#include "yyb_server_protocol.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(cursor);
+ 
+@@ -140,6 +141,7 @@
+         /* update the wine server Z-order */
+         SERVER_START_REQ(update_window_zorder)
+         {
++            MACDRV_YYB_SERVER_REQUEST(update_window_zorder, req);
+             req->window      = wine_server_user_handle(top_level_hwnd);
+             req->rect.left   = x;
+             req->rect.top    = y;
+--- /dev/null
++++ b/dlls/winemac.drv/yyb_server_protocol.h
+@@ -0,0 +1,18 @@
++/* Generated from the immutable original server dispatch table. */
++#ifndef MACDRV_YYB_SERVER_PROTOCOL_H
++#define MACDRV_YYB_SERVER_PROTOCOL_H
++/* Tencent inserts save_app_select_path at ordinal 7. All five direct
++ * server requests here otherwise retain the public request layouts. */
++C_ASSERT(REQ_set_queue_fd == 115);
++#define MACDRV_YYB_REQ_set_queue_fd ((enum request)116)
++C_ASSERT(REQ_set_capture_window == 195);
++#define MACDRV_YYB_REQ_set_capture_window ((enum request)196)
++C_ASSERT(REQ_get_window_rectangles == 156);
++#define MACDRV_YYB_REQ_get_window_rectangles ((enum request)157)
++C_ASSERT(REQ_set_window_pos == 155);
++#define MACDRV_YYB_REQ_set_window_pos ((enum request)156)
++C_ASSERT(REQ_update_window_zorder == 164);
++#define MACDRV_YYB_REQ_update_window_zorder ((enum request)165)
++#define MACDRV_YYB_SERVER_REQUEST(name, request) \
++    ((request)->__header.req = MACDRV_YYB_REQ_##name)
++#endif

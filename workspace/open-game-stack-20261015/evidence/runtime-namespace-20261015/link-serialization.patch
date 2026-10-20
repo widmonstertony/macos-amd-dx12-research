@@ -1,0 +1,81 @@
+--- before/MVKPipeline.mm
++++ link-serialized/MVKPipeline.mm
+@@ -44,6 +44,7 @@
+ using namespace SPIRV_CROSS_NAMESPACE;
+ #include "MVKRuntimeTrace.h"
+ #include "MVKMeshReplay.h"
++#include "MVKPipelineLinkGate.h"
+ 
+ 
+ #pragma mark - MVKPipelineLayout
+@@ -3795,8 +3796,11 @@
+ 	compile(lock, ^{
+ 		auto mtlDev = getMTLDevice();
+ 		@synchronized (mtlDev) {
++			dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
++			if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+ 			[mtlDev newRenderPipelineStateWithDescriptor: mtlRPLDesc
+ 									   completionHandler: ^(id<MTLRenderPipelineState> ps, NSError* error) {
++				if (linkGate) dispatch_semaphore_signal(linkGate);
+ 										   bool isLate = compileComplete(ps, error);
+ 										   if (isLate) { destroy(); }
+ 									   }];
+@@ -3815,9 +3819,12 @@
+ 	compile(lock, ^{
+ 		auto mtlDev = _owner->getMTLDevice();
+ 		@synchronized (mtlDev) {
++			dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
++			if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+ 			[mtlDev newRenderPipelineStateWithMeshDescriptor: mtlRPLDesc
+ 													 options: MTLPipelineOptionNone
+ 										   completionHandler: ^(id<MTLRenderPipelineState> ps, MTLRenderPipelineReflection *refl, NSError* error) {
++				if (linkGate) dispatch_semaphore_signal(linkGate);
+ 				bool isLate = compileComplete(ps, error);
+ 				if (isLate) { destroy(); }
+ 			}];
+@@ -3857,9 +3864,12 @@
+ 	compile(lock, ^{
+ 		auto mtlDev = getMTLDevice();
+ 		@synchronized (mtlDev) {
++			dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
++			if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+ 			[mtlDev newComputePipelineStateWithDescriptor: plDesc
+ 												  options: MTLPipelineOptionNone
+ 										completionHandler: ^(id<MTLComputePipelineState> ps, MTLComputePipelineReflection*, NSError* error) {
++				if (linkGate) dispatch_semaphore_signal(linkGate);
+ 											bool isLate = compileComplete(ps, error);
+ 											if (isLate) { destroy(); }
+ 										}];
+--- before/MVKMeshReplay.h
++++ link-serialized/MVKMeshReplay.h
+@@ -1,6 +1,7 @@
+ // Bounded opt-in in-process diagnostic: rebuild the complete selected source.
+ // This is not a release fallback: it requires the owned runtime source trace.
+ #pragma once
++#include "MVKPipelineLinkGate.h"
+ static inline id<MTLRenderPipelineState> mvkReplayFailedMesh(id<MTLDevice> device,
+         MTLMeshRenderPipelineDescriptor* original, const MVKConfiguration& config) {
+     const char* enabled = getenv("MVK_AMD_REPLAY_FAILED_MESH");
+@@ -50,7 +51,10 @@
+         id<MTLRenderPipelineState> pipeline = nil;
+         if (freshFunctions.count == 3) {
+             descriptor.objectFunction = freshFunctions[0];descriptor.meshFunction = freshFunctions[1];descriptor.fragmentFunction = freshFunctions[2];
++            dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(true); // Caller restricts replay to AMD.
++            if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+             pipeline = [device newRenderPipelineStateWithMeshDescriptor:descriptor options:MTLPipelineOptionNone reflection:nil error:&error];
++            if (linkGate) dispatch_semaphore_signal(linkGate);
+         }
+         mvkWriteRuntimeTrace(config,@"mesh-replay",@{@"renamedEntryPoints":@(rename),@"mathMode":@"safe+precise",@"sourceFilesComplete":@YES,@"freshFunctionCount":@(freshFunctions.count),@"created":@(pipeline!=nil),@"error":error.localizedDescription?:@"",@"originalObject":mvkTraceFunction(original.objectFunction),@"originalMesh":mvkTraceFunction(original.meshFunction),@"originalFragment":mvkTraceFunction(original.fragmentFunction)});
+         [descriptor release];
+--- /dev/null
++++ link-serialized/MVKPipelineLinkGate.h
+@@ -0,0 +1,9 @@
++// Opt-in AMD pipeline-link serialization. Hold across asynchronous completion,
++// not just the API submission. Library conversion/compilation remains parallel.
++#pragma once
++static inline dispatch_semaphore_t mvkGetPipelineLinkGate(bool isAMD) {
++    const char* option = getenv("MVK_AMD_SERIALIZE_PIPELINE_LINK");
++    if (!isAMD || !option || strcmp(option,"1")) return nullptr;
++    static dispatch_semaphore_t gate = dispatch_semaphore_create(1);
++    return gate;
++}

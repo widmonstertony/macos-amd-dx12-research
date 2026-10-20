@@ -1,0 +1,110 @@
+{
+  "timeUTC": "2026-10-20T07:30:40.367751+00:00",
+  "gamePID": 59188,
+  "gameRunning": false,
+  "gameRestartedOrKilledByAgent": false,
+  "currentRunGPUCandidateSHA256": "904fa44748f05189daa5e0e54bcf0976e144303cf37656220548356001e5acd9",
+  "userSceneReport": "Scene entered, only a few frames, somewhat improved",
+  "visibleRenderingDefect": "Large solid blue rectangular area over upper scene; character/ground/HUD visible",
+  "screenshot": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/scene-cpu-resource-use-20261020/user-scene-blue-occlusion.png",
+  "GPUTimeouts": [
+    {
+      "queueFamily": 2,
+      "queueIndex": 0,
+      "errorCode": 2,
+      "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+      "GPUStartTime": 45387.111958819005,
+      "GPUEndTime": 45387.111967986006,
+      "label": "vkQueueSubmit MTLCommandBuffer on Queue 2-0",
+      "status": 5,
+      "file": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/independent-queues-game-20261020T062201Z/msl/trace-gpu-timeout-59188-6.json",
+      "timeUTC": "2026-10-20T07:07:34.959049+00:00",
+      "encoderStates": {},
+      "encoderCount": 0,
+      "nonCompletedEncoders": []
+    },
+    {
+      "queueFamily": 0,
+      "queueIndex": 0,
+      "errorCode": 2,
+      "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+      "GPUStartTime": 45382.085861552005,
+      "GPUEndTime": 45388.848304748004,
+      "label": "vkQueueSubmit MTLCommandBuffer on Queue 0-0",
+      "status": 5,
+      "file": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/independent-queues-game-20261020T062201Z/msl/trace-gpu-timeout-59188-7.json",
+      "timeUTC": "2026-10-20T07:07:36.695114+00:00",
+      "encoderStates": {
+        "completed": 27
+      },
+      "encoderCount": 27,
+      "nonCompletedEncoders": []
+    }
+  ],
+  "fatalDump": {
+    "dump": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/stellar-crash-report-state/reports/715a61cb-ac61-49d5-a42e-174e47ebec91.dmp",
+    "timestampUTC": "2026-10-20T07:09:47+00:00",
+    "exceptionCode": "0x4000",
+    "exceptionThreadID": 1744,
+    "exceptionAddress": "0x6fffffb7da87",
+    "parameterCount": 1,
+    "fatalMessages": [],
+    "readOnly": true,
+    "shaderCulpritIdentified": false,
+    "exceptionThreadStackBytesSearched": 12050432,
+    "recognizedFatalMessagesInExceptionThreadStack": [
+      {
+        "encoding": "utf-16le",
+        "message": "GameThread timed out waiting for RenderThread after 120.00 secs\n"
+      },
+      {
+        "encoding": "utf-16le",
+        "message": "LowLevelFatalError [File:Unknown] [Line: 1226] \nGameThread timed out waiting for RenderThread after 120.00 secs\n"
+      }
+    ]
+  },
+  "specificShaderCulpritIdentified": false,
+  "queueDependencyCycleProven": false,
+  "CPUQueueSampleFinding": "Draw finalization spends substantial sampled time in resource declaration, live lookup and AMD useResources, but not a calibrated whole-game performance percentage",
+  "GPUUtilizationLimit": "7-13 percent observations overlap uncertain foreground state; not proof of GPU ceiling or a valid sustained scene benchmark",
+  "resourceHelperSettingsKnown": false,
+  "resourceHelperReadResult": "No active helper frames before exit; later one-shot diagnostic attempt failed at attach because process already exited; no breakpoint installed or fields changed",
+  "residencyAPIObservation": {
+    "device": "AMD Radeon Pro 5600M",
+    "responds": true,
+    "domain": "",
+    "code": 0,
+    "GPUWorkSubmitted": false,
+    "created": false,
+    "error": ""
+  },
+  "stagedDiagnosticCandidateSHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "diagnosticCandidateDeployed": false,
+  "diagnosticChanges": "Opt-in per-command-buffer native wait/signal records with requested values and observed shared-event values; bounded pending registry 256 and 64 events per CB; snapshots on GPU failure. No synchronization results/values or shader semantics changed. No forced GPU hang.",
+  "qualification": {
+    "nativeQueueModesPassed": 2,
+    "GPUReadbackWords": 524288,
+    "mismatches": 0,
+    "actualWaitRecords": 256,
+    "actualSignalRecords": 384,
+    "allCompletedRecordedWaitValuesSatisfied": true,
+    "graphicsPixels": 5120,
+    "graphicsMismatches": 0,
+    "computeWords": 124416,
+    "computeMismatches": 0,
+    "originalWineComputeCacheAndPresentPassed": true,
+    "originalWineQualification": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T072513Z/run.json",
+    "originalWineStrictComputeHits": 33
+  },
+  "reviewableNextTrial": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-dependency-trial-preview-20261020/preview.json",
+  "nextTrialScope": "Normal original licensed Steam launch only, same original Wine/prefix/Steam, all existing caches retained, same specialized queues/rendering path; optional new render-shard mode left inactive for focused dependency comparison. Needs renewed decision because latest user instruction was to preserve run/no restart.",
+  "gamePlayable": false,
+  "fullSuccessClaimed": false,
+  "remaining": [
+    "GPU timeout trigger or missing dependency unknown",
+    "Blue rectangular rendering corruption unknown",
+    "Sustained low FPS unresolved; CPU binding overhead sampled, not fully characterized",
+    "Cold compilation performance and complete render-cache deployment remain unresolved"
+  ],
+  "next": "Do not relaunch unchanged. Qualified new diagnostic candidate and original-Wine checks are ready; ask about one cache-preserving targeted normal-Steam trial because user explicitly said not to restart."
+}

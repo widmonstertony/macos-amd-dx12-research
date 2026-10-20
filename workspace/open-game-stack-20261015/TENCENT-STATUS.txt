@@ -1,0 +1,383 @@
+2026-10-15：按用户要求，改用原应用宝 Wine 和原 Steam
+==================================================
+
+用户明确要求“你就直接用吧”。不再要求登录 prefix-open-dx12 的独立 Steam。
+独立 Steam 已正常发送 -shutdown，当前未继续使用 Wine Staging11.16。
+
+实际使用的原环境
+----------------
+引擎：~/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app
+前缀：~/Library/Application Support/com.tencent.yybmac.wine.engine/wine
+Steam：此前缀 C:/Program Files (x86)/Steam/Steam.exe
+原前缀实际 socket：/private/tmp/.wine-501/server-1000009-2c263ad。
+由 lsof CWD 和前缀 dev/inode 对照核实。不是 prefix-open-dx12。
+
+没有替换或修改应用宝引擎、Apple二进制、光遇配置、原游戏或存档。
+有以下正常使用/局部修改，不能笼统称“前缀完全没变化”：
+* 原 Steam 按官方流程从9月客户端更新到10月13日客户端，约110MiB。
+* 仅自编 d3d12_probe.exe / d3d12_compute_probe.exe /
+  d3d12_presentation_probe.exe 的 Wine AppDefaults/DllOverrides 设置 native。
+  原值和查询结果备份在 evidence/tencent-app-dlls-*。没有全局DllOverrides，
+  没有光遇配置修改。SB-Win64-Shipping.exe 的设置尚未应用。
+* 原启动器需要重建共享 links 启动缓存。最初两次被旧保护阻止，启动器退出。
+  核实12个90,544字节文件共用同一inode，且与原 wineloader 逐字节相同；
+  它们不是同名的Windows游戏，而是原生启动器硬链接。已经完整备份到
+  evidence/tencent-steam-20261015T152945Z/shared-launcher-files-backup。
+  按最新用户使用原环境的授权，仅允许正常缓存重建；原游戏和引擎本体
+  写保护保留。旧 complete-control 副本保护文件没有修改或重新运行。
+
+发现并解决的真实接线问题
+----------------------
+1. 应用宝会把环境变量 WINEDLLOVERRIDES 重写为
+   dxgi,d3d11,d3d10core=n,b，把传入的 d3d12 / d3d12core 选择丢掉。
+   最小检查程序只输出四个图形变量和模块位置，没有读取其他环境或凭据。
+   证据：evidence/tencent-selection-20261015T154747Z/stdout.log。
+   因而早期 D3D12CreateDevice E_NOINTERFACE 来自旧 builtin D3D12 与新
+   DXGI 混用，不能算新开源后端/AMD执行失败。加载日志明确 builtin。
+   改用每个程序自己的 AppDefaults 后，新两个DLL明确 native，开始输出
+   本轮源码的 AMD_RESEARCH_D3D12_CREATE。
+
+2. 固定 vkd3d 源码把 vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR
+   错列为必须加载入口；原 Wine 的 Vulkan 包装层没有该入口。此次 AMD
+   没有开放协作矩阵功能，此功能不应阻止普通 D3D12 初始化。
+   开源修复将它列为可选扩展入口，并在能力查询前检查真实函数指针；
+   缺失时不启用该能力，不伪造成功或返回值。没有修改旧 Wine/驱动。
+   补丁：evidence/vkd3d-optional-cooperative-matrix-loader.patch。
+   新DLL哈希：evidence/tencent-optional-loader-dll-hashes.json。
+
+3. 原前缀 Z: 指向 /Users/tonytan，独立前缀 Z: 指向 /。
+   原来照搬的绝对POSIX缓存地址被vkd3d变成 Z:/Users/tonytan/...，在原
+   前缀会落到错误位置，不能保存缓存。现在对原前缀给出正确 Z:/Documents/
+   GitHub/... Windows路径。原生 MoltenVK dump 等仍使用实际POSIX路径。
+
+在原环境真正通过的部分
+----------------------
+evidence/tencent-device-20261015T155245Z：
+  新D3D12/D3D12Core native + 精确新MoltenVK实际加载，真实AMD5600M；
+  FL11_0/SM6.0报告、增强屏障、upload/default/readback、GPU复制比较通过。
+evidence/tencent-compute-20261015T155635Z/run.json：
+  退出0，实际DXIL计算、根UAV地址、同步、1024word GPU读回，0差异。
+  同一原前缀和原引擎；Metal验证开启。缓存不再报错误路径写失败。
+AMD Robustness2三个位仍000，私有研究编译约定、非完整R2/CTS，原限制保留。
+此前Wine11上的像素/Present成功不冒充本轮Wine10原环境的呈现成功。
+
+现在明确未通过的是窗口启动，游戏尚未启动
+--------------------------------------
+evidence/tencent-present-20261015T155915Z/run.json：
+  退出11，CreateWindow错误1400，出现在创建D3D12设备之前。
+  日志：get_desktop_window failed to start explorer；no driver could be loaded。
+  这不是shader输出错误，也没有证据说是AMD原生渲染硬件限制。
+
+直接运行原内部 winelauncher 曾留下等 server退出的首个引导进程34481，
+sample保存了start_server/wait4。后续没有杀游戏；计划按旧工作记录清理该
+精确引导进程时，它已自行退出，因此未执行kill。不能声称已完成清理。
+后来读取到原服务37705由现成入口启动，同一个前缀socket；原Steam进程
+已退出，没有可见窗口。原服务保留，不反复重启。
+
+从先前已用过的Steam专用Cocoa桥派生了研究桥，代码在
+src/tencent_open_steam_bridge.cpp；宿主文件置于已有研究App外壳中，仅加载
+原安装SDK/原Unix模块，明确使用原前缀。没有把App壳等同另一套Wine环境。
+没有继续以这个内部桥盲目重启。已有Mac入口是 /Applications/Steam（Windows）.app，
+也存在 ~/Applications/Steam（Windows）.app；原启动脚本是
+~/Library/Application Support/YYBIntelLauncher/bin/launch-windows-app steam。
+调用 open 后不能声称窗口已经显示：实际Steam启动后退出。当前已向用户
+说明并询问，请其从平时使用的原入口打开一次，核对真实窗口情况。
+不读取登录正文、控件、密码、验证码、二维码、令牌。尚未重新要求登录。
+
+下一步
+------
+保留原正常入口/原登录，不恢复新前缀登录路线。先等用户确认平时入口能否
+显示窗口，再复用它。不要继续把客户端冷启动变成CLR/环境重写工程。
+原D3D12复制/计算已过，下一次窗口成功后才有资格验证呈现和正式版。
+只通过正常Steam启动游戏；绝不直接执行Shipping.exe或改名绕过旧拒绝。
+实际游戏仍需确认旧原游戏写保护涵盖真实Wine/Steam进程族，不能因为
+LaunchServices启动了一个新服务就假定其继承了研究sandbox。
+新的可选入口修复尚未复制到 stellar-overlay 中的正式版候选DLL，正式版
+AppDefaults尚未修改，亦没有发出本轮-applaunch。不能称《剑星》已修复。
+原 heartbeat 仍暂停，没有恢复旧D3DMetal/CLR续跑。
+
+2026-10-15T16:20 UTC update
+{
+  "timeUTC": "2026-10-15T16:21:16.787091+00:00",
+  "user_direction": "User normal AppBao Steam now manually opened successfully; reuse original installed engine/prefix/login. No new prefix.",
+  "new_actual_result": "Original Tencent HWND + source vkd3d + exact protected MoltenVK SHA93709d752bdef141b2f7831539354f78d07f7a872ff2ee49b5d42d6c3f3a386d: 4096 GPU backbuffer pixels, zero differences, DXGI Present success, post-Present fence2, exit0. External compositor/game unverified. Prior CreateWindow1400 was startup context, not AMD shader failure.",
+  "evidence": "../open-game-stack-20261015/evidence/tencent-present-20261015T161215Z/run.json",
+  "integration": "Backed up and updated only owned overlay d3d12/d3d12core to optional cooperative-matrix loader fix. Backed up/set SB-Win64-Shipping.exe per-app native2DLL preference only; no global/Sky DLL override.",
+  "preservation": "Original asset volume /Volumes/Applications verified NTFS read-only; native O_WRONLY existing asset failed EROFS30, zero bytes written. Sandbox Wine access-only probe also denied. Do not mistake this alone for shared-service sandbox inheritance proof.",
+  "current": "Original Steam shutdown command exit0 but main remained. Existing user launcher helper --stop steam closed only Steam/CEF; no game active. Original sharedserver37705 retained. Original winelauncher restarted under guard + private backend env at16:20UTC, host40483 currently no Steam child. Diagnose once, no repeated unchanged startups.",
+  "game_playable": false,
+  "native_feature_bits_modified": false,
+  "full_robustness2": false,
+  "heartbeat_status": "PAUSED unchanged",
+  "next": "Confirm exact library/env reaches original normal Steam child; guard must cover actual launch path. Formal game only normal Steam -applaunch3489700, no direct Shipping or DRM changes."
+}
+
+16:34UTC: Extra engine file-write* guard blocked normal loader hard links (exact SDK error+owned fixtures). Removed only newly added incompatible engine rule; original-game and old complete-copy guard unchanged. Original four core engine file hashes unchanged. Steam loaded exact qualified MVK; CEF failed message_window179 class-not-exist0x583 before any CEF Vulkan load. Reproducing existing Cocoa frontend alone did not fix it. Actual normal script does not export probe Wine internal loader/server/dll paths: next native frontend clears these and lets originalSDK initialize exact normal Wine values. No formalgame launch.
+
+Latest original client integration audit
+{
+  "timeUTC": "2026-10-15T17:01:21.389334+00:00",
+  "user_direction": "Use original AppBao Wine and existing logged-in Steam; latest user confirms normal original App displays. No new prefix/login.",
+  "actual_gpu_progress": "Original Tencent copy/enhanced-barrier, DXIL compute1024words zero differences, actual HWND+DXGI Present4096 backbuffer pixels zero differences and post-Present fence2 pass with exact protected MoltenVK93709d752bdef141b2f7831539354f78d07f7a872ff2ee49b5d42d6c3f3a386d. Not game/compositor/conformance success.",
+  "current_block": "Temporary research graphics environment causes Steam CEF message_window179 class-not-exist0x583 and breakpoint0x80000003 before CEF Vulkan initialization. Normal original App baseline restored and multiple CEF subprocesses started. Reproducing Cocoa frontend, clearing probe Wine internals, normal LaunchServices, original working directory, and original App identity do not resolve research-started CEF. Client-only no-custom-sandbox control still fails: sandbox alone not cause.",
+  "exact_scope": "Formal game has NOT been started with this new pair this turn. Do not attribute client failure to game shaders, sparse requirements or closed AMD hardware. Do not continue unchanged game starts.",
+  "new_modifications": "Only owned formal overlay2DLL updated with backup; original prefix per-app SB native d3d12/core backed up. Original user open-source launch-windows-app has optional Steam-only YYB_OPEN_STEAM_ENTRY=1 hook with exact backup; defaults unchanged, no Sky branch change, no engine binary change. Helper execs original native winelauncher and original Steam, no game direct mode. Original assets NTFS read-only; unchanged original asset guard retained. Removed only newly added incompatible whole-engine write* rule after actual SDK hard-link denial and fixture proof. Old complete-copy guard unchanged.",
+  "current_test": "Prepare minimal new-MoltenVK-only original Steam client control, removing game-private options and extra DYLD search directories, keep original asset guard; no game. Distinguish library selection from research compiler options.",
+  "evidence": "../open-game-stack-20261015/TENCENT-STATUS.txt",
+  "legacy_game_launches": "Disabled play/warm-play/bridge-play pending verified protected original session; no directShipping workaround.",
+  "game_playable": false,
+  "native_feature_bits_modified": false,
+  "full_robustness2": false,
+  "heartbeat_status": "PAUSED unchanged"
+}
+
+Latest first real formal trial and native startup repair
+{
+  "timeUTC": "2026-10-15T17:27:43.653852+00:00",
+  "user_latest": "User saw Stellar Blade launch splash then automatic exit, no manual closure/error text.",
+  "normal_original_steam_fixed": "Original normal App, prefix and installed engine reused. Exact new MoltenVK loaded in originalSteam. Full private graphics options work after reducing DYLD_LIBRARY_PATH to qualified MoltenVK directory only; original frameworks remain FALLBACK, not global precedence. Native original-asset guard self-applied. CEF6processes stable, Steam SDLwindow verified. Do not repeat startup engineering or call it an AMD shader failure.",
+  "actual_formal_trial": "Normal Steam -applaunch3489700 at17:15:36UTC. Steam trackedSB.exe and realShipping, D3D12CreateDevice marker confirms actual formalgame minFL0xb000(11_0). Game exited17:16:17UTC withcode16384. No new UEcrashXML/newcrashpad report. OldOct13ShaderFatal XML preserved, not current evidence. Two vkd3ddeviceinitializations/cache attempts visible; sparse API trace notobserved beforeexit, notproofsparseunneeded.",
+  "raw_evidence": "../open-game-stack-20261015/evidence/tencent-normal-game-20261015T171536Z",
+  "actual_game_library_limit": "First lsof request after~30seconds raced process exit; no direct game native-image identity snapshot, although newgame MSLdump and vkd3dsource markers observed. Next controller must capture modules immediately.",
+  "diagnostic_fix": "vkd3d INFO threshold was belowWARN, and separate d3d12/core logger fopen(w) truncated requests. Research-onlyWARNcapture+append log+real CreateDevice HRESULT and bounded actual CheckFeatureSupport results added; no feature/HRESULT substitution. Built successfully. NativeMoltenVK unchanged hash93709..., R2bits000.",
+  "pending_build": "New diagnosticDLLs3353adf0d4912b9599e9824b83409c1e192ba52815d37d290c06ec649a005e88 /78b47fef3793e4967cbec0abfbc804eb62f5e954945766df1dbb463e0ef5aeff staged onlyselfprobes/backend, NOTformaloverlay. OriginalWine copy/compute/present GPU checks running; onlycopytoformalafteractualoutputsPASS.",
+  "original_modifications": "Backedup optional original Steam-only shell entry switch, defaultoff; original engine core filehashes unchanged, noSkysettingschange. SB per-appnative2DLLprefsbackedup; ownedformaloverlaypreviouspair backedup. OriginalgameNTFSreadonly+originalguard; oldcompletecopyguardunchanged.",
+  "next": "After exact diagnosticpairGPUqualification, promote2ownedoverlayDLLs; normalSteamlaunch with sameprotectedactiveSession and immediatePID/nativeImagecapture. Read actual HRESULT/featurefailure; no blind restart or genericfullDX12gate.",
+  "game_playable": false,
+  "basic_gameplay_confirmed": false,
+  "native_feature_bits_modified": false,
+  "full_robustness2": false,
+  "heartbeat_status": "PAUSED unchanged"
+}
+
+2026-10-15 17:36UTC: diagnostic DLL pair qualified in original Tencent GPU probes and promoted to backed-up owned overlay. Actual formal game exact native MoltenVK mapping and original asset guard verified. Both real CreateDevice FL11_0 succeeded; subsequent capability queries S_OK. Exit16384 persists before swapchain init. Need exception/debug-string capture, not claim shader failure or hardware blocker.
+
+2026-10-15 18:12UTC: actual splash-exit traced to old DXGI unsupported10bit/float swapchain E_INVALIDARG; backedup pergameEngine.ini8bit selection crosses it. Actual cursor-black then traced to native3D/2Dheap alias assertion and Wine vkQueueSubmit2 modal. Explicitheaps2 failedrealGPU182/560bytes; DO NOTuse. Independent original3Dtexture+depthPlane attachmentfix da378159...passed27cases542208bytes underdefaultheaps, ordinarygraphics/memory/descriptors and originalTencent copy/DXILcompute/Present. Exactnewnative mapped in actualnormalSteamgame52369, assetguard1. Currentgame no oldnativeassertobserved; sample encodes realdraw/resourcebindings. Actualvisual/basicgameplay confirmation PENDING, gamePlayablefalse. Need cache hardware getProperties query before next promotion (IOKit sideeffect inprofile), then investigate binding overhead ifstill slow. Do not overwrite mapped libraries or restartunchanged.
+
+{
+  "timeUTC": "2026-10-15T18:17:11.009215+00:00",
+  "userLatest": "New3Dpatch trial passed two visual screens then displayed out of memory wording. Not playable.",
+  "trial": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-normal-game-20261015T181000Z",
+  "session": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-original-app-steam-20261015T180912Z",
+  "originalTencentSteamPID": 52132,
+  "gameProcessAlreadyExited": true,
+  "noRestartThisTurn": true,
+  "nativeLibrarySHA256": "da3781599df6a92a2206e91eeacfc1b03d9463896b642167cf8f877652d08bce",
+  "directEvidence": {
+    "MoltenVKError": "VK_ERROR_INITIALIZATION_FAILED: Render pipeline compile failed (Error code1): Compilation failed due to an interrupted connection: XPC_ERROR_CONNECTION_INTERRUPTED after multiple retries.",
+    "vkd3dResult": "d3d12_pipeline_state_create_pipeline_variant failed Vulkan pipeline vr=-3 (initialization failed).",
+    "pipeline": {
+      "rootSignature": "dbf5f768a620184a",
+      "vertexShader": "8d73388922a70a83",
+      "fragmentShader": "e50bb92c2c983e68"
+    },
+    "fourCompilerCrashes": "All captured at2026-10-15 11:11:25 PDT, EXC_BAD_ACCESS/SIGSEGV/KERN_INVALID_ADDRESS0x18, SIGNAL11; topframe llvm::ILTargetLowering::getPtrRsrcId in libAMDIL902.dylib, then getRsrcDescNode/LowerLOAD/AMDGFX10MTLCompilerPlugin.",
+    "compilerCrashSummary": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-normal-game-20261015T181000Z/metal-compiler-crash-summary.json",
+    "rawPipelineError": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-normal-game-20261015T181000Z/metal-pipeline-error.txt",
+    "shaderEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-original-app-steam-20261015T180912Z/msl",
+    "shaderManifest": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-normal-game-20261015T181000Z/shader-dump-manifest.json"
+  },
+  "memoryInterpretation": "No memory-limit kill in these four crash reports. Current memory_pressure after game exit showed68% system-wide memory free; this is NOT peak usage evidence and cannot exclude transient pressure/internal allocation failure. Do not diagnose8GBVRAM exhaustion from generic userOOM text.",
+  "scopeAndLimits": "Closed macOS AMD Metal compiler failed during code generation for this actual game pipeline. Not proofGPUhardware cannot render game or that workaround impossible. Exact minimal shader/pipeline reproducer and whether generatedMSL rewrite could avoid trigger are NOT established. Do not claim compilerbug fixed or game compatible.",
+  "decision": "Stop game/reproduction testing now in accordance with explicit user condition to stop and report closed-source/hardware obstacles. No driverbinary edits, no feature spoof, no launch retries or new capabilityengineering. Preserve caches, diagnostics and qualified3Dpatch; heartbeat remainsPAUSED.",
+  "previousConcreteGains": [
+    "8bit game output crossed oldDXGI swapchainformat rejection",
+    "Independent native3Dattachment fix passed27cases542208bytes underdefaultheaps; originalTencent realGPU copy/DXILcompute/Present passed; current user passed two visual screens"
+  ],
+  "separateUnresolved": [
+    "resource-binding/liveness/useResource CPU overhead observed in1s sample",
+    "cache hardwaregetProperties identification before next promotion to remove introduced per-attachment timestamp query overhead"
+  ],
+  "gamePlayable": false,
+  "basicGameplayConfirmed": false,
+  "heartbeat": "PAUSED",
+  "continuationBoundary": "If user later authorizes further work on compiler obstacle, isolate the failing generatedMSL/pipeline from saved dumps in a bounded reproducer and assess a small source-level workaround; do not resume full game tests unchanged."
+}
+
+2026-10-15T18:39:30.918596+00:00：独立着色器复现与候选改写验证完成
+原始确切VS/FS管线在独立Metal程序复现同一AMD getPtrRsrcId SIGSEGV。仅把地址用途的uint2根字段改成等布局显式设备指针后，保留完整分支/4采样/4空检查，实际AMD5600M八次绘制、2048分量全部正确，Metal验证开启。
+候选为保存着色器的离线生成MSL改写验证，尚未接入通用原生SPIRV-Cross/MoltenVK规则，未推广新库，未启动游戏或修改应用宝/闭源驱动，游戏可玩性仍false，heartbeat仍PAUSED。
+证据：/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/repro-amd-compiler-20261015/evidence/conclusion.json
+
+2026-10-15T19:42:33.270714+00:00：原生通用 typed-root 规则已接入并通过10组真实GPU回归，14项推广检查通过；原应用宝Steam实际新库试跑仍出现用户确认的out of memory弹窗，游戏未可玩。旧getPtrRsrcId崩溃本轮未复现；新增5个GS到FS阶段链接错误。独立mesh测试4例512像素0差异；保存的3组MSL/D32、其中2组实际D16及2组原生SPIR-V管线检查均创建成功，但未复现游戏失败，不能算修好。另有10条内存类型选择失败，源码返回E_OUTOFMEMORY但最终传播尚未确认；不能直接诊断容量不足。失败游戏58792已退出，Steam58504/server44718保留，未再启动游戏。证据：/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/repro-geometry-interface-20261015/evidence/conclusion.json。下一步保留转换变体及真实管线函数身份/配置，核对内存请求掩码和回退；heartbeat仍PAUSED。
+
+2026-10-15 20:35 UTC: Runtime OOM traced to 4 failed mesh/fragment PSO links mapped by vkd3d to E_OUTOFMEMORY; 10 memory fallback attempts recovered, zero final allocation failures recorded. Actual source isolated PSOs succeed, game cause unresolved. Cache config serialization bug fixed at revision54525003: warm game-triple reconversions3->0; cache stable100866bytes. Cold/warm80draw GPU regression each25600words/5120pixels0mismatch; typed64/descriptors/memory and original Tencent device/compute/present pass with exact cache-r3 SHA 83f42c815edb9e39f855e6753dd3d0332bffb7d2b467d400f8d216d185dbc420. Original Steam65448 currently default library; screenshot DX12 unsupported not qualified research replay. Next normal Steam restart with protected new research selection, one game request. HeartbeatPAUSED, gameplay unverified.
+
+2026-10-15 20:46 UTC: One normal original Steam game trial203634Z with exact cache-r3 native library and original asset guard. Initial8 mesh/fragment PSOs fail; complete-source replay actually creates6replacementPSOs,2remainlinkfail and vkd3d maps2toE_OUTOFMEMORY. User screenshot confirms popup while compiling shaders. Zero final allocation failures logged; not evidence of physicalVRAMexhaustion. New triple standaloneD16PSO succeeds;35recordedmeshtriples serial and fourwayconcurrent allcreate(noGPUcommands, nondepthdescriptorapproximate). All659sourcepreload control bounded50s timedout without conclusion. Configdifferences are reflectionusedflags only. Failedgame67508 already exited before termination; noSIGTERMsent. OriginalSteam67260 and sharedwineserver44718 retained. No further game launch. Remainingruntimeprocesscontext link failure unresolved, closeddriverdefectnotproven. Replayremainsoptindiagnosticfilebacked.
+
+2026-10-15 21:31 UTC: Cold heterogeneous mesh-source controls: serial35/35pass; parallel13fail; librariesparallel+linksserialized35/35pass; librariesserialized+linksparallel2fail. Puretypenamecandidate rejected/reverted, no game tested with it. Implemented opt-in MVK_AMD_SERIALIZE_PIPELINE_LINK=1 in native open MoltenVK: gate spans asynchronous render/mesh/compute PSO completion; library compiles remainparallel; replay links sharegate. Exactlibrary c780fb2881944ea70524e7f5184b1c9c589c385b9a26f5d1fef05a30bffda4fe qualified by actual concurrent8geometryPSOs/8draws/512pixels0mismatch,80typedgraphicsdraws0mismatch,typed64/descriptors/memoryGPU0mismatch, originalTencent device/compute/present pass. OriginalSteam72633 actual newlibrarymapped, originalassetguardverified; sharedwineserver44718 retained. One normal Steamgame trial beginning. Gameplaynotconfirmed; heartbeatPAUSED.
+
+2026-10-15 21:35 UTC observation: New normalSteam game72884 exact newlinkserialized library mapped and originalwriteguard. Pipeline counts {'vertex-True': 1051, 'mesh-True': 95, 'mesh-False': 13}; 13/13fullsource replays createactualPSOs;0pipelineOOMmappings,0finalallocationfailureslogged. This passes priorOOMpoint, not gameplayproof. Usercurrentvisualreplypending. Keepgame, nofurtherrestart. Initialfastmathlinks stillfail/relyonsafe+precisefullsource diagnosticreplay; filedependency mustnotbeclaimed productionfix.
+
+2026-10-15 22:20 UTC: Readonly refresh: game72884alive, pipelinesstopped21:36:33UTC;22meshlinkfailures allreplayed, lateroneobjectlibrarycompileerror packed_half2->float2[2], onevkd3dEOUTOFMEMORYmapping,0finalallocationfailures. Capturedfullsource/SPV3955e1a3aeb805dc. GenericnativeSPIRV-Crossfix loadsarrays/matrixcolumnsperlocation. Oldfrozenlibnegativefixturefailssamecast; newcandidate 243150bc14cd8d28148212d87d0569537b61c68a15131c115ca8316b95624cb5 actual8array/matrixdraws512pixels0mismatch;8ordinarygeometrydraws512pixels0mismatch;80typedgraphicsdraws+typed64/descriptors/memorypass. CapturedSPV regeneratedlibrariescompile safe+fast; notgameGPUproof. CacheABI54525004 avoidsoldconversioncachewithoutdeletion. Existinggame/Steam/loadedc780libraryunchanged, nolaunch/kill/promotion. OriginalTencentfrontendqualificationandnormalSteamcandidatetrialpending currentuserfeedback. Gameplaynotconfirmed.
+
+2026-10-15 22:32 UTC: Arraycandidate243150... passed originalTencent device/compute/present. OriginalSteam76695 mapsnewlib; normalSteamtrial223000Z actualgame76979 mapsnewlib, originalassetwriteguard1. PriorfailingVS3955e1a3aeb805dc nowactualMTLObjectfunction8sourcee2650ab85b1b3da8created and matchingactualgame meshPSO1569created. Count1681vertex/189meshcreated,27meshfirstlinkfailures27actualreplacementPSOs,0OOMmappings/0finalallocfailures. Currentuserfeedbackpending, gamecontinuescompiling; noplayabilityclaim. Oldgameabsentbeforetransition,nogamekill, sharedwineserver44718preserved, privatecacheclonedbackup.
+
+2026-10-15T22:37:21.555028+00:00 Array-input candidate actual game continues compiling: {"timeUTC": "2026-10-15T22:37:17.398644+00:00", "pipelineCounts": {"vertex-True": 2110, "mesh-False": 27, "mesh-True": 207}, "meshReplayAttempts": 27, "meshReplayCreated": 27, "pipelineOOMMappings": 0, "finalAllocationFailures": 0, "allocationFallbacks": 10, "lastPipelineAgeSeconds": 1.2, "logBytes": 35180527}; prior fault shader/PSO crossed; 3s sample shows active Metal compile/link and synchronization waits. New candidate actual normal Steam trial recorded in qualification manifest. No library replacement, restart, game termination, shared wineserver change, or extra GPU probe. Visual feedback and real basic play unverified; heartbeat PAUSED.
+
+2026-10-15T22:43:40.646871+00:00 User reported transient warning while compiling. Rechecked current game PID76979 still live; Metal compiler services active. {"timeUTC": "2026-10-15T22:43:40.646871+00:00", "pipelineCounts": {"vertex-True": 2892, "mesh-False": 27, "mesh-True": 243}, "meshReplayAttempts": 27, "meshReplayCreated": 27, "pipelineOOMMappings": 0, "finalAllocationFailures": 0, "lastPipelineAgeSeconds": 7.6, "logBytes": 52092580, "engineGraphicsErrorBlocks": 27, "userReportsWarningCompilationContinues": true, "normalSteamTrial": "tencent-normal-game-20261015T223000Z", "userWarningTextPending": true, "gamePlayable": false, "heartbeat": "PAUSED", "next": "Continue same compiling instance; obtain pending user warning text, do not equate advancing compiler with harmless dialog or rendered gameplay."} No relaunch, termination, native change, or environment modification. Warning text pending via async question.
+
+2026-10-15T23:12:30.293262+00:00 Read-only same-game refresh: {"timeUTC": "2026-10-15T23:12:30.293262+00:00", "normalSteamTrial": "tencent-normal-game-20261015T223000Z", "gamePID": 76979, "sameGameProcessAliveAtReadOnlyProcessRefresh": true, "pipelineCounts": {"vertex-True": 7795, "mesh-False": 43, "mesh-True": 596}, "previousSnapshot": {"timeUTC": "2026-10-15T23:12:05.748407+00:00", "pipelineCounts": {"vertex-True": 7714, "mesh-False": 42, "mesh-True": 577}, "meshReplayAttempts": 43, "meshReplayCreated": 43, "pipelineOOMMappings": 0, "finalAllocationFailures": 0, "lastPipelineAgeSeconds": 8.7, "logBytes": 100282965, "engineGraphicsErrorBlocks": 43, "latestPipelineFailures": [{"file": "trace-pipeline-76979-6709.json", "mtime": 1792105336.0531363, "error": null}, {"file": "trace-pipeline-76979-6726.json", "mtime": 1792105343.6077354, "error": null}, {"file": "trace-pipeline-76979-6848.json", "mtime": 1792105368.224177, "error": null}]}, "successfulPipelineDeltaSinceEarlierRefresh": 100, "lastPipelineAgeSeconds": 3.7, "logBytes": 100834837, "pipelineOOMMappings": 0, "finalAllocationFailures": 0, "meshReplayAttempts": 43, "meshReplayCreated": 43, "userWarningTextAndVisualFeedbackPending": true, "gamePlayable": false, "heartbeat": "PAUSED", "noRelaunchNoNewTestsNoSourceChanges": true, "next": "Keep this instance and preserve evidence. No new terminal failure captured; await existing pending visual/warning feedback without another question."} Native source/library, environment, originalSteam and currentgame untouched. No repeated question, no new tests.
+
+2026-10-15T23:43:28.127466+00:00 Native Steam / FSR primary-source research saved /Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/native-steam-fsr-research-20261015/findings.json. NotProton Intel functional hook not present (x86 stub), published free fork Apple Silicon; built-in game FSR3 confirmed, actual AMD translated FSR unverified. Current PID76979 preserved. Recent pipeline completion no longer advancing; three-second sample mainly Wine waits, no MVK/Metal compiler frames, not enough to diagnose completed preload vs dialog/loading/synchronization. No restart, install or new test. Heartbeat PAUSED.
+
+2026-10-15T23:44:57.579918+00:00 CORRECTION TO WAIT-ONLY STATE: latest raw game engine region has 3 COMPUTE PSO compile errors XPC_ERROR_CONNECTION_INTERRUPTED after multiple retries; 2 preserved contemporaneous Metal compiler SIGABRT reports at16:31 PDT share IntrinsicsActionLowerPackedStore AMD plugin frames. Exact failing shader/config remains unidentified. No new graphics OOM marker does NOT exclude compute failure. Evidence /Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/native-steam-fsr-research-20261015/new-compute-failure.json. Currentgame untouched. NativeSteam/FSR research complete, not installed.
+
+2026-10-16T03:19:20Z: Exact captured game compute MSL and a six-line reduction identify the AMD Metal compiler trigger as ordinary aligned scalar 32-bit coherent device-buffer loads/stores. Generic opt-in SPIRV-Cross atomic load/store lowering built as MoltenVK SHA256 9c9bae8d2f883e13c8feebb2839b49a5d3278b5295f5b9f0e9d1d041e736806c. Old-library negative control fails with the same XPC interruption; new native Vulkan integration passes 124 scenarios/16,253,920 words/0 mismatches, plus vertex-array, geometry, typed graphics, typed64, descriptors and memory regressions with Metal validation. Original Tencent Wine device/compute/present all PASS. First normal-Steam integration accidentally omitted existing mesh-replay opt-in: 119/119 compute PSOs passed but 3 mesh failures produced 3 false OOM dialogs; that game was terminated and the configuration requirement was fixed. Current normal-Steam trial tencent-normal-game-20261016T031649Z maps the exact new library under original asset write policy1; at checkpoint 120/120 compute PSOs passed, 42/42 mesh replays created, 0 pipeline OOM mappings, 6863 pipeline traces and compilation still advancing. Gameplay/visual result remains unverified; keep this instance and do not relaunch unchanged. Heartbeat PAUSED.
+
+[2026-10-16T05:49:55.146911+00:00] FSR3 diagnostic + FH6 Intel assessment
+- Prior 57% point was crossed; later crash was non-OOM access violation in RenderPostProcessing.
+- Backed up settings and temporarily disabled FSR3/FI only for one A/B diagnostic; this is not an accepted final workaround.
+- Normal original Steam trial tencent-normal-game-20261016T054317Z is active, PID 23724; two MTLCompilerService workers are active and cache.write grew from 3,456 to 1,801,568 bytes with no new crash at the six-minute observation.
+- Final criteria retain FSR3 upscaling and frame interpolation plus real rendered gameplay.
+- FH6 on Apple Silicon has a reported Rosetta exception hitch; Intel avoids that CPU translation cost, but its open graphics path still needs enhanced barriers and AMD Metal compatibility.
+
+[2026-10-16T05:59:29.139118+00:00] crs-handler popup classified
+- Screenshot named crs-handler.exe. Main game PID 23724 and two active MTLCompilerService workers remained alive; cache.write reached 5,290,648 bytes.
+- No new UE crash directory. crs-handler exited; read-only window enumeration found only StellarBlade and Steam, so the error dialog was gone. No restart.
+2026-10-16T06:32:06.954673+00:00: Fixed the reproduced 60% CPU-side MoltenVK stall in revision 0x5452500A (SHA cc2535ea...c286c): live-list lock now ends before Metal binding while the object stays retained, shards 16->256, and useResource table reserves 1024 entries. Exact final binary passed descriptor 99,456 words, memory 192,528 witnesses, coherent 124 scenarios/16,253,920 words, graphics/vertex regressions, plus original Tencent Wine D3D12 device/compute/present, all 0 mismatches. Normal original-Steam trial PID 88586 maps the exact library under write guard; startup CPU fell 565%->5.6% by 4m15s, cache write grew to 1,556,256 bytes, only StellarBlade+Steam windows and no Error dialog. Visual menu/gameplay confirmation pending; FSR3 remains temporary A/B-off and is not final completion.
+
+2026-10-16 06:37:31Z — GAME CRASH CONFIRMED
+SB-Win64-Shipping.exe crashed at 600s on TaskGraphThreadBP 28; crs-handler.exe failure was downstream. Minidump: execute AV at 0x145ffff78 (game RVA 0x5ffff78, .rdata function-pointer table), MemoryStats.bIsOOM=0. 50/50 failed AMD mesh links were replayed successfully. No unchanged game restart; audit PSO ownership/lifetime and run isolated concurrent GPU regression first. Evidence: evidence/tencent-crash-600s-live-fast-20261016T063730Z
+
+2026-10-16T15:30:03.792401+00:00 — Corrected compute-task crash diagnosis and isolated checks
+Both baseline and diagnostic libraries pass 8-thread/512-create COM PSO lifetime stress plus 1024-word real GPU readback, no failures. New diagnostic library adds split function/link timing only, trace threshold validated with 545 records; geometry 8 draws/512 pixels/0 mismatches. Cache revision unchanged; baseline binary preserved. Reference UE4.26 compute eviction lacks an async completion wait, consistent with captured stale-object release, but exact game heap UAF remains unproven. Single-setting r.AsyncPipelineCompile=0 diagnostic applied with backup; normal original Steam launch requested against unchanged baseline. No Steam restart, no cache deletion. FSR3 remains temporary A/B-off; game not yet playable. See evidence/slow-compute-instrumentation-20261016/findings.json.
+
+2026-10-16T15:42:21.282971+00:00 — Encoder live-resource cache isolated fix
+Candidate 58e92c24dca9e295da0ea0e7010355bd852680892d9d5429ba51c4e5f0b51ad3 is NOT loaded in game. Large real GPU descriptor A/B: 16,384 aliases x32 dispatches, liveness checks 449,376->64, times 68.135->35.6977ms, both512 words/0 mismatches with descriptor replacement and unused destroyed slot. Opt-in retains one reference per unique validated resource until encoder reset, preventing stale pointer ABA. Exact candidate descriptor99,456 words, memory192,528 witnesses, geometry512pixels and Tencent Wine8-thread512PSO+1024 GPU words all pass. Current normal-Steam baseline PID26095 remains alive at11m46s with no new UE crash; asyncPSO0 diagnostic active in config but runtime value not independently read. CPU resource-binding hotspot remains; visual/user stage pending. FSR3 still temporary diagnostic-off. No additional game restart, engine modification or cache removal. Details evidence/live-resource-dedup-20261016/findings.json
+
+2026-10-16T15:44:08.640642+00:00 — Exact candidate qualification completed: Tencent device/copy PASS and graphics presentation4096pixel readback/Present/fence PASS. Byte-identical ready candidate saved to /Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/moltenvk-live-dedup/MoltenVK/libMoltenVK.1.4.2.dylib. Candidate remains outside current game; no further Steam/game restart until current screen/use is known. Current game has exceeded prior600s crash time but matching stage and visual result remain unverified. Pending proof evidence/pending-native-encoder-live-cache.json.
+
+2026-10-16T16:12:00.145184+00:00 — Current shader precompile 7% -> user11%, still slow; reporter popup
+Original Steam29011/current game29307 maps retained-cache58e92c... under original asset guard. One prior startup attempt ended Wine assertion0x80000101; diagnostic retry is still alive at15m45s, no new UE crash directory after crs-handler popup. Shader pipeline dump records2003->2311 over265s show activity, not completed PSOs/gameplay. Sampling still CPU resource binding/table-scan/map/live-miss dominated. New isolated opt-in direct lookup cache0b5832... adds generation-invalidated negative entries; exact source registration fixture40000 concurrent pairs passes, four real GPU A/B runs2048words0diff, descriptor99456/memory192528witnesses/geometry512pixels and originalTencent512PSO+compute1024words+Present4096pixels all pass. Synthetic elapsed savings13-20% only, not game FPS. Candidate saved build/moltenvk-live-recent; NOT integrated/loaded into current game, which is preserved without restart. AsyncPSO0 and FSR3/FI diagnostic-off remain; neither lifetime-crash fix nor playability confirmed. See evidence/live-recent-cache-20261016/findings.json. HeartbeatPAUSED.
+
+2026-10-16T16:46:43.144945+00:00 — REAL GAME PROGRESS: user25%->58%, explicitly much faster
+Current normal original Steam34111/game34611 maps e948afb... descriptor-use cache under originalAssetWritePolicy1, sharedserver44718 preserved. Old reporter31931 (Wine2628) was reattached by Steam, blocking first launch; verified game cwd, terminated only that reporter, Steam removed running state09:32:03, normal retry163218Z then started. Actual user58 sample now RenderThread compiling compute MTL libraries/pipelines, queue/fences waiting, not earlier full descriptor scan bottleneck. No new UE crash at last refresh. Real scene/FPS/black-world/gameplay unverified. Next native44533ee... incremental dirty-range cache completed targeted GPU/Wine checks: partial-slot update scans1 extra after65536 initial slots, four A/B runs5120words0diff, descriptor99456words/memory192528witnesses/geometry512pixels/typedgraphics5120pixels plus originalTencent512PSO/1024compute words and4096present pixels all pass. Ready + integrated option --descriptor-incremental-cache, not in running game; keep current58% instance. FSR3/FI diagnostic-off and AsyncPSO0 remain temporary. Game not complete; heartbeatPAUSED. Evidence descriptor-use-cache-20261016/findings.json and descriptor-incremental-cache-20261016/findings.json.
+
+2026-10-16T16:52:00.497638+00:00 — Same58% instance preserved; actual compute compilation continues
+Successful slow-compute requests3122->3163->3211 captured with config0/createdtrue. Last two5.197s/5.079s split approximatelyhalf library/function andhalf finalPSO. Compiler34831 active77.7% CPU, varied AMD/LLVM optimizer/register allocation/scheduling frames; main game5.5% CPU. No current compute failure trace. This is actual native GPU compilation cost now, not the earlier descriptor scan hotspot; not game success. Current librarye948 unchanged, next445 incremental ready only. Conditional user question pending for menu->continue->actual scene, no additional restart or settings change.
+
+2026-10-16T16:53:38.157314+00:00 — User62% suspected stall, still actual compute progress
+Current e948 game34611 preserved. Successful slow-compute request numbers continue advancing: [3122, 3163, 3211, 3232, 3240]. No compute failure trace/newUEcrash at refresh. Current delay is native AMD Metal compiler codegen/register allocation, with some PSOs~5s; source dump count stable during compute phase is not a deadlock criterion. No restart/setting change/new game tests; incremental445 ready but not injected, and CPU descriptor fix does not directly reduce current compiler backend cost. Actual scene and playability still unverified.
+
+
+2026-10-16 着色器编译耗时调查（2026-10-16T17:21:42.317616+00:00）
+----------------------------------------
+用户62%后反馈63%，仍极慢。保留同一游戏34611 / Steam34111 / wineserver44718；
+实际仍e948描述符缓存版，没有重启、换入候选或删除缓存。
+最新只读采样：RenderThread在计算管线/newMTLLibrary，AMD编译器约99%单核CPU。
+成功的慢调用计数3240推进到3617；17:19:57UTC又在自编库入口抓到一份185086字节
+新计算MSL，并已解除调试器恢复运行，证实没有一直卡在同一次编译调用。
+当前异步编译0是此前崩溃诊断遗留，串行吞吐是另一限制；本轮没改该配置。
+
+原生开源优化：完整保护后的向量OpLoad保存为SSA临时值，避免重复展开；边界和
+尾部保护不删除，写后读取/依赖跟踪同时处理。候选bbd1ba40...，独立路径
+build/moltenvk-guarded-vector/MoltenVK/libMoltenVK.1.4.2.dylib，缓存版本0x5452500B。
+四份实际游戏MSL的离线等效表示缩小约32–34%，冷编译对照耗时下降6.2–20.5%；
+这不是实际游戏提速数字，游戏仍同时编译，且未精确重放原SPIR-V/线程组配置。
+重复命中缓存8–10ms的结果单独保留，不能混作首次编译提速。
+原生GPU：向量864场景124416words、内存/见证、描述符、几何和顶点/片元全部
+零差异；另读向量后覆盖原缓冲区864场景124416words也零差异。
+额外32位等价边界公式2473856组及GPU通过，但额外编译收益不稳定，未选中；
+原生主源码退回仅临时值规则。两个候选及失败/噪声/缓存命中数据均保留。
+
+这些优化不是数量级修复，未解决黑场景，未恢复验证FSR3/FI，不能宣称可玩。
+未替换当前游戏库；下一轮需先做原Wine D3D12资格验证，遵守保留当前实例约束，
+继续分清串行/缓存生命周期问题和单管线AMD闭源编译成本，不盲目开异步重试。
+完整证据：evidence/compute-compile-cost-20261016/findings.json
+
+2026-10-16T18:17:32Z — Metal二进制管线缓存与编译生命周期修复
+----------------------------------------------------------
+保持原应用宝Steam34111、游戏34611、wineserver44718和全部现有缓存；没有重启、替换
+运行中库或改变游戏设置。只读记录显示游戏慢计算请求继续从4565推进到4682，均成功，
+Metal编译器仍约100%单核，当前不是冻结在单一着色器。
+
+修复了MoltenVK函数特化编译超时后的真实回调生命周期错误：旧库在受控零超时后晚回调
+SIGSEGV，新库仍正确返回失败/null，不伪造成功；等待真实回调后再次创建成功，并执行
+64个GPU结果零差异。新库基础回归：向量124416words、内存9648结果+192528见证、
+描述符99456words、几何512pixels、typed graphics25600words+5120pixels全部零差异；
+两路共享/独立冷热缓存29952words也零差异，热命中记录正确。
+
+确认当前缓存缺口：Vulkan管线缓存保存MSL但不保存最终Metal二进制。对保存的《剑星》
+衍生大型计算MSL，首次库编译1992.78ms；加载263KB MTLBinaryArchive后最终管线创建
+2.478ms，而同源暖库但不挂档案的管线仍1597.66ms。已把可选计算管线档案接入开源
+MoltenVK，候选c2e3a193...，隔离Vulkan首次/加载档案1.635s/0.366s且GPU结果一致。
+小套件暖缓存本身约0.350s，不能把其全部下降算作档案收益；大型衍生MSL对照才是
+区分证据。候选尚未装入当前游戏，现有进程不能热换库或补录已创建描述符。
+
+证据：evidence/metal-binary-archive-20261016/findings.json。当前只完成计算管线档案；
+渲染/mesh档案、下一次正常Steam集成、实际场景、FSR3/FI恢复和基本游玩仍待验证。
+
+2026-10-16T18:24:25Z — 二进制档案范围完成并确认mesh闭源限制
+传统顶点/片元档案已接入并真实写入；最终候选110acbc4...仅启用计算和传统渲染
+档案，每个档案默认上限1GiB、64条管线原子落盘一次。精确最终库重新通过向量、内存、
+描述符、typed graphics、geometry全部真实GPU零差异；受控超时恢复64words零差异，
+两路并发冷热缓存29952words零差异、12个暖命中。
+
+mesh档案调用公开Metal接口时，AMD驱动明确返回“Compiling mesh pipelines for binary
+archives is not supported!”；8次geometry绘制/512像素本身仍零差异。已从最终候选移除
+mesh档案接入，不伪造支持、不改闭源驱动，继续保留已有串行mesh链接路径。当前游戏仍
+使用旧e948库且请求推进到4812，未重启或热换。下一次正常Steam转换才可装入最终候选；
+在此之前当前进程不会因新档案获得加速。
+
+2026-10-16T18:32:09Z — 下一次正常Steam转换入口已准备，当前游戏保持不动
+--------------------------------------------------------------------------
+已把最终候选的选择项接入原应用宝Steam的x86_64原生入口；新入口SHA256为
+9ac60e217322d0708533badf478e247fdb7b3b032e3f7abadd9875166c5ca3b0。入口只接受
+完整保留runtime trace、descriptor/resource lifetime、coherent atomics和串行mesh链接
+的一组参数。缺少trace会立即拒绝；精确候选未通过原Tencent Wine呈现验证也会立即拒绝，
+两条负向自检均已通过且没有启动新Wine或游戏进程。
+
+候选证明保存在evidence/pending-native-binary-archive.json，当前明确qualified=false、
+originalTencentPresentationPassed=false、gamePlayable=false。现有游戏仍使用旧e948库，
+没有重启、热换或删除缓存。待当前实例退出后，先跑device/compute/present三项原环境
+资格验证；全部通过后才允许正常Steam启用计算和传统渲染档案。mesh档案仍因AMD闭源
+Metal驱动公开接口明确不支持而保持禁用。
+
+2026-10-16T18:49:44Z — 最终档案候选经原Steam正常重启并进入实际游戏
+-------------------------------------------------------------------
+补齐最终候选目录中加载器所需的libMoltenVK.dylib和libMoltenVK.1.dylib链接。
+精确SHA110acbc4...在原Steam App建立的应用宝Wine图形会话中通过D3D12设备/GPU
+拷贝、计算1024words零差异、HWND/DXGI Present和4096像素回读/Fence零差异。
+
+正常正版Steam已启动游戏45310；进程实际映射精确候选并保留原游戏写保护。
+用户画面停在Sony Interactive Entertainment presents片头，但只读证据显示它没有
+死锁：渲染管线记录258->478->605，Metal编译器仍活跃；97个计算管线请求全部成功，
+0失败。计算和渲染档案已真实落盘。未删除旧缓存、未改原游戏或闭源驱动。
+
+主菜单、3D场景、输入与帧率仍待验证，当前不能宣称可玩。证据：
+evidence/archive-game-restart-20261016/findings.json。
+
+2026-10-16T19:14:55Z — 同一游戏轮次只读刷新
+------------------------------------------------
+没有重启、关闭、替换库或删除缓存。Steam45032、wineserver45039、游戏45310仍为同一
+轮；游戏仍实际映射SHA110acbc4...候选、compute.metalar和render.metalar。渲染管线
+记录已从此前860推进到4021，最后记录时间与采样相差不到一秒；渲染档案增至
+11488128字节并在采样前三秒落盘。Metal编译器约95.4% CPU。计算请求/结果仍为97/97，
+0失败；162299200字节vkd3d日志未匹配到err、Out of video memory、DXGI设备错误、
+VK_ERROR或FAILED，过去10分钟没有新增log/dmp/crash文件。
+
+结论仅为同一轮仍在真实编译并持续落盘，不是可玩验收。缺用户视觉/操作证据时保持
+当前轮次与缓存，安静等待，不继续改源码或制造重复测试。
+
+2026-10-16T19:30:33Z — 用户画面25%，仍非确认卡死
+----------------------------------------------------
+同一Steam45032、wineserver45039、游戏45310保持不动。管线记录4021->6586，最后记录
+距采样约2秒；render.metalar从11488128增至20496304字节，12:29:55仍落盘。计算
+请求/结果97/97->107/107且0失败。Metal编译器88.5% CPU、游戏31.5% CPU。
+311100583字节vkd3d日志未匹配显存、设备丢失、VK_ERROR或FAILED，近10分钟没有新增
+log/dmp/crash。结论是25%对应的大批渲染管线很慢，不是已证实停滞；继续保留该轮与缓存。
+
+2026-10-16T20:01:55Z — 去除诊断开销并恢复异步PSO后的同一正版Steam验证
+--------------------------------------------------------------------------
+确认旧轮慢的两个可修因素：Engine.ini把r.AsyncPipelineCompile设为0；同时诊断轮产生约
+704MB/45976个跟踪文件和约348MB vkd3d日志。保留全部既有缓存，把异步PSO恢复为1，
+运行时只保留失败mesh重建所需的最小跟踪，关闭vkd3d/MoltenVK常规日志，并把渲染档案
+批量序列化间隔从64提高到512。未改应用宝引擎、原游戏、存档或闭源驱动。
+
+原Steam正常启动游戏50687并实际映射SHA110acbc4...候选。约15分钟实拍为24%，而旧轮
+约43分钟为25%；18分30秒已有3941条管线记录，42次mesh失败全部重建成功、0重建错误，
+render.metalar增至53787904字节，未见新崩溃或转储。5秒采样确认剩余主要热点是官方
+MoltenVK仍存在的全设备MTLLibrary/MTLFunction编译锁；没有无验证地移除该驱动保护。
+当前窗口已切回前台并继续同一轮。尚未完成菜单、3D场景和输入验收，gamePlayable=false；
+FSR3仍是较早诊断留下的临时关闭状态，基础路径通过后必须恢复并单独验证。

@@ -1,0 +1,41 @@
+--- a/libs/vkd3d/device.c
++++ b/libs/vkd3d/device.c
+@@ -3082,6 +3082,13 @@
+     VkPhysicalDeviceFeatures *features;
+     bool single_storage_texel;
+     bool single_uniform_texel;
++    /* Private source-built compiler contract. Do not change advertised Vulkan
++     * features or request unsupported device features. The isolated runner
++     * verifies the protected compiler's exact hash and GPU results first. */
++    const bool amd_protected_subset = vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            physical_device_info->properties2.properties.vendorID == 0x1002 &&
++            strstr(physical_device_info->properties2.properties.deviceName, "5600M") &&
++            physical_device_info->vulkan_1_2_properties.driverID == VK_DRIVER_ID_MOLTENVK;
+ 
+     vkd3d_trace_physical_device(physical_device, physical_device_info, vk_procs);
+     vkd3d_trace_physical_device_features(physical_device_info);
+@@ -3256,18 +3263,21 @@
+         return E_INVALIDARG;
+     }
+ 
+-    if (!physical_device_info->robustness2_features.robustBufferAccess2 ||
+-            !physical_device_info->robustness2_features.robustImageAccess2)
++    if (!amd_protected_subset && (!physical_device_info->robustness2_features.robustBufferAccess2 ||
++            !physical_device_info->robustness2_features.robustImageAccess2))
+     {
+         ERR("Robustness2 features not supported. This is required.\n");
+         return E_INVALIDARG;
+     }
+ 
+-    if (!physical_device_info->robustness2_features.nullDescriptor)
++    if (!amd_protected_subset && !physical_device_info->robustness2_features.nullDescriptor)
+     {
+         ERR("Null descriptor in VK_EXT_robustness2 is not supported by this implementation. This is required for correct operation.\n");
+         return E_INVALIDARG;
+     }
++
++    if (amd_protected_subset)
++        WARN("AMD protected-compiler research subset: Vulkan R2 bits remain unchanged; no full R2/FL conformance claim. Unsupported protected shader forms must fail compilation.\n");
+ 
+     if (vulkan_info->KHR_fragment_shading_rate)
+         physical_device_info->additional_shading_rates_supported = d3d12_device_determine_additional_shading_rates_supported(device);

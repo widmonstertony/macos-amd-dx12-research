@@ -1,0 +1,139 @@
+--- MVKPipeline.mm.before
++++ MVKPipeline.mm
+@@ -46,6 +46,7 @@
+ #include "MVKRuntimeTrace.h"
+ #include "MVKMeshReplay.h"
+ #include "MVKPipelineLinkGate.h"
++#include "MVKComputeArchive.h"
+ 
+ 
+ #pragma mark - MVKPipelineLayout
+@@ -3141,6 +3142,7 @@
+ 		// and we need to create the Metal pipeline immediately to provide error feedback to app.
+ 		// The best we can do at this point is set the pipeline name from the layout.
+ 		setMetalObjectLabel(plDesc, ((MVKPipelineLayout*)pCreateInfo->layout)->getDebugName());
++		if (!_nativeComputeArchiveKey.empty()) plDesc.label = @(_nativeComputeArchiveKey.c_str());
+ 
+ 		MVKComputePipelineCompiler* plc = new MVKComputePipelineCompiler(this);
+ 		_mtlPipelineState = plc->newMTLComputePipelineState(plDesc);	// retained
+@@ -4100,14 +4102,20 @@
+ 	unique_lock<mutex> lock(_completionLock);
+ 	static std::atomic<uint64_t> computeRequestSequence{0};
+ 	NSNumber* request = @(computeRequestSequence.fetch_add(1));
++    NSString* shardPath = getPhysicalDevice()->isAMDHardware() ? mvkComputeShardPath(plDesc) : nil;
++    uint64_t shardStart = shardPath ? mvkGetTimestamp() : 0;
++    bool shardLoaded = shardPath && mvkLoadComputeShard(getMTLDevice(), plDesc, shardPath);
++    double loadMS = shardPath ? mvkGetElapsedNanoseconds(shardStart) / 1e6 : 0;
++    bool requireHit = shardPath && getenv("MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT") &&
++        !strcmp(getenv("MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT"), "1");
+ 
+ 	compile(lock, ^{
+ 		auto mtlDev = getMTLDevice();
+ 		@synchronized (mtlDev) {
+-			mvkPrepareComputeBinaryArchive(mtlDev, plDesc, getPhysicalDevice()->isAMDHardware());
++			if (!shardPath) mvkPrepareComputeBinaryArchive(mtlDev, plDesc, getPhysicalDevice()->isAMDHardware());
+ 			if (mvkRuntimeTraceEnabled(getMVKConfig()) && !mvkRuntimeReplayOnly()) mvkWriteRuntimeTrace(getMVKConfig(), @"compute-request", @{@"request":request,@"time":@([NSDate timeIntervalSinceReferenceDate]),@"function":mvkTraceFunction(plDesc.computeFunction),@"maxThreads":@(plDesc.maxTotalThreadsPerThreadgroup),@"fullSubgroups":@(plDesc.threadGroupSizeIsMultipleOfThreadExecutionWidth),@"descriptor":plDesc.description?:@""});
+ 			[mtlDev newComputePipelineStateWithDescriptor: plDesc
+-												  options: MTLPipelineOptionNone
++												  options: requireHit ? MTLPipelineOptionFailOnBinaryArchiveMiss : MTLPipelineOptionNone
+ 										completionHandler: ^(id<MTLComputePipelineState> ps, MTLComputePipelineReflection*, NSError* error) {
+ 				if (mvkRuntimeTraceEnabled(getMVKConfig()) && (!mvkRuntimeReplayOnly() || !ps)) mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"compute-failure" : @"compute-result", @{@"request":request,@"time":@([NSDate timeIntervalSinceReferenceDate]),@"function":mvkTraceFunction(plDesc.computeFunction),@"created":@(ps!=nil),@"error":error.localizedDescription?:@"",@"errorCode":@(error.code)});
+ 											bool isLate = compileComplete(ps, error);
+@@ -4115,7 +4123,16 @@
+ 										}];
+ 		}
+ 	});
+-
++    bool shardPublished = false;
++    uint64_t publishStart = shardPath ? mvkGetTimestamp() : 0;
++    if (shardPath && !shardLoaded && !requireHit && _mtlComputePipelineState)
++        shardPublished = mvkStoreComputeShard(getMTLDevice(), plDesc, shardPath);
++    if (shardPath && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE"))
++        mvkWriteRuntimeTrace(getMVKConfig(), @"compute-archive", @{
++            @"request":request, @"key":plDesc.label ?: @"", @"loaded":@(shardLoaded),
++            @"published":@(shardPublished), @"requireHit":@(requireHit),
++            @"pipelineCreated":@(_mtlComputePipelineState != nil), @"loadMilliseconds":@(loadMS),
++            @"postCompilePublishMilliseconds":@(mvkGetElapsedNanoseconds(publishStart) / 1e6)});
+ 	return [_mtlComputePipelineState retain];
+ }
+ 
+--- MVKPipeline.h.before
++++ MVKPipeline.h
+@@ -481,6 +481,8 @@
+ class MVKComputePipeline : public MVKPipeline {
+ 
+ public:
++    void setNativeComputeArchiveKey(const std::string& key) { _nativeComputeArchiveKey = key; }
++    const std::string& getNativeComputeArchiveKey() const { return _nativeComputeArchiveKey; }
+ 	/** Returns if this pipeline allows non-zero dispatch bases in vkCmdDispatchBase(). */
+ 	bool allowsDispatchBase() { return _allowsDispatchBase; }
+ 
+@@ -519,6 +521,7 @@
+ 
+ 	MVKShaderModule* _module = nullptr;
+ 	bool _ownsModule = false;
++    std::string _nativeComputeArchiveKey;
+ };
+ 
+ 
+--- MVKShaderModule.mm.before
++++ MVKShaderModule.mm
+@@ -21,6 +21,7 @@
+ #include "MVKFoundation.h"
+ #include <sys/stat.h>
+ #include <unistd.h>
++#include <CommonCrypto/CommonDigest.h>
+ 
+ using namespace std;
+ using namespace mvk;
+@@ -429,6 +430,50 @@
+ 	}
+ 
+ 	MVKMTLFunction result = mvkLib ? mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this) : MVKMTLFunctionNull;
++    const char* shardRoot = getenv("MVK_AMD_COMPUTE_ARCHIVE_DIR");
++    if (mvkLib && result.getMTLFunction() && shardRoot && shardRoot[0] == '/' &&
++        getPhysicalDevice()->isAMDHardware() && pShaderConfig->options.entryPointStage == spv::ExecutionModelGLCompute) {
++        std::string source;
++        mvkLib->decompressMSL(source);
++        // Include generated code, entry point, compiler options, and complete
++        // specialization values. Hash object bytes explicitly: mvkHash<T>'s
++        // count is in elements, not bytes.
++        std::string recipe(source);
++        auto append = [&](const void* bytes, size_t count) {
++            if (count) recipe.append(static_cast<const char*>(bytes), count);
++        };
++        NSString* functionName = [result.getMTLFunction() name];
++        const char* name = functionName.UTF8String;
++        uint64_t nameBytes = name ? strlen(name) : 0;
++        append(&nameBytes, sizeof(nameBytes));
++        append(name, nameBytes);
++        auto flags = result.shaderConversionResults.entryPoint.fpFastMathFlags;
++        uint8_t invariant = result.shaderConversionResults.isPositionInvariant;
++        auto fastMath = getMVKConfig().fastMathEnabled;
++        auto version = pShaderConfig->options.mslOptions.msl_version;
++        append(&flags, sizeof(flags));
++        append(&invariant, sizeof(invariant));
++        append(&fastMath, sizeof(fastMath));
++        append(&version, sizeof(version));
++        uint64_t dataBytes = pSpecializationInfo ? pSpecializationInfo->dataSize : 0;
++        uint32_t mapCount = pSpecializationInfo ? pSpecializationInfo->mapEntryCount : 0;
++        append(&dataBytes, sizeof(dataBytes));
++        if (pSpecializationInfo) append(pSpecializationInfo->pData, dataBytes);
++        append(&mapCount, sizeof(mapCount));
++        for (uint32_t index = 0; index < mapCount; ++index) {
++            const auto& entry = pSpecializationInfo->pMapEntries[index];
++            append(&entry.constantID, sizeof(entry.constantID));
++            append(&entry.offset, sizeof(entry.offset));
++            append(&entry.size, sizeof(entry.size));
++        }
++        unsigned char digest[CC_SHA256_DIGEST_LENGTH];
++        CC_SHA256(recipe.data(), (CC_LONG)recipe.size(), digest);
++        char hex[CC_SHA256_DIGEST_LENGTH * 2 + 1];
++        for (size_t index = 0; index < CC_SHA256_DIGEST_LENGTH; ++index)
++            snprintf(hex + index * 2, 3, "%02x", digest[index]);
++        NSString* key = [NSString stringWithFormat:@"mvk-cs2-%s", hex];
++        static_cast<MVKComputePipeline*>(pipeline)->setNativeComputeArchiveKey(key.UTF8String);
++    }
+ 	if ((trace || replaySource) && mvkLib) {
+ 		std::string source;
+ 		mvkLib->decompressMSL(source);

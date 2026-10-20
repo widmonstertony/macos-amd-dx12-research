@@ -1,0 +1,28 @@
+#version 450
+#ifndef WIDTH
+#define WIDTH 4
+#endif
+layout(local_size_x=1) in;
+#if WIDTH == 2
+#define VALUE uvec2
+#elif WIDTH == 3
+#define VALUE uvec3
+#else
+#define VALUE uvec4
+#endif
+layout(set=0,binding=0,std430) buffer Input { VALUE v[]; } src;
+layout(set=0,binding=1,std430) buffer Output { uvec4 v[]; } dst;
+layout(push_constant) uniform Params { uint index, operation, component; } pc;
+void main() {
+    uvec4 answer=uvec4(0);
+    if (pc.operation==0) {
+        VALUE value=src.v[pc.index];
+        for(uint c=0;c<WIDTH;c++) answer[c]=value[c];
+    } else if(pc.operation==1) {
+        VALUE value=VALUE(0);
+        for(uint c=0;c<WIDTH;c++) value[c]=900+c;
+        src.v[pc.index]=value;
+    } else if(pc.operation==2) answer.x=src.v[pc.index][pc.component];
+    else src.v[pc.index][pc.component]=901;
+    dst.v[0]=answer;
+}

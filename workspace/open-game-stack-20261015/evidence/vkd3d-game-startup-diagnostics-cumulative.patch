@@ -1,0 +1,221 @@
+--- a/libs/d3d12/main.c
++++ b/libs/d3d12/main.c
+@@ -141,12 +141,20 @@
+ HRESULT WINAPI DLLEXPORT D3D12CreateDevice(IUnknown *adapter, D3D_FEATURE_LEVEL minimum_feature_level,
+         REFIID iid, void **device)
+ {
++    HRESULT hr;
+     TRACE("adapter %p, minimum_feature_level %#x, iid %s, device %p.\n",
+             adapter, minimum_feature_level, debugstr_guid(iid), device);
+ 
+-    if (!load_d3d12core())
+-        return E_NOINTERFACE;
+-    return IVKD3DCoreInterface_CreateDevice(core, adapter, minimum_feature_level, iid, device);
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1)
++        INFO("AMD_RESEARCH_D3D12_CREATE minimum_feature_level=%#x\n", minimum_feature_level);
++    if (!load_d3d12core())
++        hr = E_NOINTERFACE;
++    else
++        hr = IVKD3DCoreInterface_CreateDevice(core, adapter, minimum_feature_level, iid, device);
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1)
++        INFO("AMD_RESEARCH_D3D12_RESULT minimum_feature_level=%#x iid=%s hr=%#x output_requested=%u\n",
++                minimum_feature_level, debugstr_guid(iid), (unsigned int)hr, device != NULL);
++    return hr;
+ }
+ 
+ HRESULT WINAPI DLLEXPORT D3D12CreateRootSignatureDeserializer(const void *data, SIZE_T data_size,
+--- a/libs/vkd3d/device.c
++++ b/libs/vkd3d/device.c
+@@ -2962,6 +2962,11 @@
+     uint32_t i, count;
+     bool fp8;
+ 
++    /* Optional extension commands may be absent in an older Vulkan loader.
++     * Do not advertise cooperative matrices or dereference a missing entry. */
++    if (!vk_procs->vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR)
++        return false;
++
+     fp8 = device->device_info.shader_float8_features.shaderFloat8CooperativeMatrix == VK_TRUE;
+ 
+     /* There are no sub-capabilities (yet at least).
+@@ -3082,6 +3087,13 @@
+     VkPhysicalDeviceFeatures *features;
+     bool single_storage_texel;
+     bool single_uniform_texel;
++    /* Private source-built compiler contract. Do not change advertised Vulkan
++     * features or request unsupported device features. The isolated runner
++     * verifies the protected compiler's exact hash and GPU results first. */
++    const bool amd_protected_subset = vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            physical_device_info->properties2.properties.vendorID == 0x1002 &&
++            strstr(physical_device_info->properties2.properties.deviceName, "5600M") &&
++            physical_device_info->vulkan_1_2_properties.driverID == VK_DRIVER_ID_MOLTENVK;
+ 
+     vkd3d_trace_physical_device(physical_device, physical_device_info, vk_procs);
+     vkd3d_trace_physical_device_features(physical_device_info);
+@@ -3256,18 +3268,21 @@
+         return E_INVALIDARG;
+     }
+ 
+-    if (!physical_device_info->robustness2_features.robustBufferAccess2 ||
+-            !physical_device_info->robustness2_features.robustImageAccess2)
++    if (!amd_protected_subset && (!physical_device_info->robustness2_features.robustBufferAccess2 ||
++            !physical_device_info->robustness2_features.robustImageAccess2))
+     {
+         ERR("Robustness2 features not supported. This is required.\n");
+         return E_INVALIDARG;
+     }
+ 
+-    if (!physical_device_info->robustness2_features.nullDescriptor)
++    if (!amd_protected_subset && !physical_device_info->robustness2_features.nullDescriptor)
+     {
+         ERR("Null descriptor in VK_EXT_robustness2 is not supported by this implementation. This is required for correct operation.\n");
+         return E_INVALIDARG;
+     }
++
++    if (amd_protected_subset)
++        WARN("AMD protected-compiler research subset: Vulkan R2 bits remain unchanged; no full R2/FL conformance claim. Unsupported protected shader forms must fail compilation.\n");
+ 
+     if (vulkan_info->KHR_fragment_shading_rate)
+         physical_device_info->additional_shading_rates_supported = d3d12_device_determine_additional_shading_rates_supported(device);
+@@ -5191,7 +5206,7 @@
+     return S_OK;
+ }
+ 
+-static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(d3d12_device_iface *iface,
++static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport_impl(d3d12_device_iface *iface,
+         D3D12_FEATURE feature, void *feature_data, UINT feature_data_size)
+ {
+     struct d3d12_device *device = impl_from_ID3D12Device(iface);
+@@ -6055,6 +6070,46 @@
+     }
+ }
+ 
++/* Bounded factual diagnostic only. Calls the original implementation unchanged;
++ * neither capability results nor HRESULTs are substituted. */
++static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(d3d12_device_iface *iface,
++        D3D12_FEATURE feature, void *feature_data, UINT feature_data_size)
++{
++    static LONG research_calls;
++    unsigned int requested_sm = 0;
++    HRESULT hr;
++    if (feature == D3D12_FEATURE_SHADER_MODEL && feature_data &&
++            feature_data_size == sizeof(D3D12_FEATURE_DATA_SHADER_MODEL))
++        requested_sm = ((D3D12_FEATURE_DATA_SHADER_MODEL *)feature_data)->HighestShaderModel;
++    hr = d3d12_device_CheckFeatureSupport_impl(iface, feature, feature_data, feature_data_size);
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 128)
++    {
++        INFO("AMD_RESEARCH_FEATURE feature=%#x size=%u hr=%#x\n", feature, feature_data_size, (unsigned int)hr);
++        if (SUCCEEDED(hr) && feature_data)
++        {
++            if (feature == D3D12_FEATURE_SHADER_MODEL && feature_data_size == sizeof(D3D12_FEATURE_DATA_SHADER_MODEL))
++                INFO("AMD_RESEARCH_SHADER_MODEL requested=%#x returned=%#x\n", requested_sm,
++                        ((D3D12_FEATURE_DATA_SHADER_MODEL *)feature_data)->HighestShaderModel);
++            else if (feature == D3D12_FEATURE_FEATURE_LEVELS && feature_data_size == sizeof(D3D12_FEATURE_DATA_FEATURE_LEVELS))
++                INFO("AMD_RESEARCH_FEATURE_LEVEL maximum=%#x\n",
++                        ((D3D12_FEATURE_DATA_FEATURE_LEVELS *)feature_data)->MaxSupportedFeatureLevel);
++            else if (feature == D3D12_FEATURE_D3D12_OPTIONS && feature_data_size == sizeof(D3D12_FEATURE_DATA_D3D12_OPTIONS))
++            {
++                D3D12_FEATURE_DATA_D3D12_OPTIONS *d = feature_data;
++                INFO("AMD_RESEARCH_OPTIONS tiled_tier=%u binding_tier=%u heap_tier=%u rovs=%u\n",
++                        d->TiledResourcesTier, d->ResourceBindingTier, d->ResourceHeapTier, d->ROVsSupported);
++            }
++            else if (feature == D3D12_FEATURE_FORMAT_SUPPORT && feature_data_size == sizeof(D3D12_FEATURE_DATA_FORMAT_SUPPORT))
++            {
++                D3D12_FEATURE_DATA_FORMAT_SUPPORT *d = feature_data;
++                INFO("AMD_RESEARCH_FORMAT format=%u support1=%#x support2=%#x\n", d->Format, d->Support1, d->Support2);
++            }
++        }
++    }
++    return hr;
++}
++
+ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateDescriptorHeap(d3d12_device_iface *iface,
+         const D3D12_DESCRIPTOR_HEAP_DESC *desc, REFIID riid, void **descriptor_heap)
+ {
+@@ -7525,6 +7580,12 @@
+     struct d3d12_sparse_info *sparse = &impl_from_ID3D12Resource(resource)->sparse;
+     unsigned int max_tiling_count, i;
+ 
++    /* Bounded factual API trace, no sparse emulation or success substitution. */
++    static LONG research_calls;
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 64)
++        INFO("AMD_RESEARCH_API %s invoked.\n", __func__);
++
+     TRACE("iface %p, resource %p, tile_count %p, packed_mip_info %p, "
+             "tile_shape %p, tiling_count %p, first_tiling %u, tilings %p.\n",
+             iface, resource, tile_count, packed_mip_info, tile_shape, tiling_count,
+@@ -7964,6 +8025,12 @@
+     D3D12_RESOURCE_DESC1 desc1;
+     HRESULT hr;
+ 
++    /* Bounded factual API trace, no sparse emulation or success substitution. */
++    static LONG research_calls;
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 64)
++        INFO("AMD_RESEARCH_API %s invoked.\n", __func__);
++
+     TRACE("iface %p, desc %p, initial_state %#x, optimized_clear_value %p, protected_session %p, iid %s, resource %p.\n",
+             iface, desc, initial_state, optimized_clear_value, protected_session, debugstr_guid(iid), resource);
+ 
+@@ -8790,6 +8857,12 @@
+     struct d3d12_resource *object;
+     D3D12_RESOURCE_DESC1 desc1;
+     HRESULT hr;
++
++    /* Bounded factual API trace, no sparse emulation or success substitution. */
++    static LONG research_calls;
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 64)
++        INFO("AMD_RESEARCH_API %s invoked.\n", __func__);
+ 
+     TRACE("iface %p, desc %p, initial_layout %u, optimized_clear_value %p, protected_session %p, "
+             "num_castable_formats %u, castable_formats %p, iid %s, resource %p stub!\n", iface,
+--- a/libs/vkd3d-common/debug.c
++++ b/libs/vkd3d-common/debug.c
+@@ -81,7 +81,10 @@
+ static void vkd3d_dbg_init_once(void)
+ {
+     char vkd3d_debug[VKD3D_PATH_MAX];
++    char research_flag[16];
+     unsigned int channel, i;
++    const bool research = vkd3d_get_env_var("VKD3D_AMD_PROTECTED_SUBSET", research_flag, sizeof(research_flag)) &&
++            !strcmp(research_flag, "1");
+ 
+     for (channel = 0; channel < VKD3D_DBG_CHANNEL_COUNT; channel++)
+     {
+@@ -95,6 +98,10 @@
+         /* Default debug level. */
+         if (vkd3d_dbg_level[channel] == VKD3D_DBG_LEVEL_UNKNOWN)
+             vkd3d_dbg_level[channel] = VKD3D_DBG_LEVEL_FIXME;
++        /* INFO precedes WARN in this implementation. Preserve actual warning
++         * failures for this private trial without enabling verbose API TRACE. */
++        if (research && vkd3d_dbg_level[channel] == VKD3D_DBG_LEVEL_INFO)
++            vkd3d_dbg_level[channel] = VKD3D_DBG_LEVEL_WARN;
+     }
+ 
+     if (vkd3d_get_env_var("VKD3D_LOG_BUFFERED", vkd3d_debug, sizeof(vkd3d_debug)))
+@@ -110,7 +117,10 @@
+     if (!vkd3d_disable_file && vkd3d_get_env_var("VKD3D_LOG_FILE", vkd3d_debug, sizeof(vkd3d_debug)))
+     {
+         /* Avoid extra formatting overhead when using buffered. */
+-        vkd3d_log_file = fopen(vkd3d_debug, vkd3d_dbg_buffer.buffer ? "wb" : "w");
++        /* d3d12 and d3d12core initialize separate copies of this logger. The
++         * second DLL must not truncate the first DLL's real request/results. */
++        vkd3d_log_file = fopen(vkd3d_debug, research ?
++                (vkd3d_dbg_buffer.buffer ? "ab" : "a") : (vkd3d_dbg_buffer.buffer ? "wb" : "w"));
+         if (!vkd3d_log_file)
+         {
+             fprintf(stderr, "Failed to open log file: %s!\n", vkd3d_debug);
+--- a/libs/vkd3d/vulkan_procs.h
++++ b/libs/vkd3d/vulkan_procs.h
+@@ -382,7 +382,7 @@
+ VK_DEVICE_EXT_PFN(vkQueueNotifyOutOfBandNV)
+ 
+ /* VK_KHR_cooperative_matrix */
+-VK_INSTANCE_PFN(vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR)
++VK_INSTANCE_EXT_PFN(vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR)
+ 
+ /* VK_EXT_opacity_micromap */
+ VK_DEVICE_EXT_PFN(vkGetMicromapBuildSizesEXT)

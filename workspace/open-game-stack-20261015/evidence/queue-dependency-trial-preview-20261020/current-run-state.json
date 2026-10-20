@@ -1,0 +1,29 @@
+{
+  "timeUTC": "2026-10-20T07:37:15.492085+00:00",
+  "latestUserInstruction": "After a validated repair, deploy and restart directly. No further routine deployment/restart confirmation.",
+  "normalOriginalSteamLaunch": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/tencent-normal-game-deferred-20261020T073505Z/launch.json",
+  "gamePID": 66635,
+  "actualCandidateMapped": true,
+  "actualProxyMapped": true,
+  "fixedWindowModuleMapped": true,
+  "originalWriteDenied": true,
+  "candidateSHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "actualQueueFamilies": [
+    0,
+    2,
+    3
+  ],
+  "cacheRecords": 94,
+  "computeArchiveLoaded": 94,
+  "computePipelineCreated": 94,
+  "strictNativeHitRequired": false,
+  "cacheFilesDeleted": false,
+  "userWindowFeedback": "Compiling shaders",
+  "currentObservedGPUTimeouts": 0,
+  "startupSample": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-dependency-trial-preview-20261020/startup-sample.txt",
+  "sampleFinding": "Graphics pipeline creation still includes MSL library compilation and Metal compiler waits; compute archive reuse alone does not eliminate this phase.",
+  "GPUTimeoutFixed": false,
+  "blueSceneDefectFixed": false,
+  "gamePlayable": false,
+  "next": "Inspect this run native wait/signal snapshots if GPU timeout recurs; verify scene rendering and sustained interaction after compilation. Do not attribute completed encoder labels as offending shaders. Restart directly after a qualified fix when needed."
+}

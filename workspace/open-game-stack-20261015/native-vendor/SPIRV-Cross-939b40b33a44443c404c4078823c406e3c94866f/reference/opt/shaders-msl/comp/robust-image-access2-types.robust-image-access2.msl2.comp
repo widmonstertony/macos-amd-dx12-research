@@ -1,0 +1,29 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct OutputSSBO
+{
+    float4 out_1d;
+    float4 out_3d;
+    float4 out_array;
+    float4 out_cube;
+};
+
+constant uint3 gl_WorkGroupSize [[maybe_unused]] = uint3(1u);
+
+kernel void main0(device OutputSSBO& _22 [[buffer(0)]], texture1d<float> image1d [[texture(0)]], texture3d<float> image3d [[texture(1)]], texture2d_array<float> imageArray [[texture(2)]], texturecube<float> imageCube_ [[texture(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    int _17 = int(gl_GlobalInvocationID.x);
+    float4 _29 = (!is_null_texture(image1d) ? ((uint(_17) < image1d.get_width()) ? image1d.read(uint(_17)) : float4(0, 0, 0, 0)) : float4(0, 0, 0, 0));
+    _22.out_1d = _29;
+    int3 _39 = int3(_17);
+    float4 _40 = (!is_null_texture(image3d) ? ((((uint(_39.x) < image3d.get_width()) && (uint(_39.y) < image3d.get_height())) && (uint(_39.z) < image3d.get_depth())) ? image3d.read(uint3(_39)) : float4(0, 0, 0, 0)) : float4(0, 0, 0, 0));
+    _22.out_3d = _40;
+    float4 _49 = (!is_null_texture(imageArray) ? ((((uint(_39.x) < imageArray.get_width()) && (uint(_39.y) < imageArray.get_height())) && (uint(_39.z) < imageArray.get_array_size())) ? imageArray.read(uint2(_39.xy), uint(_39.z)) : float4(0, 0, 0, 0)) : float4(0, 0, 0, 0));
+    _22.out_array = _49;
+    float4 _58 = (!is_null_texture(imageCube_) ? ((((uint(_39.x) < imageCube_.get_width()) && (uint(_39.y) < imageCube_.get_height())) && (uint(_39.z) < 6)) ? imageCube_.read(uint2(_39.xy), uint(_39.z)) : float4(0, 0, 0, 0)) : float4(0, 0, 0, 0));
+    _22.out_cube = _58;
+}
+

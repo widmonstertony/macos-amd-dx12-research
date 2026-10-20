@@ -1,0 +1,54 @@
+-- The C compiler identification is AppleClang 21.0.0.21000101
+-- The CXX compiler identification is AppleClang 21.0.0.21000101
+-- The OBJC compiler identification is AppleClang 21.0.0.21000101
+-- The OBJCXX compiler identification is AppleClang 21.0.0.21000101
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting OBJC compiler ABI info
+-- Detecting OBJC compiler ABI info - done
+-- Check for working OBJC compiler: /usr/bin/cc - skipped
+-- Detecting OBJCXX compiler ABI info
+-- Detecting OBJCXX compiler ABI info - done
+-- Check for working OBJCXX compiler: /usr/bin/c++ - skipped
+CMake Warning (author) at cmake/MoltenVK/MoltenVK_CPM_Cache.cmake:17 (file):
+  Given path:
+
+    /Users/tonytan/.cache/CPM
+
+  does not refer to an existing path on disk.
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (include)
+This warning is for project developers.  Use -Wno-author to suppress it.
+
+-- Using CPM cache folder: /private/tmp/macos-amd-dx12-restore-check-20261020/open-game-stack-20261015/native-vendor/cache
+-- Performing Test IS_SUPPORTED_-Wno-deprecated-declarations_CXX
+-- Performing Test IS_SUPPORTED_-Wno-deprecated-declarations_CXX - Success
+-- Performing Test IS_SUPPORTED_-Wno-deprecated-declarations_OBJCXX
+-- Performing Test IS_SUPPORTED_-Wno-deprecated-declarations_OBJCXX - Success
+-- Performing Test IS_SUPPORTED_-Wno-vla-cxx-extension_CXX
+-- Performing Test IS_SUPPORTED_-Wno-vla-cxx-extension_CXX - Success
+-- Performing Test IS_SUPPORTED_-Wno-vla-cxx-extension_OBJCXX
+-- Performing Test IS_SUPPORTED_-Wno-vla-cxx-extension_OBJCXX - Success
+-- External: creating target 'SPRIV-Cross::SPRIV-Cross'
+-- CPM: Adding package SPIRV-Cross@ (/private/tmp/macos-amd-dx12-restore-check-20261020/open-game-stack-20261015/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f)
+-- SPIRV-Cross: Finding Git version for SPIRV-Cross.
+-- Found Git: /usr/bin/git (found version "2.50.1 (Apple Git-155)")
+-- SPIRV-Cross: Git hash: 
+-- External: creating target 'cereal::cereal'
+-- CPM: Adding package cereal@ (/private/tmp/macos-amd-dx12-restore-check-20261020/open-game-stack-20261015/native-vendor/cereal/cereal)
+-- Performing Test COMPILER_SUPPORT_M32
+-- Performing Test COMPILER_SUPPORT_M32 - Success
+-- Use libc++
+-- External: creating target 'Vulkan::Headers'
+-- CPM: Adding package Vulkan-Headers@ (/private/tmp/macos-amd-dx12-restore-check-20261020/open-game-stack-20261015/native-vendor/Vulkan-Headers-6aefb8eb95c8e170d0805fd0f2d02832ec1e099a)
+-- Configuring done (10.8s)
+-- Generating done (0.1s)
+-- Build files have been written to: /private/tmp/macos-amd-dx12-restore-check-20261020/open-game-stack-20261015/build/restored-native

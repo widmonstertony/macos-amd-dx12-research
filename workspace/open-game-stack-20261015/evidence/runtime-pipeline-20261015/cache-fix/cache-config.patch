@@ -1,0 +1,44 @@
+--- before/MVKPipeline.mm
++++ after/MVKPipeline.mm
+@@ -3572,6 +3572,7 @@
+ 				opt.emulate_cube_array,
+ 				opt.enable_decoration_binding,
+ 				opt.texture_buffer_native,
++				opt.add_texture_buffer_offsets,
+ 				opt.force_active_argument_buffer_resources,
+ 				opt.pad_argument_buffer_resources,
+ 				opt.force_native_arrays,
+@@ -3589,6 +3590,7 @@
+ 				opt.check_discarded_frag_stores,
+ 				opt.sample_dref_lod_array_as_grad,
+ 				opt.readwrite_texture_fences,
++				opt.bitwise_not_causes_ice,
+ 				opt.replace_recursive_inputs,
+ 				opt.agx_manual_cube_grad_fixup,
+ 				opt.force_fragment_with_side_effects_execution,
+@@ -3914,17 +3916,17 @@
+ 
+ void mvkValidateCeralArchiveDefinitions() {
+ 	[[maybe_unused]] size_t missingBytes = 0;
+-	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::CompilerMSL::Options>(12);
++	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::CompilerMSL::Options>(10);
+ 	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::MSLShaderInterfaceVariable>(3);
+ 	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::MSLResourceBinding>();
+ 	missingBytes += mvkValidateCerealArchiveSize<SPIRV_CROSS_NAMESPACE::MSLConstexprSampler>();
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVWorkgroupSizeDimension>(3);
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVEntryPoint>(20);						// Contains string
+-	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionOptions>(30);			// Contains string
++	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionOptions>(28);			// Contains string
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLShaderInterfaceVariable>(6);
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLResourceBinding>(2);
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::DescriptorBinding>();
+-	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionConfiguration>(110);	// Contains collection
++	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionConfiguration>(108);	// Contains collection
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::SPIRVToMSLConversionResultInfo>(39);		// Contains collection
+ 	missingBytes += mvkValidateCerealArchiveSize<mvk::MSLSpecializationMacroInfo>(22);			// Contains string
+ 	missingBytes += mvkValidateCerealArchiveSize<MVKShaderModuleKey>();
+--- before/MVKPatchRevision.h
++++ after/MVKPatchRevision.h
+@@ -1 +1 @@
+-#define MVK_PATCH_REVISION 0x54525002u
++#define MVK_PATCH_REVISION 0x54525003u

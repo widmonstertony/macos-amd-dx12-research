@@ -1,0 +1,86 @@
+Native D3D12 -> DXGI -> macOS window proof, 2026-10-11
+
+Hardware/runtime: genuine AMD Radeon Pro 5600M, macOS 26.7.1 (25G241).
+Original GPTK4 beta2 D3DMetal binary (never edited by this probe):
+runtime-gptk4b2/redist/lib/external/D3DMetal.framework/Versions/A/D3DMetal
+SHA256 f5b56df1b8fe8b364dd9530651a3769c8aed948bd343be3b4510604d503e2bad
+
+Successful runs:
+  native-presentation-compositor-pass.log                 exit 0
+  native-presentation-metal-validation.log                exit 0
+  dxgi-own-window-gradient-pass.png                       actual own window
+  dxgi-own-window-gradient-metal-validation.png           actual own window
+
+The second run enables MTL_DEBUG_LAYER=1; its log confirms
+"Metal API Validation Enabled" and has no Metal assertion/error.
+Both runs use exactly the standard DXGI Present(1,0), with no manual present:
+  CreateDXGIFactory2/AMD CreateDevice/GraphicsPSO           S_OK
+  CreateSwapChainForHwnd: BGRA8, 64x64, 2-buffer FlipDiscard S_OK
+  Empty rootsig + original DXIL vs_6_0/ps_6_0 fullscreen triangle
+  Enhanced Texture Barriers: PRESENT -> RT -> COPY_SRC -> PRESENT
+  D3D12 swapchain backbuffer CPU readback                  4096/4096 exact
+  Actual CAMetalDrawable texture CPU readback             4096/4096 exact
+  Own visible window compositor image: XY-gradient grid   16/16 samples match
+  Fence signalled after Present                          completed value 2
+  GetDeviceRemovedReason                                 S_OK
+
+Important observations/limits:
+  - A real NSApplication run loop is required for this native diagnostic;
+    merely polling a never-running AppKit application yielded blank capture.
+  - addPresentedHandler is not called on this D3DMetal path; the log records
+    callbacks=0 honestly. This probe requires the positive own-window image
+    plus byte-exact drawable/backbuffer data, not a fabricated callback.
+  - presentedTime is 0 even for the independent real native-Metal baseline
+    whose blue window was positively captured. Timestamp alone is not proof
+    of failure on this hardware/runtime.
+  - DMN_PRESENT_FALLBACK must be unset: the host rejects it. The optional
+    PRESENTATION_MANUAL_CONTROL negative diagnostic cannot turn PASS on;
+    all scored pixels/screenshots precede it. It was not enabled in PASS runs.
+  - The adapter still deliberately simulates the Apple7 classification gate;
+    real GPU work, shader execution and pixel data are not simulated. Runs use
+    the parent's public-Metal software residency shim, managed texture mode
+    and renderpass normalization. This is not Apple official support or a
+    complete D3D12/Metal conformance result; no game was launched by this test.
+  - GFXT host ABI is third-party reconstructed open-source interoperability,
+    not an Apple-documented native WSI API. The original Apple framework is
+    unchanged. Only UTM's OS/window/event/registry/path/allocation/library/
+    monitor/adapter/swapchain/logging service source files are linked. NOT
+    linked: UTM initializer, COM hooks, private exported Apple flags, Metal
+    swizzles, sparse/share patches. UTM checkout is unmodified.
+  - Window capture uses the installed public legacy CoreGraphics API for
+    precisely this probe's owned window. No other windows are captured and
+    no screen-capture permission or global UI preference is requested.
+
+Source provenance:
+  UTM d3dmetal-native MIT repository:
+  https://github.com/utmapp/d3dmetal-native
+  pinned d374b21668f94b7b7b059f152794fdb93e944b84 (2026-10-06)
+  https://github.com/utmapp/d3dmetal-native/blob/d374b21668f94b7b7b059f152794fdb93e944b84/src/dmn_gfxt_swapchain.mm
+  https://github.com/utmapp/d3dmetal-native/blob/d374b21668f94b7b7b059f152794fdb93e944b84/src/d3dmetal_gfxt.h
+  Microsoft MIT D3D12 declarations:
+  https://github.com/microsoft/DirectX-Headers/blob/main/include/directx/d3d12.h
+  Wine public HWND/macOS Metal surface interfaces:
+  https://github.com/wine-mirror/wine/blob/wine-11.16/dlls/winemac.drv/macdrv_cocoa.h
+  https://github.com/wine-mirror/wine/blob/wine-11.16/include/winuser.h
+
+Reproduce from research root:
+  sh presentation-probe/build_presentation_probe.sh
+  env DYLD_INSERT_LIBRARIES=<research>/gpu-adapter-experiment/metal_device_adapter.dylib \
+      GPU_ADAPTER_MODE=gate GPU_ADAPTER_TEXTURE_MODE=managed \
+      GPU_ADAPTER_RENDERPASS_NORMALIZE=1 GPU_ADAPTER_TIMEOUT_SECONDS=60 \
+      MTL_DEBUG_LAYER=1 DMN_LOG=trace DMN_VSYNC=1 \
+      PRESENTATION_CAPTURE_PATH=<research>/presentation-probe/own-window.png \
+      ./presentation-probe/native_presentation_host \
+      <research>/runtime-gptk4b2/redist/lib/external/D3DMetal.framework/Versions/A/D3DMetal
+  This requires GUI/GPU access outside the command sandbox. It creates and
+  closes only its temporary own window, and exits 0 only on the scored proof.
+
+Independent Windows companion (built, not yet run by this subagent):
+  d3d12_presentation_probe.cpp / d3d12_presentation_probe.exe
+  sh presentation-probe/build_windows_presentation_probe.sh
+  PE32+ x86-64, freestanding: kernel32.dll/user32.dll imports only. Creates a
+  genuine user32 HWND, calls standard DXGI CreateSwapChainForHwnd and Present,
+  uses the same original DXIL/XY-gradient/backbuffer readback, and retains its
+  window for 5 seconds. Exit 0 scores GPU/API only and explicitly says the
+  compositor image is NOT verified by the EXE; inspect/capture Wine's window
+  separately. Native GFXT success does not by itself wire ordinary Wine WSI.

@@ -1,0 +1,160 @@
+{
+  "timeUTC": "2026-10-19T21:09:29.071779+00:00",
+  "qualified": true,
+  "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-protocol-select/winemac.so",
+  "candidateSHA256": "b1223543882b6c4e625b9c1970ed457615b3eb49d7dfc0388071a18b3820c89c",
+  "priorModuleSHA256": "3b77ec9d03dc9b52dd8e695c666f5303526f423652d2315772a1ba38727a2bb6",
+  "serverProtocolAudit": {
+    "server": "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/MacOS/wineserver",
+    "serverSHA256": "dd1d5e5908429157dea855e246503bf1e47cd0a3c1c4fd84efdac03374a6022a",
+    "mapping": {
+      "set_queue_fd": {
+        "sourceID": 115,
+        "installedID": 116
+      },
+      "set_capture_window": {
+        "sourceID": 195,
+        "installedID": 196
+      },
+      "get_window_rectangles": {
+        "sourceID": 156,
+        "installedID": 157
+      },
+      "set_window_pos": {
+        "sourceID": 155,
+        "installedID": 156
+      },
+      "update_window_zorder": {
+        "sourceID": 164,
+        "installedID": 165
+      }
+    },
+    "installedRequestCount": 313,
+    "extraInstalledRequests": [
+      [
+        7,
+        "save_app_select_path"
+      ],
+      [
+        307,
+        "notify_shortcut_created"
+      ],
+      [
+        308,
+        "notify_shortcut_deleted"
+      ],
+      [
+        309,
+        "notify_app_displayed"
+      ],
+      [
+        310,
+        "notify_app_closed"
+      ],
+      [
+        311,
+        "get_wine_process_info"
+      ],
+      [
+        312,
+        "get_yyb_config_by_key"
+      ]
+    ],
+    "serverModified": false,
+    "sourceWindowModuleOnly": true
+  },
+  "rootCause": "Public source native window module used unshifted server request IDs; original Tencent server inserts a request at ordinal 7. set_queue_fd 115 went to get_msg_queue instead of actual set_queue_fd 116. Window events never correctly woke the Win32 queue. All five direct server requests in this module now use audited IDs.",
+  "nativeResizeAB": {
+    "original": "PASS full 800x588",
+    "priorSource": "FAIL native client 800x588, Metal surface 280x286",
+    "fixedSource": "PASS full 800x588"
+  },
+  "geometryEvidence": {
+    "timeUTC": "2026-10-19T21:06:55.899095+00:00",
+    "gamePIDPreserved": 4103,
+    "gameRestarted": false,
+    "cacheDeleted": false,
+    "results": {
+      "protocol-geometry": {
+        "pid": 19040,
+        "exitCode": 0,
+        "timeout": false,
+        "seconds": 8.25,
+        "realPixelsPassed": true,
+        "stressPassed": true,
+        "candidateMapped": true,
+        "sourceWinemacMapped": true,
+        "nativeMetalCoversClient": true,
+        "postContentionPixelsPassed": true,
+        "actualOutputPassed": true
+      }
+    }
+  },
+  "GPUAndConcurrencyRegressions": {
+    "timeUTC": "2026-10-19T21:08:27.366886+00:00",
+    "gamePIDPreserved": 4103,
+    "gameRestarted": false,
+    "cacheDeleted": false,
+    "results": {
+      "protocol-device": {
+        "pid": 19103,
+        "exitCode": 0,
+        "timeout": false,
+        "seconds": 1.79,
+        "realPixelsPassed": false,
+        "stressPassed": false,
+        "candidateMapped": true,
+        "sourceWinemacMapped": true,
+        "postContentionPixelsPassed": false,
+        "actualOutputPassed": true
+      },
+      "protocol-compute": {
+        "pid": 19123,
+        "exitCode": 0,
+        "timeout": false,
+        "seconds": 1.71,
+        "realPixelsPassed": false,
+        "stressPassed": false,
+        "candidateMapped": true,
+        "sourceWinemacMapped": true,
+        "postContentionPixelsPassed": false,
+        "actualOutputPassed": true
+      },
+      "protocol-resize": {
+        "pid": 19128,
+        "exitCode": 0,
+        "timeout": false,
+        "seconds": 8.34,
+        "realPixelsPassed": true,
+        "stressPassed": true,
+        "candidateMapped": true,
+        "sourceWinemacMapped": true,
+        "postContentionPixelsPassed": true,
+        "actualOutputPassed": true
+      },
+      "protocol-native": {
+        "pid": 19152,
+        "exitCode": 0,
+        "timeout": false,
+        "seconds": 9.39,
+        "realPixelsPassed": true,
+        "stressPassed": true,
+        "candidateMapped": true,
+        "sourceWinemacMapped": true,
+        "postContentionPixelsPassed": true,
+        "actualOutputPassed": true
+      }
+    }
+  },
+  "sameGamePID": 16428,
+  "currentGameUsesPriorModule": false,
+  "gameRestarted": true,
+  "shaderCacheDeleted": false,
+  "originalEngineModified": false,
+  "deployed": true,
+  "gamePlayable": false,
+  "requiresGameExitForSafeDeployment": true,
+  "next": "Preserve authorized new game run 21389, verify live compilation and visible window size.",
+  "deploymentTarget": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-leaf-select/winemac.so",
+  "currentGamePID": 21389
+}

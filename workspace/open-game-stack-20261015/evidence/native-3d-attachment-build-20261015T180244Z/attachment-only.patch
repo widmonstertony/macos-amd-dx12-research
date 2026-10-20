@@ -1,0 +1,44 @@
+--- a/MVKImage.mm
++++ b/MVKImage.mm
+@@ -2164,8 +2164,18 @@
+ 
+ void MVKImageView::populateMTLRenderPassAttachmentDescriptor(MTLRenderPassAttachmentDescriptor* mtlAttDesc) {
+     MVKImageViewPlane* plane = _planes[0];
+-    bool useView = plane->_useMTLTextureView;
+-    mtlAttDesc.texture = plane->getMTLTexture();
++    // AMD 3D and 2D-array textures do not have interchangeable heap layouts.
++    // For an attachment with the original format, use the actual 3D texture
++    // and the depthPlane selection below. Sampled/storage views keep their
++    // existing path; this does not advertise additional Vulkan capabilities.
++    VkPhysicalDeviceProperties actualProperties;
++    getPhysicalDevice()->getProperties(&actualProperties);
++    const bool native3DSlice = actualProperties.vendorID == 0x1002 && actualProperties.deviceID == 0x7360 &&
++        _image->getImageType() == VK_IMAGE_TYPE_3D &&
++        (_mtlTextureType == MTLTextureType2D || _mtlTextureType == MTLTextureType2DArray) &&
++        plane->_mtlPixFmt == _image->getMTLPixelFormat(0) && !plane->_useSwizzle;
++    bool useView = !native3DSlice && plane->_useMTLTextureView;
++    mtlAttDesc.texture = native3DSlice ? _image->getMTLTexture(0) : plane->getMTLTexture();
+     // If a swizzle is being applied, use the unswizzled parent texture.
+     // This is relevant for depth/stencil attachments that are also sampled and might have forced swizzles.
+     if (plane->_useSwizzle && mtlAttDesc.texture.parentTexture) {
+@@ -2184,8 +2194,18 @@
+ 
+ void MVKImageView::populateMTLRenderPassAttachmentDescriptorResolve(MTLRenderPassAttachmentDescriptor* mtlAttDesc) {
+     MVKImageViewPlane* plane = _planes[0];
+-    bool useView = plane->_useMTLTextureView;
+-    mtlAttDesc.resolveTexture = plane->getMTLTexture();
++    // AMD 3D and 2D-array textures do not have interchangeable heap layouts.
++    // For an attachment with the original format, use the actual 3D texture
++    // and the depthPlane selection below. Sampled/storage views keep their
++    // existing path; this does not advertise additional Vulkan capabilities.
++    VkPhysicalDeviceProperties actualProperties;
++    getPhysicalDevice()->getProperties(&actualProperties);
++    const bool native3DSlice = actualProperties.vendorID == 0x1002 && actualProperties.deviceID == 0x7360 &&
++        _image->getImageType() == VK_IMAGE_TYPE_3D &&
++        (_mtlTextureType == MTLTextureType2D || _mtlTextureType == MTLTextureType2DArray) &&
++        plane->_mtlPixFmt == _image->getMTLPixelFormat(0) && !plane->_useSwizzle;
++    bool useView = !native3DSlice && plane->_useMTLTextureView;
++    mtlAttDesc.resolveTexture = native3DSlice ? _image->getMTLTexture(0) : plane->getMTLTexture();
+     // If a swizzle is being applied, use the unswizzled parent texture.
+     // This is relevant for depth/stencil attachments that are also sampled and might have forced swizzles.
+     if (plane->_useSwizzle && mtlAttDesc.resolveTexture.parentTexture) {

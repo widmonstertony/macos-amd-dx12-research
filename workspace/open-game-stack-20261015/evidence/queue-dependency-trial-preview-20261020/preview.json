@@ -1,0 +1,22 @@
+{
+  "candidateSHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "proxySHA256": "847a4f6f80d15985c51253da9bb3a855a27037cab883e7f173ef66577bdd50f2",
+  "command": [
+    "xcrun",
+    "clang",
+    "-dynamiclib",
+    "-O2",
+    "-DMVK_GUARD_CANDIDATE_PATH=\"/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libCandidate.dylib\"",
+    "-DMVK_GUARD_GAME_CONFIG_HEADER=\"/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-dependency-trial-preview-20261020/game-trial-config.h\"",
+    "src/mvk_guard_proxy.c",
+    "-Wl,-reexport_library,/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libCandidate.dylib",
+    "-Wl,-install_name,/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libProbeGuard.dylib",
+    "-o",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libProbeGuard.dylib"
+  ],
+  "gameOnlyTrialSettings": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/queue-dependency-trial-preview-20261020/game-trial-config.h",
+  "originalWineQualification": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T072513Z/run.json",
+  "gameStarted": false,
+  "sharedSelectorsChanged": false,
+  "scope": "Capture actual native wait/signal dependencies on GPU failure. Keep prior render path and specialized queues. Reuse all existing compute/vkd3d caches. New optional native render shards are not enabled for this diagnostic comparison."
+}

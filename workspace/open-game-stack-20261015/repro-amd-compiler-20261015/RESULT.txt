@@ -1,0 +1,27 @@
+独立复现结果（2026-10-15）
+
+已从既有转储中精确找出触发失败的顶点/片元着色器；SPIR-V中的DXIL哈希与失败日志匹配。
+原始着色器能生成Metal库，但独立创建管线就复现XPC连接中断。新崩溃报告同为AMD libAMDIL902.dylib的getPtrRsrcId、SIGSEGV、非法地址0x18。
+独立管线使用原日志的RGBA16Float、RGB写掩码、Depth32Float_Stencil8、单采样、无顶点属性；原日志没记录混合因子，独立因子为One/One，此处保留近似限制。
+
+有效候选：将RootConstants中仅表示64位设备地址的uint2字段及其局部别名改为显式const device uchar*，删除对应整数转指针步骤。64字节布局不变，原顶点代码不变，完整片元分支、4次采样、4次空纹理检查不变。
+这避免了当前完整片元着色器的编译崩溃。关于编译器丢失资源来源信息，只是与结果一致的假设，未分析或修改闭源实现。
+
+实际GPU：AMD Radeon Pro5600M，Metal验证开启，8次8x8绘制，512像素/2048颜色分量，0差异、最大绝对误差0。覆盖体积纹理、天空、大气+天空、空天空、空大气、空体积、空深度、discard。5个CBV均使用不同非零地址偏移；原VS的整数地址与新FS的指针字段共用同一root数据。
+输入为受控的均匀纹理，不代表任意输入/全部功能/游戏性能。原始着色器因编译崩溃不能执行，因此结果对照独立CPU公式，不宣称与原始着色器逐像素比较。
+
+当前仍是该确切着色器的隔离候选验证，不是已接入的通用转换器补丁。
+prepare_candidate.py是哈希固定的离线重放工具，拒绝其他源文件版本；不是Python运行时转换器。
+后续需要在原生开源转换中做严格的地址用途分析和类型传播，保留布局、混合整数用途与保护；经隔离回归后才能推广。不能全局把uint2字段换成指针，也不能依赖固定游戏着色器ID宣称通用支持。
+
+本轮未启动游戏，未修改应用宝或闭源驱动，未替换当前运行库。原Steam保留，未留下GPU探针。黑屏/性能整体尚未验证修复。
+
+复现命令（此目录）：
+clang++ -std=c++17 -O1 -fobjc-arc pipeline_repro.mm -framework Foundation -framework Metal -o build/pipeline_repro
+python3 prepare_candidate.py
+python3 run_repro.py NEW_BASELINE input/shader-fs-25f807389203fa9a.metal safe
+python3 run_repro.py NEW_CANDIDATE variants/typed-root-pointers.metal safe
+clang++ -std=c++17 -O1 -fobjc-arc gpu_oracle.mm -framework Foundation -framework Metal -o build/gpu_oracle
+MTL_DEBUG_LAYER=1 build/gpu_oracle input/shader-vs-40f012fa5dc390cb.metal variants/typed-root-pointers.metal
+
+原始失败、拒绝的改写和全部运行输出均保存在evidence；候选差异为generated-msl-typed-root-pointers.patch。

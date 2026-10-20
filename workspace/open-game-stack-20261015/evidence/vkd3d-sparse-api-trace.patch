@@ -1,0 +1,56 @@
+--- a/libs/vkd3d/device.c
++++ b/libs/vkd3d/device.c
+@@ -7535,6 +7535,12 @@
+     struct d3d12_sparse_info *sparse = &impl_from_ID3D12Resource(resource)->sparse;
+     unsigned int max_tiling_count, i;
+ 
++    /* Bounded factual API trace, no sparse emulation or success substitution. */
++    static LONG research_calls;
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 64)
++        INFO("AMD_RESEARCH_API %s invoked.\n", __func__);
++
+     TRACE("iface %p, resource %p, tile_count %p, packed_mip_info %p, "
+             "tile_shape %p, tiling_count %p, first_tiling %u, tilings %p.\n",
+             iface, resource, tile_count, packed_mip_info, tile_shape, tiling_count,
+@@ -7974,6 +7980,12 @@
+     D3D12_RESOURCE_DESC1 desc1;
+     HRESULT hr;
+ 
++    /* Bounded factual API trace, no sparse emulation or success substitution. */
++    static LONG research_calls;
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 64)
++        INFO("AMD_RESEARCH_API %s invoked.\n", __func__);
++
+     TRACE("iface %p, desc %p, initial_state %#x, optimized_clear_value %p, protected_session %p, iid %s, resource %p.\n",
+             iface, desc, initial_state, optimized_clear_value, protected_session, debugstr_guid(iid), resource);
+ 
+@@ -8800,6 +8812,12 @@
+     struct d3d12_resource *object;
+     D3D12_RESOURCE_DESC1 desc1;
+     HRESULT hr;
++
++    /* Bounded factual API trace, no sparse emulation or success substitution. */
++    static LONG research_calls;
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 64)
++        INFO("AMD_RESEARCH_API %s invoked.\n", __func__);
+ 
+     TRACE("iface %p, desc %p, initial_layout %u, optimized_clear_value %p, protected_session %p, "
+             "num_castable_formats %u, castable_formats %p, iid %s, resource %p stub!\n", iface,
+--- a/libs/vkd3d/command.c
++++ b/libs/vkd3d/command.c
+@@ -21348,6 +21348,12 @@
+     uint32_t *bound_tiles;
+     unsigned int i;
+ 
++    /* Bounded factual API trace, no sparse emulation or success substitution. */
++    static LONG research_calls;
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1 &&
++            InterlockedIncrement(&research_calls) <= 64)
++        INFO("AMD_RESEARCH_API %s invoked.\n", __func__);
++
+     TRACE("iface %p, resource %p, region_count %u, region_coords %p, "
+             "region_sizes %p, heap %p, range_count %u, range_flags %p, heap_range_offsets %p, "
+             "range_tile_counts %p, flags %#x.\n",

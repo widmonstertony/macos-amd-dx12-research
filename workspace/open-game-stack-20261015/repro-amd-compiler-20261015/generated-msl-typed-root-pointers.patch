@@ -1,0 +1,220 @@
+--- original-generated.metal
++++ typed-root-pointers.metal
+@@ -25,11 +25,11 @@
+ 
+ struct RootConstants
+ {
+-    uint2 _m0;
+-    uint2 _m1;
+-    uint2 _m2;
+-    uint2 _m3;
+-    uint2 _m4;
++    const device uchar* _m0;
++    const device uchar* _m1;
++    const device uchar* _m2;
++    const device uchar* _m3;
++    const device uchar* _m4;
+     uint _m5;
+     uint _m6;
+     uint _m7;
+@@ -76,10 +76,10 @@
+     uint _60;
+     uint _65;
+     uint _70;
+-    uint2 _78;
+-    uint2 _80;
+-    uint2 _82;
+-    uint2 _85;
++    const device uchar* _78;
++    const device uchar* _80;
++    const device uchar* _82;
++    const device uchar* _85;
+     float _88;
+     float _90;
+     float _118;
+@@ -112,24 +112,24 @@
+         out.SV_Target.y = 0.0;
+         out.SV_Target.z = 0.0;
+         out.SV_Target.w = 0.0;
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _106 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _115 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++        const device PhysicalPointerFloat4NonWriteCBVArray* _106 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++        const device PhysicalPointerFloat4NonWriteCBVArray* _115 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+         _118 = _115->value[172u].x;
+         _119 = _115->value[172u].y;
+         _120 = _115->value[172u].z;
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _122 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++        const device PhysicalPointerFloat4NonWriteCBVArray* _122 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+         _131 = (_118 - _122->value[173u].x) * 9.9999997473787516355514526367188e-06;
+         _133 = (_119 - _122->value[173u].y) * 9.9999997473787516355514526367188e-06;
+         _134 = (_120 - _122->value[173u].z) * 9.9999997473787516355514526367188e-06;
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _136 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _144 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _155 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _162 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _169 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _176 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++        const device PhysicalPointerFloat4NonWriteCBVArray* _136 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++        const device PhysicalPointerFloat4NonWriteCBVArray* _144 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++        const device PhysicalPointerFloat4NonWriteCBVArray* _155 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++        const device PhysicalPointerFloat4NonWriteCBVArray* _162 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++        const device PhysicalPointerFloat4NonWriteCBVArray* _169 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++        const device PhysicalPointerFloat4NonWriteCBVArray* _176 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+         float _184 = (_93 * 2000000.0) * (((_88 - _136->value[129u].x) * _144->value[130u].z) + (-0.5));
+         float _187 = (_93 * (-2000000.0)) * (((_90 - _136->value[129u].y) * _144->value[130u].w) + (-0.5));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _203 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++        const device PhysicalPointerFloat4NonWriteCBVArray* _203 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+         float _209 = (fma(1000000.0, _169->value[50u].x, fma(_187, _162->value[49u].x, _184 * _155->value[48u].x)) + _176->value[51u].x) - _203->value[67u].x;
+         float _210 = (fma(1000000.0, _169->value[50u].y, fma(_187, _162->value[49u].y, _184 * _155->value[48u].y)) + _176->value[51u].y) - _203->value[67u].y;
+         float _211 = (fma(1000000.0, _169->value[50u].z, fma(_187, _162->value[49u].z, _184 * _155->value[48u].z)) + _176->value[51u].z) - _203->value[67u].z;
+@@ -138,7 +138,7 @@
+         _218 = _210 * _216;
+         _219 = _211 * _216;
+         float4 _233 = (is_null_texture(_15[registers._m5]) ? float4(0, 0, 0, 0) : _15[registers._m5].sample(_23[registers._m6], float2(_106->value[132u].z * _88, _106->value[132u].w * _90), level(0.0)));
+-        _237 = ((reinterpret_cast<const device PhysicalPointerUint4NonWriteCBVArray*>(as_type<ulong>(_85)))->value[1u].y != 0u) ? 0.0 : _233.x;
++        _237 = ((reinterpret_cast<const device PhysicalPointerUint4NonWriteCBVArray*>(_85))->value[1u].y != 0u) ? 0.0 : _233.x;
+         _238 = _237 == 0.0;
+         float _257;
+         float _259;
+@@ -148,14 +148,14 @@
+         float _265;
+         if (_238)
+         {
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _240 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_78));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _240 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_78);
+             float frontier_phi_3_1_ladder;
+             float frontier_phi_3_1_ladder_1;
+             float frontier_phi_3_1_ladder_2;
+             float frontier_phi_3_1_ladder_3;
+             float frontier_phi_3_1_ladder_4;
+             float frontier_phi_3_1_ladder_5;
+-            if ((reinterpret_cast<const device PhysicalPointerUint4NonWriteCBVArray*>(as_type<ulong>(_85)))->value[0u].w == 0u)
++            if ((reinterpret_cast<const device PhysicalPointerUint4NonWriteCBVArray*>(_85))->value[0u].w == 0u)
+             {
+                 frontier_phi_3_1_ladder = 0.0;
+                 frontier_phi_3_1_ladder_1 = 0.0;
+@@ -166,7 +166,7 @@
+             }
+             else
+             {
+-                const device PhysicalPointerFloat4NonWriteCBVArray* _280 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_80));
++                const device PhysicalPointerFloat4NonWriteCBVArray* _280 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_80);
+                 float _287 = dot(float3(_217, _218, _219), float3(_217, _218, _219));
+                 float _293 = dot(float3(_217, _218, _219), float3(_131, _133, _134)) * 2.0;
+                 float _295 = _280->value[0u].y * _280->value[0u].y;
+@@ -221,11 +221,11 @@
+                 float frontier_phi_3_1_ladder_15_ladder_3;
+                 float frontier_phi_3_1_ladder_15_ladder_4;
+                 float frontier_phi_3_1_ladder_15_ladder_5;
+-                if ((_576 < 0.0) && ((reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82)))->value[183u].w == 0.0))
+-                {
+-                    const device PhysicalPointerFloat4NonWriteCBVArray* _641 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-                    const device PhysicalPointerFloat4NonWriteCBVArray* _648 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-                    float _660 = dot(float3(_217, _218, _219), float3((reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82)))->value[161u].xyz));
++                if ((_576 < 0.0) && ((reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82))->value[183u].w == 0.0))
++                {
++                    const device PhysicalPointerFloat4NonWriteCBVArray* _641 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++                    const device PhysicalPointerFloat4NonWriteCBVArray* _648 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++                    float _660 = dot(float3(_217, _218, _219), float3((reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82))->value[161u].xyz));
+                     float _674;
+                     float _676;
+                     float _678;
+@@ -278,8 +278,8 @@
+                         _676 = 0.0;
+                         _678 = 0.0;
+                     }
+-                    const device PhysicalPointerFloat4NonWriteCBVArray* _680 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-                    float _690 = (_680->value[184u].x != 0.0) ? _680->value[184u].y : (reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82)))->value[135u].y;
++                    const device PhysicalPointerFloat4NonWriteCBVArray* _680 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++                    float _690 = (_680->value[184u].x != 0.0) ? _680->value[184u].y : (reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82))->value[135u].y;
+                     float _699 = (1.0 - _648->value[169u].x) * 0.25;
+                     float _705 = 1.0 - precise::clamp(((_648->value[169u].x - _660) + _699) / _699, 0.0, 1.0);
+                     frontier_phi_3_1_ladder_15_ladder = _705 * precise::min(_690 * _674, 64000.0);
+@@ -314,7 +314,7 @@
+         }
+         else
+         {
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _252 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_78));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _252 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_78);
+             if (!(isunordered(_252->value[8u].w, 0.0) || _252->value[8u].w > 0.0))
+             {
+                 out.SV_Target.x = 0.0;
+@@ -332,12 +332,12 @@
+             _265 = 1.0;
+         }
+         float _271 = sqrt(((_131 * _131) + (_133 * _133)) + (_134 * _134));
+-        const device PhysicalPointerFloat4NonWriteCBVArray* _272 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_80));
++        const device PhysicalPointerFloat4NonWriteCBVArray* _272 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_80);
+         if (_238 && (_271 < (_272->value[0u].z + 0.00999999977648258209228515625)))
+         {
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _308 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _315 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _322 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _308 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _315 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _322 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+             float _330 = fma(_308->value[174u].z, _219, fma(_308->value[174u].y, _218, _308->value[174u].x * _217));
+             float _333 = fma(_315->value[175u].z, _219, fma(_315->value[175u].y, _218, _315->value[175u].x * _217));
+             float _336 = fma(_322->value[176u].z, _219, fma(_322->value[176u].y, _218, _322->value[176u].x * _217));
+@@ -389,7 +389,7 @@
+                 }
+                 _588 = frontier_phi_17_18_ladder;
+             }
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _593 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_78));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _593 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_78);
+             float _603 = sqrt((_271 * _271) - _351) / _271;
+             float _604 = abs(_603);
+             float _605 = _604 * _604;
+@@ -417,8 +417,8 @@
+             float _726 = (_710 > _711) ? (1.57079637050628662109375 - _722) : _722;
+             float _729 = (_330 > (-0.0)) ? (3.1415927410125732421875 - _726) : _726;
+             float4 _747 = (is_null_texture(_15[_42]) ? float4(0, 0, 0, 0) : _15[_42].sample(_23[_65], float2((((((_333 > (-0.0)) ? ((-0.0) - _729) : _729) + 3.1415927410125732421875) * 0.15915493667125701904296875) + (_593->value[7u].z * 0.5)) * (_593->value[7u].x / (_593->value[7u].x + 1.0)), (_593->value[7u].y / (_593->value[7u].y + 1.0)) * (_707 + (_593->value[7u].w * 0.5))), level(0.0)));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _755 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _759 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _755 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _759 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+             float _767 = ((_759->value[184u].x != 0.0) ? _759->value[184u].y : _755->value[135u].y) * _755->value[135u].z;
+             out.SV_Target.x = precise::min(((_747.x * _263) * _767) + _257, 32256.0);
+             out.SV_Target.y = precise::min(((_747.y * _264) * _767) + _259, 32256.0);
+@@ -429,28 +429,28 @@
+         else
+         {
+             float _358 = precise::max(9.9999999600419720025001879548654e-13, _237);
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _361 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _369 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _377 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _385 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _361 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _369 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _377 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _385 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+             float _407 = fma(_358, _377->value[46u].w, fma(_90, _369->value[45u].w, _361->value[44u].w * _88)) + _385->value[47u].w;
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _412 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _412 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+             float _418 = ((fma(_358, _377->value[46u].x, fma(_90, _369->value[45u].x, _361->value[44u].x * _88)) + _385->value[47u].x) / _407) - _412->value[70u].x;
+             float _419 = ((fma(_358, _377->value[46u].y, fma(_90, _369->value[45u].y, _361->value[44u].y * _88)) + _385->value[47u].y) / _407) - _412->value[70u].y;
+             float _420 = ((fma(_358, _377->value[46u].z, fma(_90, _369->value[45u].z, _361->value[44u].z * _88)) + _385->value[47u].z) / _407) - _412->value[70u].z;
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _422 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _428 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _434 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _441 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _422 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _428 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _434 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _441 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+             float _458 = fma(_420, _434->value[6u].w, fma(_419, _428->value[5u].w, _418 * _422->value[4u].w)) + _441->value[7u].w;
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _460 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _465 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_82));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _460 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
++            const device PhysicalPointerFloat4NonWriteCBVArray* _465 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_82);
+             float _473 = ((_465->value[184u].x != 0.0) ? _465->value[184u].y : _460->value[135u].y) * _460->value[135u].z;
+-            const device PhysicalPointerFloat4NonWriteCBVArray* _474 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_78));
++            const device PhysicalPointerFloat4NonWriteCBVArray* _474 = reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_78);
+             float _492 = (_418 - _118) * 9.9999997473787516355514526367188e-06;
+             float _494 = (_419 - _119) * 9.9999997473787516355514526367188e-06;
+             float _496 = (_420 - _120) * 9.9999997473787516355514526367188e-06;
+-            float _507 = sqrt((_474->value[3u].y * _474->value[3u].w) * precise::max(0.0, sqrt(((_492 * _492) + (_494 * _494)) + (_496 * _496)) - (reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(as_type<ulong>(_85)))->value[0u].x));
++            float _507 = sqrt((_474->value[3u].y * _474->value[3u].w) * precise::max(0.0, sqrt(((_492 * _492) + (_494 * _494)) + (_496 * _496)) - (reinterpret_cast<const device PhysicalPointerFloat4NonWriteCBVArray*>(_85))->value[0u].x));
+             float _508 = _507 * _474->value[3u].x;
+             float _540;
+             if (_508 < 0.707106769084930419921875)

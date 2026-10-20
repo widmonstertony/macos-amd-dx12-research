@@ -1,0 +1,39 @@
+{
+  "timeUTC": "2026-10-20T07:35:05.482488+00:00",
+  "normalLicensedSteamRequest": true,
+  "existingSteamPID": 25028,
+  "clientPID": 66624,
+  "privateCrashState": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/stellar-crash-report-state",
+  "proxySHA256": "847a4f6f80d15985c51253da9bb3a855a27037cab883e7f173ef66577bdd50f2",
+  "candidateSHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "command": [
+    "/Users/tonytan/Library/Application Support/YYBIntelLauncher/wine-loader",
+    "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine/wine/drive_c/Program Files (x86)/Steam/Steam.exe",
+    "-applaunch",
+    "3489700",
+    "-dx12",
+    "-windowed",
+    "-ResX=1280",
+    "-ResY=800"
+  ],
+  "observed": {
+    "66635": {
+      "pid": 66635,
+      "ppid": 1,
+      "comm": "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine/links/SB-Win64-Shipping.exe",
+      "mappings": [
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libCandidate.dylib",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libProbeGuard.dylib",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-leaf-select/winemac.so",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/stellar-overlay/SB/Binaries/Win64/dxgi.dll",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/ntdll.so",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/win32u.so"
+      ],
+      "candidateMapped": true,
+      "proxyMapped": true,
+      "fixedWindowModuleMapped": true,
+      "originalWriteDenied": true
+    }
+  },
+  "verified": true
+}

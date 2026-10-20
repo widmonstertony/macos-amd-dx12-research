@@ -1,0 +1,209 @@
+--- before/MVKQueue.mm
++++ after/MVKQueue.mm
+@@ -25,6 +25,7 @@
+ #include "MVKOSExtensions.h"
+ #include "MVKGPUCapture.h"
+ #include "MVKRuntimeTrace.h"
++#include "MVKQueueDependencyTrace.h"
+ 
+ using namespace std;
+ 
+@@ -179,7 +180,13 @@
+ 	addPerformanceInterval(getPerformanceStats().queue.retrieveMTLCommandBuffer, startTime);
+ 	NSString* mtlCmdBuffLabel = getMTLCommandBufferLabel(cmdUse);
+ 	setMetalObjectLabel(mtlCmdBuff, mtlCmdBuffLabel);
+-	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) { handleMTLCommandBufferError(mtlCB); }];
++	mvkBeginDependencyTrace(mtlCmdBuff, _queueFamily->getIndex(), _index);
++	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) {
++		handleMTLCommandBufferError(mtlCB);
++		if (mvkDependencyTraceEnabled() && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))
++			mvkWriteRuntimeTrace(getMVKConfig(), @"queue-dependencies", mvkCommandBufferDependencies(mtlCB));
++		mvkEndDependencyTrace(mtlCB);
++	}];
+ 
+ 	if ( !mtlCmdBuff ) { reportError(VK_ERROR_OUT_OF_POOL_MEMORY, "%s could not be acquired.", mtlCmdBuffLabel.UTF8String); }
+ 	return mtlCmdBuff;
+@@ -271,7 +278,9 @@
+             @"queueIndex":@(_index), @"label":mtlCmdBuff.label ?: @"", @"errorCode":@(mtlCmdBuff.error.code),
+             @"error":mtlCmdBuff.error.localizedDescription ?: @"", @"status":@(mtlCmdBuff.status),
+             @"GPUStartTime":@(mtlCmdBuff.GPUStartTime), @"GPUEndTime":@(mtlCmdBuff.GPUEndTime),
+-            @"encoders":encoders});
++            @"encoders":encoders,
++            @"dependencies":mvkCommandBufferDependencies(mtlCmdBuff),
++            @"pendingQueueDependencies":mvkSnapshotPendingDependencies()});
+     }
+ 	if (NSArray<id<MTLCommandBufferEncoderInfo>>* mtlEncInfo = mtlCmdBuff.error.userInfo[MTLCommandBufferEncoderInfoErrorKey]) {
+ 		MVKLogInfo("Encoders for %p \"%s\":", mtlCmdBuff, mtlCmdBuff.label ? mtlCmdBuff.label.UTF8String : "");
+--- before/MVKSync.mm
++++ after/MVKSync.mm
+@@ -19,6 +19,7 @@
+ #include "MVKSync.h"
+ #include "MVKFoundation.h"
+ #include "MVKInstance.h"
++#include "MVKQueueDependencyTrace.h"
+ 
+ using namespace std;
+ 
+@@ -117,11 +118,19 @@
+ #pragma mark MVKSemaphoreMTLEvent
+ 
+ void MVKSemaphoreMTLEvent::encodeWait(id<MTLCommandBuffer> mtlCmdBuff, uint64_t) {
+-	if (mtlCmdBuff) { [mtlCmdBuff encodeWaitForEvent: _mtlEvent value: _mtlEventValue++]; }
++	if (mtlCmdBuff) {
++		uint64_t value = _mtlEventValue++;
++		mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"wait", @"binary");
++		[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: value];
++	}
+ }
+ 
+ void MVKSemaphoreMTLEvent::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff, uint64_t) {
+-	if (mtlCmdBuff) { [mtlCmdBuff encodeSignalEvent: _mtlEvent value: _mtlEventValue]; }
++	if (mtlCmdBuff) {
++		uint64_t value = _mtlEventValue;
++		mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"signal", @"binary");
++		[mtlCmdBuff encodeSignalEvent: _mtlEvent value: value];
++	}
+ }
+ 
+ uint64_t MVKSemaphoreMTLEvent::deferSignal() {
+@@ -129,6 +138,7 @@
+ }
+ 
+ void MVKSemaphoreMTLEvent::encodeDeferredSignal(id<MTLCommandBuffer> mtlCmdBuff, uint64_t deferToken) {
++	mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, deferToken, @"signal", @"binary-deferred");
+ 	[mtlCmdBuff encodeSignalEvent: _mtlEvent value: deferToken];
+ }
+ 
+@@ -242,11 +252,13 @@
+ 
+ // Nil mtlCmdBuff will do nothing.
+ void MVKTimelineSemaphoreMTLEvent::encodeWait(id<MTLCommandBuffer> mtlCmdBuff, uint64_t value) {
++	mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"wait", @"timeline");
+ 	[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: value];
+ }
+ 
+ // Nil mtlCmdBuff will do nothing.
+ void MVKTimelineSemaphoreMTLEvent::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff, uint64_t value) {
++	mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"signal", @"timeline");
+ 	[mtlCmdBuff encodeSignalEvent: _mtlEvent value: value];
+ }
+ 
+--- before/MVKRuntimeTrace.h
++++ after/MVKRuntimeTrace.h
+@@ -43,7 +43,8 @@
+         ![kind isEqualToString:@"slow-compute"] &&
+         !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
+         !([kind isEqualToString:@"compute-archive"] && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
+-        !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"]))) return;
++        !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"] ||
++          ([kind isEqualToString:@"queue-dependencies"] && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))))) return;
+     static std::atomic<uint64_t> sequence{0};
+     NSString* dir = @(config.shaderDumpDir);
+     mkdir(dir.UTF8String, 0755);
+--- before/MVKQueueDependencyTrace.h
++++ after/MVKQueueDependencyTrace.h
+@@ -0,0 +1,104 @@
++// Public Metal event observations only. Never modifies semaphore values, waits,
++// completion results, watchdogs, or hardware feature reports.
++#pragma once
++#import <Foundation/Foundation.h>
++#import <Metal/Metal.h>
++#include <objc/runtime.h>
++#include <atomic>
++#include <mutex>
++
++inline bool mvkDependencyTraceEnabled() {
++    static const bool enabled = [] { const char* v = getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v, "1"); }();
++    return enabled;
++}
++inline const void* mvkDependencyKey() { return sel_registerName("mvkQueueDependenciesV1"); }
++struct MVKPendingDependencyRecords {
++    std::mutex lock;
++    NSMutableDictionary* records = [NSMutableDictionary new];
++    std::atomic<uint64_t> sequence{0};
++};
++inline MVKPendingDependencyRecords& mvkPendingDependencies() {
++    static MVKPendingDependencyRecords state;
++    return state;
++}
++inline id mvkObservedEventValue(id<MTLEvent> event) {
++    return [event respondsToSelector:@selector(signaledValue)]
++        ? @(((id<MTLSharedEvent>)event).signaledValue) : (id)[NSNull null];
++}
++inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, uint32_t index) {
++    if (!cb || !mvkDependencyTraceEnabled()) return;
++    auto& state = mvkPendingDependencies();
++    NSNumber* serial = @(state.sequence.fetch_add(1));
++    NSMutableDictionary* record = [@{@"submission":serial, @"queueFamily":@(family),
++        @"queueIndex":@(index), @"createdTime":@([NSDate timeIntervalSinceReferenceDate]),
++        @"events":[NSMutableArray array], @"truncatedEvents":@0} mutableCopy];
++    objc_setAssociatedObject(cb, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
++    {
++        std::lock_guard<std::mutex> lock(state.lock);
++        // Bound global snapshots. A command buffer's own event record is still
++        // available even if the pending registry is full.
++        if (state.records.count < 256) state.records[serial] = record;
++    }
++    [record release];
++}
++inline void mvkRecordEventDependency(id<MTLCommandBuffer> cb, id<MTLEvent> event,
++                                     uint64_t value, NSString* operation, NSString* kind) {
++    if (!cb || !event || !mvkDependencyTraceEnabled()) return;
++    NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
++    if (!record) return;
++    @synchronized (record) {
++        NSMutableArray* events = record[@"events"];
++        if (events.count >= 64) {
++            record[@"truncatedEvents"] = @([record[@"truncatedEvents"] unsignedLongLongValue] + 1);
++            return;
++        }
++        // Keep only the native event alive until this command buffer completes.
++        // No Vulkan wrapper, buffer, texture or application data is retained.
++        [events addObject:@{@"eventObject":event, @"operation":operation, @"kind":kind,
++            @"requestedValue":@(value), @"valueAtEncode":mvkObservedEventValue(event),
++            @"encodeTime":@([NSDate timeIntervalSinceReferenceDate])}];
++    }
++}
++inline NSDictionary* mvkSnapshotDependencyRecord(NSDictionary* record) {
++    if (!record) return @{};
++    @synchronized (record) {
++        NSMutableArray* events = [NSMutableArray array];
++        for (NSDictionary* raw in record[@"events"]) {
++            id<MTLEvent> event = raw[@"eventObject"];
++            [events addObject:@{@"event":[NSString stringWithFormat:@"%p",event],
++                @"operation":raw[@"operation"], @"kind":raw[@"kind"],
++                @"requestedValue":raw[@"requestedValue"], @"valueAtEncode":raw[@"valueAtEncode"],
++                @"valueAtObservation":mvkObservedEventValue(event), @"encodeTime":raw[@"encodeTime"]}];
++        }
++        return @{@"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
++            @"queueIndex":record[@"queueIndex"], @"createdTime":record[@"createdTime"],
++            @"events":events, @"truncatedEvents":record[@"truncatedEvents"]};
++    }
++}
++inline NSDictionary* mvkCommandBufferDependencies(id<MTLCommandBuffer> cb) {
++    return mvkSnapshotDependencyRecord(objc_getAssociatedObject(cb, mvkDependencyKey()));
++}
++inline NSArray* mvkSnapshotPendingDependencies() {
++    auto& state = mvkPendingDependencies();
++    NSArray* records;
++    {
++        std::lock_guard<std::mutex> lock(state.lock);
++        records = [state.records.allValues retain];
++    }
++    NSMutableArray* result = [NSMutableArray array];
++    for (NSDictionary* record in records) [result addObject:mvkSnapshotDependencyRecord(record)];
++    [records release];
++    return result;
++}
++inline void mvkEndDependencyTrace(id<MTLCommandBuffer> cb) {
++    if (!mvkDependencyTraceEnabled()) return;
++    NSDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
++    if (!record) return;
++    auto& state = mvkPendingDependencies();
++    {
++        std::lock_guard<std::mutex> lock(state.lock);
++        [state.records removeObjectForKey:record[@"submission"]];
++    }
++    // Releasing native event objects must not hold the registry mutex.
++    objc_setAssociatedObject(cb, mvkDependencyKey(), nil, OBJC_ASSOCIATION_RETAIN);
++}

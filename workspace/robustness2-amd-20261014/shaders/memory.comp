@@ -1,0 +1,34 @@
+#version 450
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+layout(local_size_x=32) in;
+layout(set=0,binding=0,std430) buffer Words { uint v[]; } words;
+layout(set=0,binding=1,std430) readonly buffer Cases { ivec4 v[]; } cases;
+layout(set=0,binding=2,std430) buffer Results { uvec4 v[]; } results;
+layout(set=0,binding=3,std430) buffer Vectors { uvec4 v[]; } vectors;
+layout(set=0,binding=4,rgba32ui) readonly uniform uimage2D imageIn;
+layout(set=0,binding=5,rgba32ui) writeonly uniform uimage2D imageOut;
+layout(set=0,binding=6,std430) buffer Atomics { uint v[]; } atomics;
+layout(set=0,binding=7,std430) buffer Wide { uint64_t v[]; } wide;
+layout(set=0,binding=8) uniform utexture2D sampleImage;
+layout(set=0,binding=9) uniform sampler sampleSampler;
+layout(push_constant) uniform Config { uint count; } config;
+void main() {
+    uint id=gl_GlobalInvocationID.x;
+    if (id>=config.count) return;
+    ivec4 c=cases.v[id];
+    uvec4 result=uvec4(0);
+    switch(c.x) {
+    case 0: result.x=words.v[c.y]; break;
+    case 1: words.v[c.y]=uint(c.z); result.x=1; break;
+    case 2: result=vectors.v[c.y]; break;
+    case 3: vectors.v[c.y]=uvec4(uint(c.z))+uvec4(0,1,2,3); result.x=1; break;
+    case 4: result.x=atomicAdd(atomics.v[c.y],uint(c.z)); break;
+    case 5: result=imageLoad(imageIn,c.yz); break;
+    case 6: imageStore(imageOut,c.yz,uvec4(uint(c.w))+uvec4(0,1,2,3)); result.x=1; break;
+    case 7: { uint64_t n=wide.v[c.y]; result=uvec4(uint(n),uint(n>>32),0,0); break; }
+    case 8: wide.v[c.y]=(uint64_t(uint(c.w))<<32)|uint(c.z); result.x=1; break;
+    case 9: result=uvec4(words.v.length(),vectors.v.length(),wide.v.length(),0); break;
+    case 10: result=textureLod(usampler2D(sampleImage,sampleSampler),(vec2(c.yz)+0.25)/vec2(4,3),float(c.w)); break;
+    }
+    results.v[id]=result;
+}

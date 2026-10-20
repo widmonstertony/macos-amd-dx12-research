@@ -1,0 +1,39 @@
+{
+  "records": [
+    {
+      "queueFamily": 2,
+      "queueIndex": 0,
+      "errorCode": 2,
+      "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+      "GPUStartTime": 45387.111958819005,
+      "GPUEndTime": 45387.111967986006,
+      "label": "vkQueueSubmit MTLCommandBuffer on Queue 2-0",
+      "status": 5,
+      "file": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/independent-queues-game-20261020T062201Z/msl/trace-gpu-timeout-59188-6.json",
+      "timeUTC": "2026-10-20T07:07:34.959049+00:00",
+      "encoderStates": {},
+      "encoderCount": 0,
+      "nonCompletedEncoders": []
+    },
+    {
+      "queueFamily": 0,
+      "queueIndex": 0,
+      "errorCode": 2,
+      "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+      "GPUStartTime": 45382.085861552005,
+      "GPUEndTime": 45388.848304748004,
+      "label": "vkQueueSubmit MTLCommandBuffer on Queue 0-0",
+      "status": 5,
+      "file": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/independent-queues-game-20261020T062201Z/msl/trace-gpu-timeout-59188-7.json",
+      "timeUTC": "2026-10-20T07:07:36.695114+00:00",
+      "encoderStates": {
+        "completed": 27
+      },
+      "encoderCount": 27,
+      "nonCompletedEncoders": []
+    }
+  ],
+  "doNotAttributeCompletedEncoderShadersAsCulprit": true,
+  "gameKilledByAgent": false,
+  "gameRestarted": false
+}

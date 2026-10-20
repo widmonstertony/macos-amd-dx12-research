@@ -1,0 +1,22 @@
+{
+  "dump": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/stellar-crash-report-state/reports/715a61cb-ac61-49d5-a42e-174e47ebec91.dmp",
+  "timestampUTC": "2026-10-20T07:09:47+00:00",
+  "exceptionCode": "0x4000",
+  "exceptionThreadID": 1744,
+  "exceptionAddress": "0x6fffffb7da87",
+  "parameterCount": 1,
+  "fatalMessages": [],
+  "readOnly": true,
+  "shaderCulpritIdentified": false,
+  "exceptionThreadStackBytesSearched": 12050432,
+  "recognizedFatalMessagesInExceptionThreadStack": [
+    {
+      "encoding": "utf-16le",
+      "message": "GameThread timed out waiting for RenderThread after 120.00 secs\n"
+    },
+    {
+      "encoding": "utf-16le",
+      "message": "LowLevelFatalError [File:Unknown] [Line: 1226] \nGameThread timed out waiting for RenderThread after 120.00 secs\n"
+    }
+  ]
+}

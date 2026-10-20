@@ -1,0 +1,20 @@
+#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#include <cstring>
+int main(){@autoreleasepool{
+ id<MTLDevice>d=nil;for(id<MTLDevice>x in MTLCopyAllDevices())if([x.name containsString:@"AMD"])d=x;if(!d)return 2;
+ NSError*error=nil;NSString*s=@"#include <metal_stdlib>\nusing namespace metal;struct Basic{float4 pos[[position]];};struct Layer{float4 pos[[position]];uint layer[[render_target_array_index]];};float4 tri(uint i){float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(p[i],0,1);}vertex Basic badVS(uint i[[vertex_id]]){return {tri(i)};}vertex Layer goodVS(uint i[[vertex_id]]){return {tri(i),0};}fragment float4 fs(uint layer[[render_target_array_index]]){return layer==0?float4(1,0,0,1):float4(0,1,0,1);}";
+ id<MTLLibrary>lib=[d newLibraryWithSource:s options:nil error:&error];if(!lib){fprintf(stderr,"Library %s\n",error.localizedDescription.UTF8String);return 3;}
+ MTLRenderPipelineDescriptor*p=[MTLRenderPipelineDescriptor new];p.vertexFunction=[lib newFunctionWithName:@"badVS"];p.fragmentFunction=[lib newFunctionWithName:@"fs"];p.colorAttachments[0].pixelFormat=MTLPixelFormatRGBA8Unorm;p.inputPrimitiveTopology=MTLPrimitiveTopologyClassTriangle;
+ id<MTLRenderPipelineState>bad=[d newRenderPipelineStateWithDescriptor:p error:&error];NSString*originalError=error.localizedDescription?:@"";BOOL reproduced=!bad&&[originalError containsString:@"render_target_array_index"];
+ p.vertexFunction=[lib newFunctionWithName:@"goodVS"];error=nil;id<MTLRenderPipelineState>good=[d newRenderPipelineStateWithDescriptor:p error:&error];if(!good){fprintf(stderr,"Corrected pipeline %s\n",error.localizedDescription.UTF8String);return 4;}
+ MTLTextureDescriptor*td=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:8 height:8 mipmapped:NO];td.textureType=MTLTextureType2DArray;td.arrayLength=2;td.storageMode=MTLStorageModePrivate;td.usage=MTLTextureUsageRenderTarget;
+ id<MTLTexture>target=[d newTextureWithDescriptor:td];id<MTLBuffer>read=[d newBufferWithLength:4096 options:MTLResourceStorageModeShared];if(!target||!read)return 5;memset(read.contents,0,4096);
+ MTLRenderPassDescriptor*rp=[MTLRenderPassDescriptor renderPassDescriptor];rp.colorAttachments[0].texture=target;rp.colorAttachments[0].loadAction=MTLLoadActionClear;rp.colorAttachments[0].storeAction=MTLStoreActionStore;rp.colorAttachments[0].clearColor=MTLClearColorMake(32.0/255,64.0/255,128.0/255,1);rp.renderTargetArrayLength=2;
+ id<MTLCommandBuffer>cb=[[d newCommandQueue]commandBuffer];id<MTLRenderCommandEncoder>e=[cb renderCommandEncoderWithDescriptor:rp];[e setRenderPipelineState:good];[e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];[e endEncoding];
+ id<MTLBlitCommandEncoder>b=[cb blitCommandEncoder];for(unsigned layer=0;layer<2;layer++)[b copyFromTexture:target sourceSlice:layer sourceLevel:0 sourceOrigin:MTLOriginMake(0,0,0) sourceSize:MTLSizeMake(8,8,1) toBuffer:read destinationOffset:layer*2048 destinationBytesPerRow:256 destinationBytesPerImage:2048];[b endEncoding];[cb commit];[cb waitUntilCompleted];
+ unsigned mismatches=0;const unsigned char*bytes=(const unsigned char*)read.contents;unsigned char expected[2][4]={{255,0,0,255},{32,64,128,255}};
+ for(unsigned layer=0;layer<2;layer++)for(unsigned y=0;y<8;y++)for(unsigned x=0;x<8;x++)if(memcmp(bytes+layer*2048+y*256+x*4,expected[layer],4))mismatches++;
+ BOOL ok=reproduced&&cb.status==MTLCommandBufferStatusCompleted&&!mismatches;
+ NSDictionary*j=@{@"passed":@(ok),@"device":d.name,@"nativeBadInterfaceRejected":@(reproduced),@"nativeOriginalError":originalError,@"correctedVertexWritesRealLayerIndex":@0,@"pixelsChecked":@128,@"mismatchedPixels":@(mismatches),@"commandStatus":@(cb.status),@"scope":@"Self-authored shaders on genuine AMD; reproduces exact linking error and validates real layer0 output plus untouched layer1. Game shaders unchanged; not game fix."};NSData*data=[NSJSONSerialization dataWithJSONObject:j options:NSJSONWritingPrettyPrinted error:nil];fwrite(data.bytes,1,data.length,stdout);puts("");return ok?0:6;
+}}

@@ -1,0 +1,15 @@
+{
+  "timeUTC": "2026-10-20T07:51:53.468911+00:00",
+  "sourceFileCount": 11378,
+  "runtimeFileCount": 10,
+  "internalSourceLinksRestored": 9,
+  "manifestVerificationPassed": true,
+  "fullExtractionAndRestoredHashCheckPassed": true,
+  "nativeCMakeConfigurationFromRestoredSourcesPassed": true,
+  "fullCleanRebuildPerformed": false,
+  "newGameCompatibilityClaimed": false,
+  "restorationTarget": "/private/tmp/macos-amd-dx12-restore-check-20261020",
+  "gameAndOriginalEnvironmentModifiedByBackup": false,
+  "credentialsPatternScan": "No high-confidence credential patterns found in captured source/text files. Steam/client logs, prefixes and raw dumps were not captured.",
+  "runtimeArchiveBytes": 8408908
+}

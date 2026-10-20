@@ -1,0 +1,126 @@
+--- a/include/wine/gdi_driver.h
++++ b/include/wine/gdi_driver.h
+@@ -443,6 +443,11 @@
+     /* CW Hack 22310 */
+     NTSTATUS (*pSetCurrentProcessExplicitAppUserModelID)(LPCWSTR);
+     NTSTATUS (*pGetCurrentProcessExplicitAppUserModelID)(LPWSTR,INT);
++    /* Tencent's interface-108 host appends two optional native UI hooks.
++     * Reserve the observed slots; this research driver supplies neither.
++     * Do not let its table copy read past the source driver's allocation. */
++    void (*yyb_reserved_open_folder)(void);
++    void (*yyb_reserved_message_box)(void);
+ };
+ 
+ W32KAPI void __wine_set_user_driver( const struct user_driver_funcs *funcs, UINT version );
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -244,6 +244,40 @@
+ void release_win_data(struct macdrv_win_data *data)
+ {
+     if (data) pthread_mutex_unlock(&win_data_mutex);
++}
++
++/* win32u invokes client surface update/present with surfaces_lock held.
++ * A window owner can reenter message processing while retaining win_data_mutex.
++ * Waiting for its window lock here then inverts its window -> surface order.
++ * Defer the view operation instead: the window-owner update or a later present
++ * retries it. The caller still holds surfaces_lock, retaining surface lifetime.
++ * Never use this helper for window creation/destruction or other mandatory work.
++ */
++static struct macdrv_win_data *get_surface_win_data(HWND hwnd)
++{
++    struct macdrv_win_data *data;
++    static LONG deferred_count;
++    static LONG blocking_count;
++    const char *blocking = getenv("WINE_MACDRV_TEST_BLOCKING_SURFACES");
++
++    /* Isolated regression control, never enabled in the deployed configuration. */
++    if (blocking && !strcmp(blocking, "1"))
++    {
++        if (InterlockedIncrement(&blocking_count) == 1)
++            fprintf(stderr, "macdrv-lockfix: blocking regression control enabled\n");
++        return get_win_data(hwnd);
++    }
++    if (!hwnd) return NULL;
++    if (pthread_mutex_trylock(&win_data_mutex))
++    {
++        if (InterlockedIncrement(&deferred_count) == 1 && getenv("WINE_MACDRV_LOCK_DIAGNOSTICS"))
++            fprintf(stderr, "macdrv-lockfix: deferred surface window update under contention\n");
++        return NULL;
++    }
++    if (win_datas && (data = (struct macdrv_win_data *)CFDictionaryGetValue(win_datas, hwnd)))
++        return data;
++    pthread_mutex_unlock(&win_data_mutex);
++    return NULL;
+ }
+ 
+ 
+@@ -1183,7 +1217,7 @@
+     NtUserGetClientRect(hwnd, &rect, NtUserGetWinMonitorDpi(hwnd, MDT_RAW_DPI));
+     NtUserMapWindowPoints(hwnd, toplevel, (POINT *)&rect, 2, NtUserGetWinMonitorDpi(toplevel, MDT_RAW_DPI));
+ 
+-    if (!(data = get_win_data(toplevel))) return;
++    if (!(data = get_surface_win_data(toplevel))) return;
+     OffsetRect(&rect, data->rects.client.left - data->rects.visible.left, data->rects.client.top - data->rects.visible.top);
+     macdrv_set_view_frame(surface->cocoa_view, cgrect_from_rect(rect));
+     macdrv_set_view_superview(surface->cocoa_view, toplevel == hwnd ? NULL : data->client_view, data->cocoa_window, NULL, NULL);
+@@ -1197,7 +1231,7 @@
+ 
+     TRACE("%s\n", debugstr_client_surface(client));
+ 
+-    if (!(data = get_win_data(surface->client.hwnd))) return;
++    if (!(data = get_surface_win_data(surface->client.hwnd))) return;
+     if (data->client_view != surface->cocoa_view)
+     {
+         if (data->client_view) macdrv_set_view_hidden(data->client_view, TRUE);
+@@ -1733,6 +1767,18 @@
+     }
+ 
+ done:
++    if (getenv("WINE_MACDRV_TEST_RETAIN_POSITION_LOCK") && data->client_view)
++    {
++        static LONG position_test_active;
++        if (!InterlockedCompareExchange(&position_test_active, 1, 0))
++        {
++            fprintf(stderr, "macdrv-lockfix: retained window position regression seam entered\n");
++            usleep(100000);
++            NtUserSetWindowPos(hwnd, 0, data->rects.window.left + 1, data->rects.window.top,
++                               0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
++            InterlockedExchange(&position_test_active, 0);
++        }
++    }
+     release_win_data(data);
+ }
+ 
+@@ -1780,6 +1826,8 @@
+     UINT flags = SWP_NOACTIVATE | SWP_NOZORDER;
+     int width, height;
+     BOOL being_dragged;
++    BOOL retained_lock_test = getenv("WINE_MACDRV_TEST_RETAIN_FRAME_LOCK") != NULL;
++    static LONG retained_count;
+ 
+     if (!hwnd) return;
+     if (!(data = get_win_data(hwnd))) return;
+@@ -1815,7 +1863,13 @@
+               data->rects.window.bottom - data->rects.window.top, width, height);
+ 
+     being_dragged = data->drag_event != NULL;
+-    release_win_data(data);
++    if (!retained_lock_test) release_win_data(data);
++    else
++    {
++        if (InterlockedIncrement(&retained_count) == 1)
++            fprintf(stderr, "macdrv-lockfix: retained native frame lock regression seam entered\n");
++        usleep(100000); /* isolated test seam for the observed retained-lock order */
++    }
+ 
+     if (event->window_frame_changed.fullscreen)
+         flags |= SWP_NOSENDCHANGING;
+@@ -1828,6 +1882,7 @@
+         if (send_sizemove)
+             send_message(hwnd, WM_EXITSIZEMOVE, 0, 0);
+     }
++    if (retained_lock_test) release_win_data(data);
+ }
+ 
+ 

@@ -1,0 +1,128 @@
+--- before/GPUObjects/MVKDevice.h
++++ after/GPUObjects/MVKDevice.h
+@@ -30,6 +30,7 @@
+ #include <shared_mutex>
+ #include <string>
+ #include <mutex>
++#include <atomic>
+ #include <os/lock.h>
+ 
+ #import <Metal/Metal.h>
+@@ -568,6 +569,7 @@
+ 	struct alignas(64) Group {
+ 		Lock lock;
+ 		std::unordered_map<id, uint32_t> entries;
++		std::atomic<uint64_t> additions{0};
+ 	};
+ 
+ 	// Descriptor-indexing workloads can keep many thousands of resources live.
+@@ -592,6 +594,9 @@
+ 	void add(id object);
+ 	void remove(id object);
+ 	IsLiveResult isLive(id object) { return isLive_(object); }
++	// A cached absence is valid only until another registration in this shard.
++	// Read before isLive(): registration during that query must invalidate it too.
++	uint64_t additionGeneration(id object) { return getGroup(object)->additions.load(std::memory_order_acquire); }
+ 
+ private:
+ 	IsLiveResult isLive_(id object);
+--- before/GPUObjects/MVKDevice.mm
++++ after/GPUObjects/MVKDevice.mm
+@@ -3781,6 +3781,7 @@
+ 	Group* group = getGroup(object);
+ 	std::lock_guard<Lock> guard(group->lock);
+ 	group->entries[object]++;
++	group->additions.fetch_add(1, std::memory_order_release);
+ }
+ 
+ void MVKLiveList::remove(id object) {
+--- before/Commands/MVKCommandEncoderState.h
++++ after/Commands/MVKCommandEncoderState.h
+@@ -190,6 +190,8 @@
+ 		used.reserve(1024);
+ 		const char* value = getenv("MVK_AMD_ENCODER_LIVE_CACHE");
+ 		cacheLiveResources = value && !strcmp(value, "1");
++		value = getenv("MVK_AMD_LIVE_LOOKUP_FAST_CACHE");
++		if (cacheLiveResources && value && !strcmp(value, "1")) recentLiveResources.resize(256);
+ 		value = getenv("MVK_AMD_TRACE_LIVE_CACHE");
+ 		traceLiveCache = value && !strcmp(value, "1");
+ 	}
+@@ -207,11 +209,19 @@
+ 		bool deferred;
+ 		bool liveRetained = false;
+ 	};
++	struct RecentLiveResource {
++		id<MTLResource> resource = nil;
++		MVKLiveList* list = nullptr;
++		ResourceInfo* retainedInfo = nullptr;
++		uint64_t absentGeneration = 0;
++	};
++	std::vector<RecentLiveResource> recentLiveResources;
+ 	MVKOnePerEnumEntry<Entry, MVKResourceUsageStages> entries;
+ 	std::unordered_map<id<MTLResource>, ResourceInfo> used;
+ 	bool cacheLiveResources = false;
+ 	bool traceLiveCache = false;
+ 	uint64_t liveLookupCount = 0, liveReuseCount = 0;
++	uint64_t liveRecentReuseCount = 0, liveAbsentReuseCount = 0;
+ 	MVKSmallVector<id<MTLResource>> retainedLiveResources;
+ 	void releaseLiveResources();
+ 	/** Reuse a validated object only while this helper owns a retained reference. */
+--- before/Commands/MVKCommandEncoderState.mm
++++ after/Commands/MVKCommandEncoderState.mm
+@@ -1058,16 +1058,41 @@
+ 	if (traceLiveCache && (liveLookupCount || liveReuseCount)) {
+ 		fprintf(stderr, "MVK_LIVE_CACHE enabled=%u lookups=%llu reused=%llu retained=%zu\n",
+ 		        cacheLiveResources, (unsigned long long)liveLookupCount, (unsigned long long)liveReuseCount, retainedLiveResources.size());
++		if (!recentLiveResources.empty()) fprintf(stderr, "MVK_LIVE_RECENT retainedHits=%llu absentHits=%llu\n", (unsigned long long)liveRecentReuseCount, (unsigned long long)liveAbsentReuseCount);
+ 		liveLookupCount = liveReuseCount = 0;
+-	}
++		liveRecentReuseCount = liveAbsentReuseCount = 0;
++	}
++	// ResourceInfo pointers remain stable across unordered_map rehash, but not
++	// across the encoder's used.clear(). Never carry them into another encoder.
++	for (auto& recent : recentLiveResources) recent = {};
+ 	for (id<MTLResource> resource : retainedLiveResources) [resource release];
+ 	retainedLiveResources.clear();
+ }
+ 
+ void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
++	RecentLiveResource* recent = nullptr;
++	uint64_t generationBeforeLookup = 0;
++	if (!recentLiveResources.empty()) {
++		uintptr_t key = reinterpret_cast<uintptr_t>(resource);
++		recent = &recentLiveResources[((key >> 4) ^ (key >> 17)) & 255];
++		if (recent->resource == resource && recent->list == &liveList) {
++			if (recent->retainedInfo) {
++				if (traceLiveCache) { ++liveReuseCount; ++liveRecentReuseCount; }
++				if (!isCompatible(*recent->retainedInfo, ResourceInfo{stage, write, false}))
++					addImmediate(resource, enc, func, stage, write);
++				return;
++			}
++			if (recent->absentGeneration == liveList.additionGeneration(resource)) {
++				if (traceLiveCache) ++liveAbsentReuseCount;
++				return;
++			}
++		}
++		generationBeforeLookup = liveList.additionGeneration(resource);
++	}
+ 	if (cacheLiveResources) {
+ 		auto it = used.find(resource);
+ 		if (it != used.end() && it->second.liveRetained) {
++			if (recent) *recent = {resource, &liveList, &it->second, 0};
+ 			if (traceLiveCache) ++liveReuseCount;
+ 			// Holding the Metal object prevents pointer reuse (ABA) even if its
+ 			// Vulkan wrapper was removed from the live list in the meantime.
+@@ -1083,7 +1108,12 @@
+ 			// The live-list guard retains it until this owned reference is taken.
+ 			retainedLiveResources.push_back([resource retain]);
+ 			used.find(resource)->second.liveRetained = true;
+-		}
++			if (recent) *recent = {resource, &liveList, &used.find(resource)->second, 0};
++		}
++	} else if (recent) {
++		// No Objective-C message is sent to an absent pointer. A subsequent
++		// registration invalidates this entry, including same-address reuse.
++		*recent = {resource, &liveList, nullptr, generationBeforeLookup};
+ 	}
+ }
+ 

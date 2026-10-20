@@ -1,0 +1,170 @@
+--- before/GPUObjects/MVKDescriptorSet.h
++++ after/GPUObjects/MVKDescriptorSet.h
+@@ -22,6 +22,7 @@
+ #include "MVKSmallVector.h"
+ #include "MVKBitArray.h"
+ #include "MVKInlineArray.h"
++#include "MVKDescriptorUseCache.h"
+ #include <unordered_set>
+ #include <unordered_map>
+ #include <vector>
+@@ -449,6 +450,8 @@
+ 
+ /** Represents a Vulkan descriptor set. */
+ struct MVKDescriptorSet {
++	/** Non-owning: the pool owns this optional cache, push descriptors leave it null. */
++	MVKDescriptorUseCache* resourceUseCache;
+ 	/** The layout this descriptor set uses. */
+ 	const MVKDescriptorSetLayout* layout;
+ 	/** The argument encoder, if needed. */
+@@ -569,6 +572,7 @@
+ 	MVKDescriptorSetListItem* _firstFreeDescriptorSet = nullptr;
+ 	MVKDescriptorPoolFreeList _cpuBufferFreeList;
+ 	MVKDescriptorPoolFreeList _gpuBufferFreeList;
++	std::unordered_map<MVKDescriptorSet*, std::unique_ptr<MVKDescriptorUseCache>> _resourceUseCaches;
+ 
+ 	friend class MVKInlineObjectConstructor<MVKDescriptorPool>;
+ 	MVKDescriptorPool(MVKDevice* device);
+--- before/GPUObjects/MVKDescriptorSet.mm
++++ after/GPUObjects/MVKDescriptorSet.mm
+@@ -1417,6 +1417,8 @@
+ 	const void* src, MVKDescriptorUpdateSourceType type, size_t stride,
+ 	uint32_t start, uint32_t count)
+ {
++	std::unique_lock<std::mutex> cacheWrite;
++	if (set->resourceUseCache) cacheWrite = set->resourceUseCache->beginWrite();
+ 	char* cpuBuffer = set->cpuBuffer + binding->cpuOffset;
+ 	writeDescriptorSetCPUBufferDispatch(layout, *binding, cpuBuffer, src, stride, type, start, count);
+ 	switch (layout->argBufMode()) {
+@@ -1470,6 +1472,8 @@
+ 	const MVKDescriptorBinding* dstBinding, const MVKDescriptorSet* dstSet, id<MTLArgumentEncoder> dstEnc,
+ 	uint32_t srcArrayElement, uint32_t dstArrayElement, uint32_t count)
+ {
++	std::unique_lock<std::mutex> cacheWrite;
++	if (dstSet->resourceUseCache) cacheWrite = dstSet->resourceUseCache->beginWrite();
+ 	assert(srcBinding->cpuLayout == dstBinding->cpuLayout);
+ 	assert(srcBinding->gpuLayout == dstBinding->gpuLayout);
+ 	MVKDescriptorCPULayout cpu = srcBinding->cpuLayout;
+@@ -2246,6 +2250,12 @@
+ 		}
+ 	}
+ 
++	const char* cache = getenv("MVK_AMD_DESCRIPTOR_USE_CACHE");
++	if (set->cpuBuffer && cache && !strcmp(cache, "1")) {
++		auto& owned = _resourceUseCaches[set];
++		owned = std::make_unique<MVKDescriptorUseCache>();
++		set->resourceUseCache = owned.get();
++	}
+ 	return VK_SUCCESS;
+ }
+ 
+@@ -2256,6 +2266,8 @@
+ 				continue;
+ 			MVKDescriptorSetListItem* setItem = reinterpret_cast<MVKDescriptorSetListItem*>(pDescriptorSets[i]);
+ 			MVKDescriptorSet* set = &setItem->allocated;
++			_resourceUseCaches.erase(set);
++			set->resourceUseCache = nullptr;
+ 			if (set->cpuBufferSize)
+ 				_cpuBufferFreeList.add(set->cpuBuffer - _cpuBuffer.data(), set->cpuBufferSize);
+ 			if (set->gpuBufferSize)
+@@ -2268,6 +2280,8 @@
+ 		// Just rewind all the bump allocators.
+ 		for (uint32_t i = 0; i < count; i++) {
+ 			MVKDescriptorSet* set = reinterpret_cast<MVKDescriptorSet*>(pDescriptorSets[i]);
++			_resourceUseCaches.erase(set);
++			set->resourceUseCache = nullptr;
+ 			assert(set == &_descriptorSets[_numAllocatedDescriptorSets - count + i].allocated);
+ 			_gpuBufferUsed -= set->gpuBufferSize;
+ 			_cpuBufferUsed -= set->cpuBufferSize;
+@@ -2278,6 +2292,7 @@
+ }
+ 
+ VkResult MVKDescriptorPool::reset(VkDescriptorPoolResetFlags flags) {
++	_resourceUseCaches.clear();
+ 	if (_freeAllowed) {
+ 		_firstFreeDescriptorSet = nullptr;
+ 		_cpuBufferFreeList.reset();
+--- before/Commands/MVKCommandEncoderState.mm
++++ after/Commands/MVKCommandEncoderState.mm
+@@ -683,6 +683,18 @@
+ 				continue;
+ 			didUseResource = true;
+ 		}
++		if (set->resourceUseCache && count >= 64 &&
++		    (op.opcode == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck ||
++		     op.opcode == MVKDescriptorBindOperationCode::UseTextureWithLiveCheck)) {
++			// This snapshot contains identities, not a liveness decision. Preserve
++			// the normal encoder-scoped validation, retention and usage upgrades.
++			auto resources = set->resourceUseCache->resources(src, count, stride);
++			MVKLiveList& list = op.opcode == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck ?
++			    mvkEncoder.getDevice()->getLiveResources().buffers : mvkEncoder.getDevice()->getLiveResources().textures;
++			for (id<MTLResource> resource : *resources)
++				mvkEncoder.getState().mtlShared()._useResource.addImmediateLive(resource, list, encoder, binder.useResource, useResourceStage, target);
++			continue;
++		}
+ 
+ 		switch (op.opcode) {
+ #define CASE(x) case MVKDescriptorBindOperationCode::x: \
+--- /dev/null
++++ after/GPUObjects/MVKDescriptorUseCache.h
+@@ -0,0 +1,60 @@
++// Opt-in CPU bookkeeping for unchanged partially-bound descriptor tables.
++// Stores raw identities only: the encoder must still validate/retain each one.
++#pragma once
++#include <algorithm>
++#include <map>
++#include <memory>
++#include <mutex>
++#include <tuple>
++#include <unordered_set>
++#include <vector>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++
++class MVKDescriptorUseCache {
++public:
++    using Resources = std::vector<id<MTLResource>>;
++    using Snapshot = std::shared_ptr<const Resources>;
++    std::unique_lock<std::mutex> beginWrite() {
++        std::unique_lock<std::mutex> lock(_lock);
++        _snapshots.clear();
++        ++_invalidations;
++        return lock;
++    }
++    Snapshot resources(const char* src, uint32_t count, size_t stride) {
++        std::lock_guard<std::mutex> lock(_lock);
++        auto key = std::make_tuple(src, count, stride);
++        auto found = _snapshots.find(key);
++        if (found != _snapshots.end()) {
++            ++_hits;
++            return found->second;
++        }
++        auto result = std::make_shared<Resources>();
++        std::unordered_set<id<MTLResource>> seen;
++        seen.reserve(std::min<uint32_t>(count, 1024));
++        for (uint32_t i = 0; i < count; ++i) {
++            id<MTLResource> resource = *reinterpret_cast<const id<MTLResource>*>(src + i * stride);
++            if (resource && seen.insert(resource).second) result->push_back(resource);
++        }
++        _scanned += count;
++        _emitted += result->size();
++        ++_rebuilds;
++        // Bound retained CPU lists even for pipelines interpreting a set in
++        // many different ways. Old immutable snapshots survive in-flight use.
++        if (_snapshots.size() >= 64) _snapshots.clear();
++        _snapshots.emplace(key, result);
++        return result;
++    }
++    ~MVKDescriptorUseCache() {
++        const char* trace = getenv("MVK_AMD_TRACE_DESCRIPTOR_CACHE");
++        if (trace && !strcmp(trace, "1"))
++            fprintf(stderr, "MVK_DESCRIPTOR_CACHE hits=%llu rebuilds=%llu invalidations=%llu scanned=%llu emitted=%llu\n",
++                (unsigned long long)_hits, (unsigned long long)_rebuilds, (unsigned long long)_invalidations,
++                (unsigned long long)_scanned, (unsigned long long)_emitted);
++    }
++private:
++    std::mutex _lock;
++    std::map<std::tuple<const char*, uint32_t, size_t>, Snapshot> _snapshots;
++    uint64_t _hits = 0, _rebuilds = 0, _invalidations = 0, _scanned = 0, _emitted = 0;
++};

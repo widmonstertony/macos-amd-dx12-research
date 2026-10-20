@@ -1,0 +1,65 @@
+--- a/include/wine/gdi_driver.h
++++ b/include/wine/gdi_driver.h
+@@ -443,6 +443,11 @@
+     /* CW Hack 22310 */
+     NTSTATUS (*pSetCurrentProcessExplicitAppUserModelID)(LPCWSTR);
+     NTSTATUS (*pGetCurrentProcessExplicitAppUserModelID)(LPWSTR,INT);
++    /* Tencent's interface-108 host appends two optional native UI hooks.
++     * Reserve the observed slots; this research driver supplies neither.
++     * Do not let its table copy read past the source driver's allocation. */
++    void (*yyb_reserved_open_folder)(void);
++    void (*yyb_reserved_message_box)(void);
+ };
+ 
+ W32KAPI void __wine_set_user_driver( const struct user_driver_funcs *funcs, UINT version );
+--- a/dlls/winemac.drv/window.c
++++ b/dlls/winemac.drv/window.c
+@@ -244,6 +244,30 @@
+ void release_win_data(struct macdrv_win_data *data)
+ {
+     if (data) pthread_mutex_unlock(&win_data_mutex);
++}
++
++/* win32u calls these surface callbacks while holding surfaces_lock. Never wait
++ * here on a window lock retained by its owner during reentrant window updates:
++ * that owner may itself need surfaces_lock. Defer only the view operation and
++ * let the owner update or next present retry. surfaces_lock still protects the
++ * surface's lifetime. Mandatory window operations retain their blocking locks.
++ */
++static struct macdrv_win_data *get_surface_win_data(HWND hwnd)
++{
++    struct macdrv_win_data *data;
++    static LONG deferred_count;
++
++    if (!hwnd) return NULL;
++    if (pthread_mutex_trylock(&win_data_mutex))
++    {
++        if (InterlockedIncrement(&deferred_count) == 1 && getenv("WINE_MACDRV_LOCK_DIAGNOSTICS"))
++            fprintf(stderr, "macdrv-lockfix: deferred surface window update under contention\n");
++        return NULL;
++    }
++    if (win_datas && (data = (struct macdrv_win_data *)CFDictionaryGetValue(win_datas, hwnd)))
++        return data;
++    pthread_mutex_unlock(&win_data_mutex);
++    return NULL;
+ }
+ 
+ 
+@@ -1183,7 +1207,7 @@
+     NtUserGetClientRect(hwnd, &rect, NtUserGetWinMonitorDpi(hwnd, MDT_RAW_DPI));
+     NtUserMapWindowPoints(hwnd, toplevel, (POINT *)&rect, 2, NtUserGetWinMonitorDpi(toplevel, MDT_RAW_DPI));
+ 
+-    if (!(data = get_win_data(toplevel))) return;
++    if (!(data = get_surface_win_data(toplevel))) return;
+     OffsetRect(&rect, data->rects.client.left - data->rects.visible.left, data->rects.client.top - data->rects.visible.top);
+     macdrv_set_view_frame(surface->cocoa_view, cgrect_from_rect(rect));
+     macdrv_set_view_superview(surface->cocoa_view, toplevel == hwnd ? NULL : data->client_view, data->cocoa_window, NULL, NULL);
+@@ -1197,7 +1221,7 @@
+ 
+     TRACE("%s\n", debugstr_client_surface(client));
+ 
+-    if (!(data = get_win_data(surface->client.hwnd))) return;
++    if (!(data = get_surface_win_data(surface->client.hwnd))) return;
+     if (data->client_view != surface->cocoa_view)
+     {
+         if (data->client_view) macdrv_set_view_hidden(data->client_view, TRUE);

@@ -1,0 +1,22 @@
+(version 1)
+(allow default)
+; Preserve the user's real installed assets, including through overlay symlinks.
+(deny file-write*
+    (subpath "/Volumes/Applications/Program Files (x86)/Steam/steamapps/common/StellarBlade"))
+; Only genuine shared redistributables (228980) may stage downloads. Allow the
+; directory itself so Steam can create it; deny other app download paths.
+(deny file-write*
+    (require-all
+        (subpath "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/SteamClient/steamapps/downloading")
+        (require-not (literal "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/SteamClient/steamapps/downloading"))
+        (require-not (subpath "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/SteamClient/steamapps/downloading/228980")))
+    ; Root temporary permission/manifest probes are allowed, but numeric app
+    ; staging folders other than 228980 remain protected from game updates.
+    (require-all
+        (regex #"^/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/SteamClient/steamapps/temp/[0-9]+(/|$)")
+        (require-not (subpath "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/SteamClient/steamapps/temp/228980"))))
+
+(deny file-write*
+    (subpath "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine")
+    (subpath "/Users/tonytan/Library/Application Support/YYBIntelLauncher")
+    (subpath "/Users/tonytan/Public/links"))

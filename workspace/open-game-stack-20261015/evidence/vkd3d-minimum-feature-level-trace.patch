@@ -1,0 +1,11 @@
+--- a/libs/d3d12/main.c
++++ b/libs/d3d12/main.c
+@@ -144,6 +144,8 @@
+     TRACE("adapter %p, minimum_feature_level %#x, iid %s, device %p.\n",
+             adapter, minimum_feature_level, debugstr_guid(iid), device);
+ 
++    if (vkd3d_env_var_as_uint("VKD3D_AMD_PROTECTED_SUBSET", 0) == 1)
++        INFO("AMD_RESEARCH_D3D12_CREATE minimum_feature_level=%#x\n", minimum_feature_level);
+     if (!load_d3d12core())
+         return E_NOINTERFACE;
+     return IVKD3DCoreInterface_CreateDevice(core, adapter, minimum_feature_level, iid, device);

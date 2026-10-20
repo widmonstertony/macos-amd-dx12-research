@@ -1,0 +1,112 @@
+--- software_residency_resource_usage_typed.m
++++ software_residency_resource_usage_typed.m
+@@ -195,6 +195,12 @@
+ @property(nonatomic) uint64_t captureNs, captureCalls, layoutQueryNs, layoutQueryCalls, textureSyncNs;
+ @property(nonatomic, strong) dispatch_source_t profileTimer;
+ @property(nonatomic) uint64_t generation;
++@property(nonatomic) uint64_t indexedDrawCalls,indexedDrawReturns;
++@property(nonatomic) NSUInteger lastDrawType,lastDrawCount,lastDrawIndexType,lastDrawOffset,lastDrawBufferLength,lastDrawInstances,lastDrawBaseInstance;
++@property(nonatomic) NSInteger lastDrawBaseVertex;
++@property(nonatomic) uint64_t visibilityCalls, visibilityReturns;
++@property(nonatomic) NSUInteger lastVisibilityMode,lastVisibilityOffset,lastVisibilityLength,lastVisibilityStorage,lastVisibilityType;
++@property(nonatomic) BOOL lastVisibilityHasBuffer,lastVisibilityHasHeap,lastVisibilityHasPipeline,lastVisibilityColorMapping;
+ - (void)registerAllocation:(id)allocation;
+ - (NSArray *)snapshot;
+ - (uint64_t)generationSnapshot;
+@@ -233,8 +239,12 @@
+           double snapshot=context.snapshotNs/1e6,gather=context.gatherNs/1e6,native=context.nativeDeclarationNs/1e6,gpu=context.nativeGPUNs/1e6;
+           double capture=context.captureNs/1e6,layout=context.layoutQueryNs/1e6,sync=context.textureSyncNs/1e6;
+           uint64_t captures=context.captureCalls,queries=context.layoutQueryCalls;
++          uint64_t vc=context.visibilityCalls,vr=context.visibilityReturns;NSUInteger vm=context.lastVisibilityMode,vo=context.lastVisibilityOffset,vl=context.lastVisibilityLength,vs=context.lastVisibilityStorage,vt=context.lastVisibilityType;BOOL vb=context.lastVisibilityHasBuffer,vh=context.lastVisibilityHasHeap,vp=context.lastVisibilityHasPipeline,vmapping=context.lastVisibilityColorMapping;
++          uint64_t dc=context.indexedDrawCalls,dr=context.indexedDrawReturns;NSUInteger dt=context.lastDrawType,dn=context.lastDrawCount,di=context.lastDrawIndexType,doff=context.lastDrawOffset,dl=context.lastDrawBufferLength,ds=context.lastDrawInstances,dbi=context.lastDrawBaseInstance;NSInteger dbv=context.lastDrawBaseVertex;
+           [context.lock unlock];
++          if(dc)fprintf(stderr,"DRAW_STATE pid=%d monotonicNs=%llu calls=%llu returns=%llu type=%lu count=%lu indexType=%lu offset=%lu bufferLength=%lu instances=%lu baseVertex=%ld baseInstance=%lu EXACT_NATIVE_ARGUMENTS_NOT_GPU_OUTPUT\n",getpid(),(unsigned long long)SRNow(),(unsigned long long)dc,(unsigned long long)dr,(unsigned long)dt,(unsigned long)dn,(unsigned long)di,(unsigned long)doff,(unsigned long)dl,(unsigned long)ds,(long)dbv,(unsigned long)dbi);
+           fprintf(stderr,"SR_PERF pid=%d monotonicNs=%llu liveAllocations=%llu submittedCBs=%llu completedCBs=%llu presentRequests=%llu snapshotMs=%.3f gatherMs=%.3f nativeDeclarationMs=%.3f completedGPUms=%.3f captureCalls=%llu captureMs=%.3f layoutQueryCalls=%llu layoutQueryMs=%.3f textureSyncCPUMs=%.3f CUMULATIVE_NOT_GAME_FPS\n",getpid(),(unsigned long long)SRNow(),(unsigned long long)live,(unsigned long long)submitted,(unsigned long long)completed,(unsigned long long)presents,snapshot,gather,native,gpu,(unsigned long long)captures,capture,(unsigned long long)queries,layout,sync);
++          if(vc)fprintf(stderr,"VIS_STATE pid=%d calls=%llu returns=%llu mode=%lu offset=%lu bufferLength=%lu storage=%lu resultType=%lu hasBuffer=%u hasHeap=%u hasPipeline=%u colorMapping=%u EXACT_NATIVE_ARGUMENTS_NOT_OCCLUSION_RESULTS\n",getpid(),(unsigned long long)vc,(unsigned long long)vr,(unsigned long)vm,(unsigned long)vo,(unsigned long)vl,(unsigned long)vs,(unsigned long)vt,vb,vh,vp,vmapping);
+           NSDictionary *ts=TSTextureStorageStatistics();
+           fprintf(stderr,"SR_MEMORY pid=%d nativeAllocatedBytes=%llu recommendedWorkingSetBytes=%llu convertedTextures=%llu liveConvertedTextures=%llu nativeTextureSynchronizations=%llu SCOPE_NATIVE_PUBLIC_METADATA_NOT_VRAM_ONLY\n",getpid(),(unsigned long long)context.device.currentAllocatedSize,(unsigned long long)context.device.recommendedMaxWorkingSetSize,[ts[@"convertedTextures"] unsignedLongLongValue],[ts[@"liveConvertedTextures"] unsignedLongLongValue],[ts[@"nativeTextureSynchronizations"] unsignedLongLongValue]);
+         });
+@@ -367,6 +377,9 @@
+ @property(nonatomic, copy) NSArray *allocations;
+ @property(nonatomic, strong) SRDeclarationMetadata *metadata;
+ @property(nonatomic) uint64_t generation;
++@property(nonatomic) uint64_t visibilityCalls, visibilityReturns;
++@property(nonatomic) NSUInteger lastVisibilityMode,lastVisibilityOffset,lastVisibilityLength,lastVisibilityStorage,lastVisibilityType;
++@property(nonatomic) BOOL lastVisibilityHasBuffer,lastVisibilityHasHeap,lastVisibilityHasPipeline,lastVisibilityColorMapping;
+ @end
+ @implementation SRSnapshotCache
+ @end
+@@ -394,6 +407,8 @@
+ @property(nonatomic) BOOL ended;
+ @property(nonatomic) BOOL declaredOnce;
+ @property(nonatomic) uint64_t lastGeneration;
++@property(nonatomic) NSUInteger visibilityLength,visibilityStorage,visibilityType;
++@property(nonatomic) BOOL visibilityHasBuffer,visibilityHasHeap,pipelineBound,visibilityColorMapping;
+ - (void)declareBeforeExecution:(SEL)selector;
+ @end
+ 
+@@ -414,6 +429,12 @@
+   buffer.retainedAuxiliaryObjects = SRStrongIdentitySet();
+   buffer.snapshotCache = [SRSnapshotCache new];
+   return buffer;
++}
++static id SRNewRenderEncoder(id native,SRBuffer *buffer,NSString *kind,MTLRenderPassDescriptor *descriptor){
++  SREncoder *e=SRNewEncoder(native,buffer,kind);if(!e)return nil;
++  id<MTLBuffer> visibility=SRNative(descriptor.visibilityResultBuffer);
++  e.visibilityHasBuffer=visibility!=nil;e.visibilityLength=visibility.length;e.visibilityStorage=visibility.storageMode;e.visibilityType=descriptor.visibilityResultType;e.visibilityHasHeap=visibility.heap!=nil;e.visibilityColorMapping=descriptor.supportColorAttachmentMapping;
++  return e;
+ }
+ static void SRRequireSoftwareSet(id set) {
+   if (![set isKindOfClass:[SRSet class]]) SRFail(@"cannot mix native/foreign residency sets with software queue");
+@@ -575,14 +596,14 @@
+   descriptor = SRNormalizePublicRenderPass(_queue.context.device,descriptor);
+   SRRenderPassDiagnostics(@"renderCommandEncoder.publicNormalized",descriptor);
+   [self captureRenderPass:descriptor];
+-  return SRNewEncoder([(id<MTLCommandBuffer>)_native renderCommandEncoderWithDescriptor:descriptor], self, @"render");
++  return SRNewRenderEncoder([(id<MTLCommandBuffer>)_native renderCommandEncoderWithDescriptor:descriptor], self, @"render",descriptor);
+ }
+ - (id<MTLParallelRenderCommandEncoder>)parallelRenderCommandEncoderWithDescriptor:(MTLRenderPassDescriptor *)descriptor {
+   SRRenderPassDiagnostics(@"parallelRenderCommandEncoder",descriptor);
+   descriptor = SRNormalizePublicRenderPass(_queue.context.device,descriptor);
+   SRRenderPassDiagnostics(@"parallelRenderCommandEncoder.publicNormalized",descriptor);
+   [self captureRenderPass:descriptor];
+-  return SRNewEncoder([(id<MTLCommandBuffer>)_native parallelRenderCommandEncoderWithDescriptor:descriptor], self, @"parallel");
++  return SRNewRenderEncoder([(id<MTLCommandBuffer>)_native parallelRenderCommandEncoderWithDescriptor:descriptor], self, @"parallel",descriptor);
+ }
+ - (id<MTLBlitCommandEncoder>)blitCommandEncoder { return SRNewEncoder([(id<MTLCommandBuffer>)_native blitCommandEncoder], self, @"blit"); }
+ - (id<MTLBlitCommandEncoder>)blitCommandEncoderWithDescriptor:(MTLBlitPassDescriptor *)descriptor {
+@@ -655,7 +676,33 @@
+ }
+ - (id<MTLRenderCommandEncoder>)renderCommandEncoder {
+   if (![_kind isEqualToString:@"parallel"]) SRFail(@"render child on non-parallel encoder");
+-  return SRNewEncoder([(id<MTLParallelRenderCommandEncoder>)_native renderCommandEncoder], _buffer, @"render");
++  SREncoder *e=SRNewEncoder([(id<MTLParallelRenderCommandEncoder>)_native renderCommandEncoder],_buffer,@"render");
++  e.visibilityHasBuffer=_visibilityHasBuffer;e.visibilityLength=_visibilityLength;e.visibilityStorage=_visibilityStorage;e.visibilityType=_visibilityType;e.visibilityHasHeap=_visibilityHasHeap;e.visibilityColorMapping=_visibilityColorMapping;return (id)e;
++}
++// Keep indexed draw arguments in documented typed calls, while retaining the
++// same full resource declarations and completion-time ownership as generic forwarding.
++- (void)drawIndexedPrimitives:(MTLPrimitiveType)type indexCount:(NSUInteger)count indexType:(MTLIndexType)indexType indexBuffer:(id<MTLBuffer>)buffer indexBufferOffset:(NSUInteger)offset instanceCount:(NSUInteger)instances baseVertex:(NSInteger)baseVertex baseInstance:(NSUInteger)baseInstance {
++  id<MTLBuffer> real=SRNative(buffer);[_buffer captureAllocation:real];[self declareBeforeExecution:_cmd];
++  SRContext *context=_buffer.queue.context;BOOL trace=SRProfileEnabled();
++  if(trace){[context.lock lock];++context.indexedDrawCalls;context.lastDrawType=type;context.lastDrawCount=count;context.lastDrawIndexType=indexType;context.lastDrawOffset=offset;context.lastDrawBufferLength=real.length;context.lastDrawInstances=instances;context.lastDrawBaseVertex=baseVertex;context.lastDrawBaseInstance=baseInstance;[context.lock unlock];}
++  [(id<MTLRenderCommandEncoder>)_native drawIndexedPrimitives:type indexCount:count indexType:indexType indexBuffer:real indexBufferOffset:offset instanceCount:instances baseVertex:baseVertex baseInstance:baseInstance];
++  if(trace){[context.lock lock];++context.indexedDrawReturns;[context.lock unlock];}
++}
++- (void)drawPrimitives:(MTLPrimitiveType)type vertexStart:(NSUInteger)start vertexCount:(NSUInteger)count {
++  [self declareBeforeExecution:_cmd];[(id<MTLRenderCommandEncoder>)_native drawPrimitives:type vertexStart:start vertexCount:count];
++}
++- (void)setRenderPipelineState:(id<MTLRenderPipelineState>)pipeline {
++  id<MTLRenderPipelineState> real=SRNative(pipeline);[_buffer captureAuxiliaryObject:real];_pipelineBound=real!=nil;
++  [(id<MTLRenderCommandEncoder>)_native setRenderPipelineState:real];
++}
++- (void)setVisibilityResultMode:(MTLVisibilityResultMode)mode offset:(NSUInteger)offset {
++  if(_ended)SRFail(@"visibility state after endEncoding");
++  BOOL trace=SRProfileEnabled();SRContext *context=_buffer.queue.context;
++  if(trace){[context.lock lock];++context.visibilityCalls;context.lastVisibilityMode=mode;context.lastVisibilityOffset=offset;context.lastVisibilityLength=_visibilityLength;context.lastVisibilityStorage=_visibilityStorage;context.lastVisibilityType=_visibilityType;context.lastVisibilityHasBuffer=_visibilityHasBuffer;context.lastVisibilityHasHeap=_visibilityHasHeap;context.lastVisibilityHasPipeline=_pipelineBound;context.lastVisibilityColorMapping=_visibilityColorMapping;[context.lock unlock];}
++  // Exact original arguments to the documented, typed native method. No
++  // query disabling, synthetic results or changed accumulation/storage policy.
++  [(id<MTLRenderCommandEncoder>)_native setVisibilityResultMode:mode offset:offset];
++  if(trace){[context.lock lock];++context.visibilityReturns;[context.lock unlock];}
+ }
+ - (void)declareBeforeExecution:(SEL)selector {
+   if (_ended) SRFail(@"GPU work encoded after endEncoding");

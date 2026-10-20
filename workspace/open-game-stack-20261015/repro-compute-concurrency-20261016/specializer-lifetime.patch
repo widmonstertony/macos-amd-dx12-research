@@ -1,0 +1,20 @@
+--- a/MVKShaderModule.mm
++++ b/MVKShaderModule.mm
+@@ -152,11 +152,15 @@
+ 					}
+ 
+ 					// Compile the specialized Metal function, and use it instead of the unspecialized Metal function.
+-					MVKFunctionSpecializer fs(_owner);
++					// Specialization can return a timeout before Metal invokes its completion.
++					// Use the same deferred-destroy ownership as library/pipeline compilers;
++					// a stack object would leave the late completion with a dangling this.
++					MVKFunctionSpecializer* fs = new MVKFunctionSpecializer(_owner);
+ 					if (pShaderFeedback) {
+ 						startTime = mvkGetTimestamp();
+ 					}
+-					mtlFunc = [fs.newMTLFunction(lib, mtlFuncName, mtlFCVals) autorelease];
++					mtlFunc = [fs->newMTLFunction(lib, mtlFuncName, mtlFCVals) autorelease];
++					fs->destroy();
+ 					if (pShaderFeedback) {
+ 						pShaderFeedback->duration += mvkGetElapsedNanoseconds(startTime);
+ 					}

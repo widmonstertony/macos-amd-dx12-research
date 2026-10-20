@@ -1,0 +1,32 @@
+#version 450
+layout(local_size_x = 1) in;
+
+layout(rgba32f, binding = 0) uniform readonly image1D image1d;
+layout(rgba32f, binding = 1) uniform readonly image3D image3d;
+layout(rgba32f, binding = 2) uniform readonly image2DArray imageArray;
+layout(rgba32f, binding = 3) uniform readonly imageCube imageCube_;
+
+layout(std430, binding = 4) buffer OutputSSBO
+{
+    vec4 out_1d;
+    vec4 out_3d;
+    vec4 out_array;
+    vec4 out_cube;
+};
+
+void main()
+{
+    int idx = int(gl_GlobalInvocationID.x);
+
+    // Test 1D image read with potential OOB
+    out_1d = imageLoad(image1d, idx);
+
+    // Test 3D image read with potential OOB
+    out_3d = imageLoad(image3d, ivec3(idx, idx, idx));
+
+    // Test 2D array image read with potential OOB
+    out_array = imageLoad(imageArray, ivec3(idx, idx, idx));
+
+    // Test cube image read with potential OOB
+    out_cube = imageLoad(imageCube_, ivec3(idx, idx, idx));
+}

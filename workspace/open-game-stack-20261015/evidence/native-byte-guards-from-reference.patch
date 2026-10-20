@@ -1,0 +1,294 @@
+--- a/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.cpp
++++ b/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.cpp
+@@ -3062,6 +3062,7 @@
+ 	do
+ 	{
+ 		reset(pass_count);
++		amd_byte_accesses.clear();
+ 
+ 		// Start bindings at zero.
+ 		next_metal_resource_index_buffer = 0;
+@@ -3128,6 +3129,18 @@
+ // Register the need to output any custom functions.
+ void CompilerMSL::preprocess_op_codes()
+ {
++	if (amd_byte_guards_enabled())
++	{
++		ir.for_each_typed_id<SPIRVariable>([&](uint32_t, SPIRVariable &var) {
++			if (var.storage != StorageClassUniform && var.storage != StorageClassStorageBuffer) return;
++			auto &block = get_variable_element_type(var);
++			if (has_decoration(block.self, DecorationBlock) || has_decoration(block.self, DecorationBufferBlock))
++			{
++				buffers_requiring_robust_access.insert(var.self);
++				buffers_requiring_array_length.insert(var.self);
++			}
++		});
++	}
+ 	OpCodePreprocessor preproc(*this);
+ 	traverse_all_reachable_opcodes(get<SPIRFunction>(ir.default_entry_point), preproc);
+ 
+@@ -11136,6 +11149,7 @@
+ 		uint32_t result_type = ops[0];
+ 		uint32_t id = ops[1];
+ 		uint32_t ptr = ops[2];
++		if (amd_emit_byte_load(result_type, id, ptr)) break;
+ 
+ 		// robustBufferAccess2: an array cannot be selected against a zero value (arrays in buffers are
+ 		// plain C arrays), so it is loaded into a temporary that is zeroed when out of bounds.
+@@ -11995,11 +12009,13 @@
+ 			robust_access_chains[result_id] = pending_robust_access_info;
+ 			pending_robust_access_info.valid = false;
+ 		}
++		if (opcode != OpPtrAccessChain) amd_record_byte_access(ops, instruction.length);
+ 		break;
+ 	}
+ 
+ 	case OpStore:
+ 	{
++		if (amd_emit_byte_store(ops[0], ops[1])) break;
+ 		const auto &type = expression_type(ops[0]);
+ 
+ 		if (is_out_of_bounds_tessellation_level(ops[0]))
+@@ -12068,6 +12084,16 @@
+ 		if (has_decoration(ops[0], DecorationBuiltIn) && get_decoration(ops[0], DecorationBuiltIn) == BuiltInPointSize)
+ 			writes_to_point_size = true;
+ 
++		break;
++	}
++
++	case OpCopyObject:
++	{
++		CompilerGLSL::emit_instruction(instruction);
++		AMDByteAccess copied;
++		if (amd_get_byte_access(ops[2], copied)) amd_byte_accesses[ops[1]] = copied;
++		auto guarded = robust_access_chains.find(ops[2]);
++		if (guarded != robust_access_chains.end()) robust_access_chains[ops[1]] = guarded->second;
+ 		break;
+ 	}
+ 
+@@ -15669,6 +15695,8 @@
+ 	}
+ 	return "";
+ }
++
++#include "amd_byte_access.inc"
+ 
+ string CompilerMSL::robust_vector_component_condition(const RobustAccessInfo &info, const string &component)
+ {
+--- a/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.hpp
++++ b/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.hpp
+@@ -1486,6 +1486,21 @@
+ 	};
+ 	std::string robust_vector_component_condition(const RobustAccessInfo &info, const std::string &component);
+ 	std::unordered_map<uint32_t, RobustAccessInfo> robust_access_chains;
++	// Private AMD path: static CBV members and fixed arrays need explicit byte
++	// bounds too. Physical-storage-buffer addresses retain caller-managed bounds.
++	struct AMDByteAccess
++	{
++		uint32_t root = 0, matrix_stride = 0;
++		std::string base, size, offset = "0ul", condition = "true";
++		bool constant = false, row_major = false, runtime = false;
++	};
++	std::unordered_map<uint32_t, AMDByteAccess> amd_byte_accesses;
++	bool amd_byte_guards_enabled() const;
++	bool amd_get_byte_access(uint32_t pointer, AMDByteAccess &access);
++	void amd_record_byte_access(const uint32_t *ops, uint32_t length);
++	bool amd_emit_byte_load(uint32_t result_type, uint32_t id, uint32_t pointer);
++	bool amd_emit_byte_store(uint32_t pointer, uint32_t value);
++	std::string amd_component_condition(const AMDByteAccess &access, const std::string &offset, uint32_t bytes);
+ 
+ 	// Temporary storage for robust access info during access chain building
+ 	RobustAccessInfo pending_robust_access_info;
+--- a/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/amd_byte_access.inc
++++ b/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/amd_byte_access.inc
+@@ -0,0 +1,186 @@
++// Included in spirv_msl.cpp inside SPIRV-Cross namespace. Private compiler
++// implementation, never a hardware/capability override.
++bool CompilerMSL::amd_byte_guards_enabled() const
++{
++    const char *enabled = getenv("MVK_AMD_BYTE_GUARDS");
++    return msl_options.robust_buffer_access2 && enabled && string(enabled) == "1";
++}
++
++bool CompilerMSL::amd_get_byte_access(uint32_t pointer, AMDByteAccess &access)
++{
++    if (!amd_byte_guards_enabled()) return false;
++    auto existing = amd_byte_accesses.find(pointer);
++    if (existing != amd_byte_accesses.end()) { access = existing->second; return true; }
++    auto *var = maybe_get<SPIRVariable>(pointer);
++    if (!var || !buffers_requiring_robust_access.count(var->self))
++    {
++        auto &pointer_type = expression_type(pointer);
++        if (pointer_type.pointer && (pointer_type.storage == StorageClassUniform || pointer_type.storage == StorageClassStorageBuffer))
++            SPIRV_CROSS_THROW("Untraced logical buffer pointer in AMD protected compiler");
++        return false;
++    }
++    auto &block = get_variable_element_type(*var);
++    access = {};
++    access.root = var->self;
++    access.base = to_pointer_expression(var->self, false);
++    access.size = to_buffer_size_expression(var->self);
++    access.constant = var->storage == StorageClassUniform && !has_decoration(block.self, DecorationBufferBlock);
++    return !access.size.empty();
++}
++
++void CompilerMSL::amd_record_byte_access(const uint32_t *ops, uint32_t length)
++{
++    AMDByteAccess access;
++    if (!amd_get_byte_access(ops[2], access)) return;
++    const SPIRType *type = &get_pointee_type(expression_type(ops[2]));
++    for (uint32_t i = 3; i < length; ++i)
++    {
++        string index = to_unpacked_expression(ops[i]);
++        bool descriptor = i == 3 && ops[2] == access.root && is_array(*type) && type->basetype == SPIRType::Struct &&
++            (has_decoration(type->self, DecorationBlock) || has_decoration(type->self, DecorationBufferBlock));
++        if (descriptor)
++        {
++            access.base += "[" + index + "]";
++            access.size += "[" + index + "]";
++            type = &get<SPIRType>(type->parent_type);
++            continue;
++        }
++        uint32_t stride = 0;
++        if (is_array(*type))
++        {
++            stride = get_robust_array_stride(*type);
++            if (is_runtime_size_array(*type)) access.runtime = true;
++            else access.condition = join("(", access.condition, " && ulong(", index, ") < ulong(", to_array_size(*type, uint32_t(type->array.size() - 1)), "))");
++            type = &get<SPIRType>(type->parent_type);
++        }
++        else if (type->basetype == SPIRType::Struct)
++        {
++            auto *constant = maybe_get<SPIRConstant>(ops[i]);
++            if (!constant || constant->specialization) SPIRV_CROSS_THROW("Nonconstant buffer struct index");
++            uint32_t member = constant->scalar();
++            if (member >= type->member_types.size()) SPIRV_CROSS_THROW("Buffer member index out of range");
++            access.offset = join("(", access.offset, " + ", type_struct_member_offset(*type, member), "ul)");
++            auto &member_type = get<SPIRType>(type->member_types[member]);
++            access.row_major = has_member_decoration(type->self, member, DecorationRowMajor);
++            access.matrix_stride = member_type.columns > 1 ? type_struct_member_matrix_stride(*type, member) : 0;
++            type = &member_type;
++            continue;
++        }
++        else if (type->columns > 1)
++        {
++            if (!access.matrix_stride) SPIRV_CROSS_THROW("Missing protected matrix stride");
++            access.condition = join("(", access.condition, " && ulong(", index, ") < ", type->columns, "ul)");
++            stride = access.row_major ? type->width / 8 : access.matrix_stride;
++            type = &get<SPIRType>(type->parent_type);
++        }
++        else if (type->vecsize > 1)
++        {
++            access.condition = join("(", access.condition, " && ulong(", index, ") < ", type->vecsize, "ul)");
++            stride = access.row_major && access.matrix_stride ? access.matrix_stride : type->width / 8;
++            type = &get<SPIRType>(type->parent_type);
++        }
++        else SPIRV_CROSS_THROW("Unsupported protected buffer access-chain element");
++        if (!stride) SPIRV_CROSS_THROW("Zero protected buffer stride");
++        // Bound before multiplication; negative integer indices convert to large
++        // unsigned values and fail. Guards short-circuit underflow/overflow.
++        access.condition = join("(", access.condition, " && ", access.offset, " <= ulong(", access.size,
++            ") && ulong(", index, ") <= (ulong(", access.size, ") - ", access.offset, ") / ", stride, "ul)");
++        access.offset = join("(", access.offset, " + ulong(", index, ") * ", stride, "ul)");
++    }
++    amd_byte_accesses[ops[1]] = access;
++    auto &result = get<SPIRType>(ops[0]);
++    if (!access.runtime && result.vecsize == 1 && result.columns == 1 && result.array.empty() &&
++        (result.width == 32 || result.width == 64))
++    {
++        RobustAccessInfo atomic;
++        atomic.valid = true;
++        atomic.bounds_check_condition = amd_component_condition(access, access.offset, result.width / 8);
++        robust_access_chains[ops[1]] = atomic;
++    }
++}
++
++string CompilerMSL::amd_component_condition(const AMDByteAccess &access, const string &offset, uint32_t bytes)
++{
++    return join("(", access.base, " != nullptr && ", access.condition, " && ", offset,
++        " <= ulong(", access.size, ") && ", bytes, "ul <= ulong(", access.size, ") - ", offset, ")");
++}
++
++bool CompilerMSL::amd_emit_byte_load(uint32_t result_type, uint32_t id, uint32_t pointer)
++{
++    AMDByteAccess access;
++    if (!amd_get_byte_access(pointer, access) || access.runtime) return false;
++    auto &type = get<SPIRType>(result_type);
++    // Protect the logical address-table read; the physical address it contains
++    // retains caller-managed Vulkan BDA semantics after this load.
++    if (is_pointer(type) && type.storage == StorageClassPhysicalStorageBuffer)
++    {
++        string qualifier = access.constant ? "constant " : "const device ";
++        string read = join("*((", qualifier, "ulong*)((", qualifier, "uchar*)(", access.base, ") + ", access.offset, "))");
++        string bits = join("(", amd_component_condition(access, access.offset, 8), " ? ", read, " : 0ul)");
++        emit_op(result_type, id, join("reinterpret_cast<", type_to_glsl(type), ">(", bits, ")"), false);
++        register_read(id, pointer, false);
++        inherit_expression_dependencies(id, pointer);
++        return true;
++    }
++    if (type.pointer || is_array(type) || type.basetype == SPIRType::Struct)
++        SPIRV_CROSS_THROW("Static aggregate/pointer load not yet qualified in AMD protected compiler");
++    if (type.width != 32 && type.width != 64) SPIRV_CROSS_THROW("Unqualified narrow protected CBV load");
++    SPIRType scalar = type; scalar.vecsize = scalar.columns = 1;
++    string scalar_name = type_to_glsl(scalar);
++    string qualifier = access.constant ? "constant " : "const device ";
++    auto component = [&](uint32_t column, uint32_t row) {
++        uint32_t relative = type.columns > 1 ? (access.row_major ? row * access.matrix_stride + column * (type.width / 8) : column * access.matrix_stride + row * (type.width / 8)) : row * (type.width / 8);
++        string offset = join("(", access.offset, " + ", relative, "ul)");
++        string read = join("*((", qualifier, scalar_name, "*)((", qualifier, "uchar*)(", access.base, ") + ", offset, "))");
++        return join("(", amd_component_condition(access, offset, type.width / 8), " ? ", read, " : ", scalar_name, "(0))");
++    };
++    string expression;
++    if (type.columns == 1 && type.vecsize == 1) expression = component(0, 0);
++    else {
++        expression = type_to_glsl(type) + "(";
++        for (uint32_t column = 0; column < type.columns; ++column) {
++            if (column) expression += ", ";
++            SPIRType vector = type; vector.columns = 1;
++            if (type.columns > 1) expression += type_to_glsl(vector) + "(";
++            for (uint32_t row = 0; row < type.vecsize; ++row) {
++                if (row) expression += ", ";
++                expression += component(column, row);
++            }
++            if (type.columns > 1) expression += ")";
++        }
++        expression += ")";
++    }
++    emit_op(result_type, id, expression, false);
++    register_read(id, pointer, false);
++    inherit_expression_dependencies(id, pointer);
++    unset_extended_decoration(id, SPIRVCrossDecorationPhysicalTypePacked);
++    unset_extended_decoration(id, SPIRVCrossDecorationPhysicalTypeID);
++    return true;
++}
++
++bool CompilerMSL::amd_emit_byte_store(uint32_t pointer, uint32_t value)
++{
++    AMDByteAccess access;
++    if (!amd_get_byte_access(pointer, access) || access.runtime) return false;
++    auto &type = expression_type(value);
++    if (type.pointer || is_array(type) || type.basetype == SPIRType::Struct)
++        SPIRV_CROSS_THROW("Static aggregate/pointer store not yet qualified in AMD protected compiler");
++    if (access.constant) SPIRV_CROSS_THROW("Store to protected constant buffer");
++    if (type.width != 32 && type.width != 64) SPIRV_CROSS_THROW("Unqualified narrow protected buffer store");
++    SPIRType scalar = type; scalar.vecsize = scalar.columns = 1;
++    string rhs = to_unpacked_expression(value);
++    for (uint32_t column = 0; column < type.columns; ++column) for (uint32_t row = 0; row < type.vecsize; ++row) {
++        uint32_t relative = type.columns > 1 ? (access.row_major ? row * access.matrix_stride + column * (type.width / 8) : column * access.matrix_stride + row * (type.width / 8)) : row * (type.width / 8);
++        string offset = join("(", access.offset, " + ", relative, "ul)");
++        string condition = amd_component_condition(access, offset, type.width / 8);
++        if (needs_frag_discard_checks()) condition = join("(!", builtin_to_glsl(BuiltInHelperInvocation, StorageClassInput), " && ", condition, ")");
++        statement("if (", condition, ")"); begin_scope();
++        string component = "(" + rhs + ")";
++        if (type.columns > 1) component += "[" + to_string(column) + "]";
++        if (type.vecsize > 1) component += "[" + to_string(row) + "]";
++        statement("*((device ", type_to_glsl(scalar), "*)((device uchar*)(", access.base, ") + ", offset, ")) = ", component, ";");
++        end_scope();
++    }
++    register_write(pointer);
++    return true;
++}
+--- a/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPatchRevision.h
++++ b/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPatchRevision.h
+@@ -0,0 +1 @@
++#define MVK_PATCH_REVISION 0x7a069504u

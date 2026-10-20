@@ -1,0 +1,9 @@
+(version 1)
+(allow default)
+; Keep all working Tencent prefixes, game data and SDK log history read-only.
+(deny file-write*
+    (subpath "/Volumes/Applications/Program Files (x86)/Steam/steamapps/common/StellarBlade")
+    (subpath "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine")
+    (subpath "/Users/tonytan/Library/Application Support/YYBIntelLauncher")
+    (subpath "/Users/tonytan/Library/Logs/com.tencent.yybmac.wine.engine")
+    (literal "/Users/tonytan/Library/Preferences/com.tencent.yybmac.wine.engine.plist"))

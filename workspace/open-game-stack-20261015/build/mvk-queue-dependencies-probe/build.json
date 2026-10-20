@@ -1,0 +1,19 @@
+{
+  "candidateSHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "proxySHA256": "dbc294395571aeab83493c78f89cff8863c21b52a61d0ea73f9d5950c45cf1e0",
+  "sourceCandidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/moltenvk-queue-dependencies-signed/MoltenVK/libMoltenVK.1.4.2.dylib",
+  "command": [
+    "xcrun",
+    "clang",
+    "-dynamiclib",
+    "-O2",
+    "-DMVK_GUARD_CANDIDATE_PATH=\"/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-probe/libCandidate.dylib\"",
+    "src/mvk_guard_proxy.c",
+    "-Wl,-reexport_library,/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-probe/libCandidate.dylib",
+    "-Wl,-install_name,/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-probe/libProbeGuard.dylib",
+    "-o",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-probe/libProbeGuard.dylib"
+  ],
+  "gameOnlyConfigHeaderIncluded": false,
+  "sharedSelectorsChanged": false
+}

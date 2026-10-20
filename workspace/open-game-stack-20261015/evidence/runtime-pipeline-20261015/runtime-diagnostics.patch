@@ -1,0 +1,252 @@
+--- a/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm
+@@ -24,6 +24,7 @@
+ 
+ using namespace std;
+ using namespace mvk;
++#include "MVKRuntimeTrace.h"
+ 
+ MVKMTLFunction::MVKMTLFunction(id<MTLFunction> mtlFunc, const SPIRVToMSLConversionResultInfo scRslts, MTLSize tgSize) {
+ 	_mtlFunction = [mtlFunc retain];		// retained
+@@ -403,6 +404,8 @@
+ 											   const VkSpecializationInfo* pSpecializationInfo,
+ 											   MVKPipeline* pipeline,
+ 											   VkPipelineCreationFeedback* pShaderFeedback) {
++	bool trace = mvkRuntimeTraceEnabled(getMVKConfig());
++	NSDictionary* requestedConfig = trace ? mvkTraceConfig(*pShaderConfig) : nil;
+ 	MVKShaderLibrary* mvkLib = _directMSLLibrary;
+ 	if ( !mvkLib ) {
+ 		uint64_t startTime = pShaderFeedback ? mvkGetTimestamp() : getPerformanceTimestamp();
+@@ -418,7 +421,19 @@
+ 		pShaderConfig->markAllInterfaceVarsAndResourcesUsed();
+ 	}
+ 
+-	return mvkLib ? mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this) : MVKMTLFunctionNull;
++	MVKMTLFunction result = mvkLib ? mvkLib->getMTLFunction(pSpecializationInfo, pShaderFeedback, this) : MVKMTLFunctionNull;
++	if (trace && mvkLib) {
++		std::string source;
++		mvkLib->decompressMSL(source);
++		size_t sourceHash = mvkHash(source.data(), source.size());
++		NSString* label = [NSString stringWithFormat:@"%016zx:%016zx:%u",_key.codeHash,sourceHash,(unsigned)pShaderConfig->options.entryPointStage];
++		id<MTLFunction> function = result.getMTLFunction();
++		function.label = label;
++		NSString* path = [@(getMVKConfig().shaderDumpDir) stringByAppendingPathComponent:[NSString stringWithFormat:@"source-%016zx.metal",sourceHash]];
++		[[NSData dataWithBytes:source.data() length:source.size()] writeToFile:path options:NSDataWritingAtomic error:nil];
++		mvkWriteRuntimeTrace(getMVKConfig(), @"function", @{@"shader":[NSString stringWithFormat:@"%016zx",_key.codeHash],@"sourceHash":[NSString stringWithFormat:@"%016zx",sourceHash],@"requested":requestedConfig,@"selected":mvkTraceConfig(*pShaderConfig),@"function":mvkTraceFunction(function),@"pipelineCache":@(pipeline->getPipelineCache()!=nullptr),@"fpFastMathFlags":@(mvkLib->_shaderConversionResultInfo.entryPoint.fpFastMathFlags),@"positionInvariant":@(mvkLib->_shaderConversionResultInfo.isPositionInvariant)});
++	}
++	return result;
+ }
+ 
+ bool MVKShaderModule::convert(SPIRVToMSLConversionConfiguration* pShaderConfig,
+--- a/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm
+@@ -42,6 +42,8 @@
+ using namespace std;
+ using namespace mvk;
+ using namespace SPIRV_CROSS_NAMESPACE;
++#include "MVKRuntimeTrace.h"
++#include "MVKMeshReplay.h"
+ 
+ 
+ #pragma mark - MVKPipelineLayout
+@@ -3799,12 +3801,14 @@
+ 		}
+ 	});
+ 
++	if (mvkRuntimeTraceEnabled(getMVKConfig())) mvkWriteRuntimeTrace(getMVKConfig(), @"pipeline", @{@"kind":@"vertex",@"vertex":mvkTraceFunction(mtlRPLDesc.vertexFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil)});
+ 	return [_mtlRenderPipelineState retain];
+ }
+ 
+ #if MVK_XCODE_14
+ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLMeshRenderPipelineDescriptor* mtlRPLDesc) {
+ 	unique_lock<mutex> lock(_completionLock);
++	VkResult previousResult = _owner->getConfigurationResult();
+ 
+ 	compile(lock, ^{
+ 		auto mtlDev = _owner->getMTLDevice();
+@@ -3818,6 +3822,12 @@
+ 		}
+ 	});
+ 
++	if (mvkRuntimeTraceEnabled(getMVKConfig())) mvkWriteRuntimeTrace(getMVKConfig(), @"pipeline", @{@"kind":@"mesh",@"object":mvkTraceFunction(mtlRPLDesc.objectFunction),@"mesh":mvkTraceFunction(mtlRPLDesc.meshFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil)});
++	if (!_mtlRenderPipelineState && _compileError.code == 2 &&
++		[_compileError.localizedDescription containsString:@"fragment input"] && getPhysicalDevice()->isAMDHardware()) {
++		_mtlRenderPipelineState = mvkReplayFailedMesh(getMTLDevice(),mtlRPLDesc,getMVKConfig());
++		if (_mtlRenderPipelineState && previousResult == VK_SUCCESS) _owner->clearConfigurationResult();
++	}
+ 	return [_mtlRenderPipelineState retain];
+ }
+ #endif
+--- a/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/state.c
++++ b/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/state.c
+@@ -5654,14 +5654,22 @@
+     {
+         if (!(graphics->library = d3d12_pipeline_state_create_pipeline_variant(state, NULL, graphics->dsv_format,
+                 state->vk_pso_cache, library_flags, &graphics->pipeline_dynamic_states)))
++        {
++            if (getenv("VKD3D_AMD_RUNTIME_TRACE"))
++                INFO("AMD_RT_PIPELINE library_creation_failed mapped_to_E_OUTOFMEMORY; not an allocation diagnosis.\n");
+             return E_OUTOFMEMORY;
++        }
+     }
+ 
+     if (can_compile_pipeline_early)
+     {
+         if (!(graphics->pipeline = d3d12_pipeline_state_create_pipeline_variant(state, NULL, graphics->dsv_format,
+                 state->vk_pso_cache, 0, &graphics->pipeline_dynamic_states)))
++        {
++            if (getenv("VKD3D_AMD_RUNTIME_TRACE"))
++                INFO("AMD_RT_PIPELINE pipeline_creation_failed mapped_to_E_OUTOFMEMORY; not an allocation diagnosis.\n");
+             return E_OUTOFMEMORY;
++        }
+     }
+ 
+     graphics->dsv_plane_optimal_mask = d3d12_graphics_pipeline_state_get_plane_optimal_mask(graphics);
+--- a/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/memory.c
++++ b/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/memory.c
+@@ -926,6 +926,9 @@
+         else
+         {
+             FIXME("Found no suitable memory type for requested type_flags #%x.\n", type_flags);
++            if (getenv("VKD3D_AMD_RUNTIME_TRACE"))
++                INFO("AMD_RT_MEMORY no_type size=%"PRIu64" flags=%#x mask=%#x candidates=%#x respect_budget=%u.\n",
++                        size, type_flags, base_type_mask, candidate_mask, respect_budget);
+             return E_OUTOFMEMORY;
+         }
+     }
+@@ -1450,6 +1453,9 @@
+ 
+     if (FAILED(hr))
+     {
++        if (getenv("VKD3D_AMD_RUNTIME_TRACE"))
++            INFO("AMD_RT_MEMORY init_failed size=%"PRIu64" flags=%#x mask=%#x heap=%u allocation_flags=%#x hr=%#x.\n",
++                    memory_requirements.size, type_flags, type_mask, allocation->heap_type, info->flags, hr);
+         VK_CALL(vkDestroyBuffer(device->vk_device, allocation->resource.vk_buffer, NULL));
+         return hr;
+     }
+@@ -1954,6 +1960,9 @@
+ 
+     if (FAILED(hr) && (required_mask & ~optional_mask))
+     {
++        if (getenv("VKD3D_AMD_RUNTIME_TRACE"))
++            INFO("AMD_RT_MEMORY suballocate_fallback size=%"PRIu64" from_mask=%#x to_mask=%#x.\n",
++                    memory_requirements.size, optional_mask, required_mask & ~optional_mask);
+         hr = vkd3d_memory_allocator_try_suballocate_memory(allocator, device,
+                 &memory_requirements, required_mask & ~optional_mask,
+                 optional_flags,
+@@ -1962,6 +1971,8 @@
+     }
+ 
+     pthread_mutex_unlock(&allocator->mutex);
++    if (getenv("VKD3D_AMD_RUNTIME_TRACE") && FAILED(hr))
++        INFO("AMD_RT_MEMORY suballocate_final_failed size=%"PRIu64" hr=%#x.\n", memory_requirements.size, hr);
+     return hr;
+ }
+ 
+@@ -2096,6 +2107,9 @@
+     else
+         hr = vkd3d_memory_allocation_init(allocation, device, allocator, info);
+ 
++    if (getenv("VKD3D_AMD_RUNTIME_TRACE") && FAILED(hr))
++        INFO("AMD_RT_MEMORY allocate_final_failed size=%"PRIu64" mask=%#x heap=%u suballocate=%u hr=%#x.\n",
++                info->memory_requirements.size, info->memory_requirements.memoryTypeBits, info->heap_properties.Type, suballocate, hr);
+     if (FAILED(hr))
+         return hr;
+ 
+--- /dev/null
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRuntimeTrace.h
+@@ -0,0 +1,31 @@
++// Opt-in research diagnostics only. No capability or pipeline behavior changes.
++#pragma once
++#include <atomic>
++#include <unistd.h>
++#include <sys/stat.h>
++static inline bool mvkRuntimeTraceEnabled(const MVKConfiguration& config) {
++    const char* value = getenv("MVK_AMD_RUNTIME_TRACE");
++    return value && !strcmp(value, "1") && config.shaderDumpDir[0];
++}
++static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString* kind, NSDictionary* record) {
++    if (!mvkRuntimeTraceEnabled(config)) return;
++    static std::atomic<uint64_t> sequence{0};
++    NSString* dir = @(config.shaderDumpDir);
++    mkdir(dir.UTF8String, 0755);
++    NSString* path = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"trace-%@-%d-%llu.json",kind,getpid(),(unsigned long long)sequence.fetch_add(1)]];
++    NSData* data = [NSJSONSerialization dataWithJSONObject:record options:NSJSONWritingPrettyPrinted error:nil];
++    [data writeToFile:path options:NSDataWritingAtomic error:nil];
++}
++static inline NSDictionary* mvkTraceFunction(id<MTLFunction> function) {
++    if (!function) return @{};
++    return @{@"label":function.label ?: @"", @"name":function.name ?: @"", @"type":@(function.functionType), @"identity":[NSString stringWithFormat:@"%p",function]};
++}
++static inline NSDictionary* mvkTraceConfig(const mvk::SPIRVToMSLConversionConfiguration& c) {
++    NSMutableArray* inputs = [NSMutableArray array];
++    NSMutableArray* outputs = [NSMutableArray array];
++    NSMutableArray* resources = [NSMutableArray array];
++    for (auto& s : c.shaderInputs) [inputs addObject:@{@"location":@(s.shaderVar.location),@"used":@(s.outIsUsedByShader),@"raw":[[NSData dataWithBytes:&s.shaderVar length:sizeof(s.shaderVar)] base64EncodedStringWithOptions:0]}];
++    for (auto& s : c.shaderOutputs) [outputs addObject:@{@"location":@(s.shaderVar.location),@"used":@(s.outIsUsedByShader),@"raw":[[NSData dataWithBytes:&s.shaderVar length:sizeof(s.shaderVar)] base64EncodedStringWithOptions:0]}];
++    for (auto& r : c.resourceBindings) if (r.resourceBinding.stage == c.options.entryPointStage) [resources addObject:@{@"set":@(r.resourceBinding.desc_set),@"binding":@(r.resourceBinding.binding),@"count":@(r.resourceBinding.count),@"buffer":@(r.resourceBinding.msl_buffer),@"used":@(r.outIsUsedByShader)}];
++    return @{@"stage":@(c.options.entryPointStage),@"entryPoint":@(c.options.entryPointName.c_str()),@"mesh":@(c.options.mslOptions.for_mesh_pipeline),@"flipY":@(c.options.shouldFlipVertexY),@"mslOptionsRaw":[[NSData dataWithBytes:&c.options.mslOptions length:sizeof(c.options.mslOptions)] base64EncodedStringWithOptions:0],@"inputs":inputs,@"outputs":outputs,@"resources":resources};
++}
+--- /dev/null
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKMeshReplay.h
+@@ -0,0 +1,60 @@
++// Bounded opt-in in-process diagnostic: rebuild the complete selected source.
++// This is not a release fallback: it requires the owned runtime source trace.
++#pragma once
++static inline id<MTLRenderPipelineState> mvkReplayFailedMesh(id<MTLDevice> device,
++        MTLMeshRenderPipelineDescriptor* original, const MVKConfiguration& config) {
++    const char* enabled = getenv("MVK_AMD_REPLAY_FAILED_MESH");
++    if (!enabled || strcmp(enabled,"1") || !mvkRuntimeTraceEnabled(config)) return nil;
++    NSArray* functions = @[original.objectFunction ?: (id)[NSNull null], original.meshFunction ?: (id)[NSNull null], original.fragmentFunction ?: (id)[NSNull null]];
++    NSMutableArray* sources = [NSMutableArray array];
++    for (id value in functions) {
++        if (value == [NSNull null]) return nil;
++        id<MTLFunction> function = value;
++        if (function.functionConstantsDictionary.count) return nil;
++        NSArray* parts = [function.label componentsSeparatedByString:@":"];
++        if (parts.count != 3 || [parts[1] length] != 16) return nil;
++        NSCharacterSet* hex = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"];
++        if ([parts[1] rangeOfCharacterFromSet:hex.invertedSet].location != NSNotFound) return nil;
++        NSString* path = [@(config.shaderDumpDir) stringByAppendingPathComponent:[NSString stringWithFormat:@"source-%@.metal",parts[1]]];
++        NSString* source = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
++        if (!source || [source containsString:@"SPIRV_CROSS_CONSTANT_ID"]) return nil;
++        [sources addObject:source];
++    }
++    for (unsigned rename=0;rename<2;rename++) {
++        MTLMeshRenderPipelineDescriptor* descriptor = [original copy];
++        NSMutableArray* freshFunctions = [NSMutableArray array];
++        NSError* error = nil;
++        for (NSUInteger i=0;i<3;i++) {
++            id<MTLFunction> old = functions[i];
++            NSString* entry = old.name;
++            NSString* source = sources[i];
++            if (rename) {
++                NSString* replacement = [NSString stringWithFormat:@"mvk_replay_%@_%lu",[[old.label componentsSeparatedByString:@":"]firstObject],(unsigned long)i];
++                NSString* pattern = [NSString stringWithFormat:@"\\b%@\\b",[NSRegularExpression escapedPatternForString:entry]];
++                source = [source stringByReplacingOccurrencesOfString:pattern withString:replacement options:NSRegularExpressionSearch range:NSMakeRange(0,source.length)];
++                entry = replacement;
++            }
++            MTLCompileOptions* options = [[MTLCompileOptions new] autorelease];
++            options.languageVersion = MTLLanguageVersion4_0;
++            options.mathMode = MTLMathModeSafe;
++            options.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsPrecise;
++            options.preserveInvariance = i < 2;
++            id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
++            id<MTLFunction> function = library ? [library newFunctionWithName:entry] : nil;
++            [library release];
++            if (!function) break;
++            function.label = [old.label stringByAppendingString:rename ? @":renamed-replay" : @":source-replay"];
++            [freshFunctions addObject:function];
++            [function release];
++        }
++        id<MTLRenderPipelineState> pipeline = nil;
++        if (freshFunctions.count == 3) {
++            descriptor.objectFunction = freshFunctions[0];descriptor.meshFunction = freshFunctions[1];descriptor.fragmentFunction = freshFunctions[2];
++            pipeline = [device newRenderPipelineStateWithMeshDescriptor:descriptor options:MTLPipelineOptionNone reflection:nil error:&error];
++        }
++        mvkWriteRuntimeTrace(config,@"mesh-replay",@{@"renamedEntryPoints":@(rename),@"mathMode":@"safe+precise",@"sourceFilesComplete":@YES,@"freshFunctionCount":@(freshFunctions.count),@"created":@(pipeline!=nil),@"error":error.localizedDescription?:@"",@"originalObject":mvkTraceFunction(original.objectFunction),@"originalMesh":mvkTraceFunction(original.meshFunction),@"originalFragment":mvkTraceFunction(original.fragmentFunction)});
++        [descriptor release];
++        if (pipeline) return pipeline; // Actual successfully compiled PSO, retained.
++    }
++    return nil;
++}

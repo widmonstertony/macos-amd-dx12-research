@@ -1,0 +1,17 @@
+--- MVKPipeline.before.mm
++++ MVKPipeline.mm
+@@ -4052,9 +4052,12 @@
+ 
+ 	compile(lock, ^{
+ 		auto mtlDev = _owner->getMTLDevice();
++		// Waiting for another mesh link must not monopolize the device
++		// monitor needed by unrelated shader-library and compute work.
++		// Keep mesh submissions serialized through their completion callback.
++		dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
++		if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+ 		@synchronized (mtlDev) {
+-			dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
+-			if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+ 			[mtlDev newRenderPipelineStateWithMeshDescriptor: mtlRPLDesc
+ 													 options: MTLPipelineOptionNone
+ 										   completionHandler: ^(id<MTLRenderPipelineState> ps, MTLRenderPipelineReflection *refl, NSError* error) {

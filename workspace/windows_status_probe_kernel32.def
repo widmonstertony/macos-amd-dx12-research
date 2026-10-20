@@ -1,0 +1,9 @@
+LIBRARY KERNEL32.dll
+EXPORTS
+LoadLibraryW
+GetProcAddress
+GetLastError
+GetStdHandle
+WriteFile
+WideCharToMultiByte
+ExitProcess

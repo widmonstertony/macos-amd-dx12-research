@@ -1,0 +1,40 @@
+#version 450
+layout(local_size_x = 1) in;
+
+layout(std430, binding = 0) readonly buffer ReadSSBO
+{
+    vec4 read_data[];
+};
+
+layout(std430, binding = 1) writeonly buffer WriteSSBO
+{
+    vec4 write_data[];
+};
+
+layout(std430, binding = 2) buffer AtomicSSBO
+{
+    uint atomic_data[];
+};
+
+layout(std430, binding = 3) buffer OutputSSBO
+{
+    vec4 out_value;
+    uint out_atomic;
+};
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+
+    // Test buffer read with potential OOB index
+    // With robustBufferAccess2, OOB reads should return 0
+    out_value = read_data[idx];
+
+    // Test buffer write with potential OOB index
+    // With robustBufferAccess2, OOB writes should be discarded
+    write_data[idx] = vec4(1.0, 2.0, 3.0, 4.0);
+
+    // Test buffer atomic with potential OOB index
+    // With robustBufferAccess2, OOB atomics should return 0 and not modify memory
+    out_atomic = atomicAdd(atomic_data[idx], 1u);
+}

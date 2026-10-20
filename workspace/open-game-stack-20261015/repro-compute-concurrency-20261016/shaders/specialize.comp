@@ -1,0 +1,6 @@
+#version 450
+layout(local_size_x=64) in;
+layout(constant_id=0) const uint variant=7;
+layout(set=0,binding=0,std430) readonly buffer Input {uvec2 data[];} src;
+layout(set=0,binding=1,std430) buffer Output {uint data[];} dst;
+void main(){uint t=gl_GlobalInvocationID.x; dst.data[t]=(src.data[t].x ^ src.data[t].y) + variant;}

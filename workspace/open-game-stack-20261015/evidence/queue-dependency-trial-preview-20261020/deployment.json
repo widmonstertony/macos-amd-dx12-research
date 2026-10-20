@@ -1,0 +1,13 @@
+{
+  "timeUTC": "2026-10-20T07:34:53.902705+00:00",
+  "selectors": {
+    "/private/tmp/mvk": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libProbeGuard.dylib",
+    "/private/tmp/mvk-guard-proxy-select/libMoltenVK.dylib": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libProbeGuard.dylib",
+    "/private/tmp/mvk-guard-proxy-select/libMoltenVK.1.dylib": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libProbeGuard.dylib",
+    "/private/tmp/mvk-guard-proxy-select/libMoltenVK.1.4.2.dylib": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-queue-dependencies-game/libProbeGuard.dylib"
+  },
+  "candidateSHA256": "ab5a688c2df324983b61106e2af44d59190dfe7bbee9ebe98ba8a46c4e3aa5fb",
+  "proxySHA256": "847a4f6f80d15985c51253da9bb3a855a27037cab883e7f173ef66577bdd50f2",
+  "cacheDeleted": false,
+  "immutableLibrariesOverwritten": false
+}

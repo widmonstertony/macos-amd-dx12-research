@@ -1,0 +1,18 @@
+--- MVKPipeline.before-retirement.mm
++++ MVKPipeline.mm
+@@ -3931,6 +3931,15 @@
+ 						if (getenv("MVK_AMD_BINARY_ARCHIVE_TRACE"))
+ 							fprintf(stderr, "MoltenVK binary archive oversized candidate preserved (size %lld >= limit %llu); prior archive retained: %s\n",
+ 								(long long)archiveStat.st_size, (unsigned long long)maxBytes, archivePathC);
++						// The descriptor already retains this archive for the current
++						// pipeline creation. Stop retaining it process-wide: merely
++						// setting full left a multi-GB archive resident for the rest
++						// of the game. Future pipelines can compile without it;
++						// the last bounded on-disk archive remains unchanged.
++						[state.archive release];
++						state.archive = nil;
++						if (getenv("MVK_AMD_BINARY_ARCHIVE_TRACE"))
++							fprintf(stderr, "MoltenVK binary archive retired from persistent state after oversized publication was rejected: %s\n", archivePathC);
+ 					} else {
+ 						rename(tempPath.fileSystemRepresentation, state.path.fileSystemRepresentation);
+ 					}

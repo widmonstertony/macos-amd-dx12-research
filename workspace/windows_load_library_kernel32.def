@@ -1,0 +1,14 @@
+LIBRARY kernel32.dll
+EXPORTS
+LoadLibraryW
+GetProcAddress
+GetModuleFileNameW
+GetLastError
+SetLastError
+GetStdHandle
+WriteFile
+WideCharToMultiByte
+GetCommandLineW
+SetErrorMode
+Sleep
+ExitProcess

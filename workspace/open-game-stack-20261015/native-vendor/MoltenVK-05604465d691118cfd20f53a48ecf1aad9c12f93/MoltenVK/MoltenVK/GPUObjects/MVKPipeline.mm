@@ -4105,6 +4105,8 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 #if MVK_XCODE_14
 id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLMeshRenderPipelineDescriptor* mtlRPLDesc) {
     if (mvkGPUTimeoutTraceEnabled()) mtlRPLDesc.label = [NSString stringWithFormat:@"obj=%@;mesh=%@;fs=%@", mtlRPLDesc.objectFunction.label ?: @"", mtlRPLDesc.meshFunction.label ?: @"", mtlRPLDesc.fragmentFunction.label ?: @""];
+	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_PIPELINES");
+	bool synchronousMesh = getPhysicalDevice()->isAMDHardware() && syncOption && !strcmp(syncOption, "1");
 
 	unique_lock<mutex> lock(_completionLock);
 	VkResult previousResult = _owner->getConfigurationResult();
@@ -4116,6 +4118,20 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 		// Keep mesh submissions serialized through their completion callback.
 		dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
 		if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
+		if (synchronousMesh) {
+			// Public API control matching the successful diagnostic rebuild.
+			// Preserve the complete descriptor, native result and timeout;
+			// this is a first attempt, not a retry or a fabricated success.
+			// Do not hold the device monitor across a blocking driver call.
+			NSError* error = nil;
+			id<MTLRenderPipelineState> ps = [mtlDev newRenderPipelineStateWithMeshDescriptor:mtlRPLDesc
+				options:MTLPipelineOptionNone reflection:nil error:&error];
+			if (linkGate) dispatch_semaphore_signal(linkGate);
+			bool isLate = compileComplete(ps, error);
+			[ps release];
+			if (isLate) { destroy(); }
+			return;
+		}
 		@synchronized (mtlDev) {
 			[mtlDev newRenderPipelineStateWithMeshDescriptor: mtlRPLDesc
 													 options: MTLPipelineOptionNone
@@ -4128,7 +4144,7 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 	});
 
 	if (mvkRuntimeTraceEnabled(getMVKConfig()) && (!mvkRuntimeReplayOnly() || !_mtlRenderPipelineState))
-		mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"pipeline-failure" : @"pipeline", @{@"kind":@"mesh",@"object":mvkTraceFunction(mtlRPLDesc.objectFunction),@"mesh":mvkTraceFunction(mtlRPLDesc.meshFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil),@"error":_compileError.localizedDescription?:@"",@"errorCode":@(_compileError.code)});
+		mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"pipeline-failure" : @"pipeline", @{@"kind":@"mesh",@"linkCreationAPI":synchronousMesh ? @"synchronous" : @"asynchronous",@"object":mvkTraceFunction(mtlRPLDesc.objectFunction),@"mesh":mvkTraceFunction(mtlRPLDesc.meshFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil),@"error":_compileError.localizedDescription?:@"",@"errorCode":@(_compileError.code)});
 	if (!_mtlRenderPipelineState && _compileError.code == 2 &&
 		[_compileError.localizedDescription containsString:@"fragment input"] && getPhysicalDevice()->isAMDHardware()) {
 		_mtlRenderPipelineState = mvkReplayFailedMesh(getMTLDevice(),mtlRPLDesc,getMVKConfig());

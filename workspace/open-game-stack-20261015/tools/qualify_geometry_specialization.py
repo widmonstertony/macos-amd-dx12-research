@@ -18,6 +18,8 @@ def main():
     ap.add_argument('--label', required=True)
     ap.add_argument('--shaders', type=Path, required=True)
     ap.add_argument('--safe-math', action='store_true')
+    ap.add_argument('--sync-mesh-libraries', action='store_true')
+    ap.add_argument('--sync-mesh-pipelines', action='store_true')
     args = ap.parse_args()
     lib, shaders = args.library.resolve(), args.shaders.resolve()
     assert lib.is_relative_to(ROOT / 'build') and lib.is_file()
@@ -40,6 +42,11 @@ def main():
                MVK_AMD_SERIALIZE_PIPELINE_LINK='1')
     if args.safe_math:
         env['MVK_AMD_SAFE_MESH_LIBRARIES'] = '1'
+    if args.sync_mesh_libraries:
+        assert args.safe_math, 'Synchronous mesh control requires conservative mesh mode'
+        env['MVK_AMD_SYNC_MESH_LIBRARIES'] = '1'
+    if args.sync_mesh_pipelines:
+        env['MVK_AMD_SYNC_MESH_PIPELINES'] = '1'
     command = [str(ROOT / 'build/probes/geometry_specialization_gpu'), str(shaders), str(out / 'output.json')]
     start = time.monotonic()
     p = subprocess.run(command, env=env, capture_output=True, text=True, timeout=35)
@@ -48,7 +55,7 @@ def main():
     result = json.loads((out / 'output.json').read_text()) if (out / 'output.json').exists() else {}
     row = {'command': command, 'exitCode': p.returncode, 'elapsedSeconds': time.monotonic() - start,
            'candidateSHA256': hashlib.sha256(lib.read_bytes()).hexdigest(), 'result': result,
-           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math,
+           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math, 'syncMeshLibraries': args.sync_mesh_libraries, 'syncMeshPipelines': args.sync_mesh_pipelines,
            'metalValidationEnabled': 'Metal API Validation Enabled' in p.stderr}
     row['passed'] = p.returncode == 0 and result.get('passed', False)
     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')

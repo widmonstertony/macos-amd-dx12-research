@@ -1,0 +1,24 @@
+{
+  "timeUTC": "2026-10-20T17:09:02.621086+00:00",
+  "nativeRegressionPassed": true,
+  "originalTencentPresentationPassed": true,
+  "deferredGameGuardPassed": true,
+  "gamePlayable": false,
+  "gameFirstPassCompilationPassed": false,
+  "runtimeRootCauseProven": false,
+  "failedMeshReplayEnabled": false,
+  "cacheDeleted": false,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-startup-api-game/libCandidate.dylib",
+    "candidateSHA256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-startup-api-game/libProbeGuard.dylib",
+    "proxySHA256": "ca8cc39271005d5ccbf52079d3e9cba29365055ce90b33b1f9bd0d4f1971993a",
+    "presentationPassed": true
+  },
+  "evidence": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/sync-mesh-pipeline-20261020/qualification.json",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T170759Z/run.json",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/startup-api-game-20261020/proxy-boundary-qualification.json"
+  ],
+  "newControl": "Diagnostic API-boundary forwarding only; identical candidate and game options; prior startup exit not classified as a shader failure"
+}

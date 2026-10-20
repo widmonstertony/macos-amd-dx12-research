@@ -1,0 +1,29 @@
+[
+  {
+    "mode": "async-parallel",
+    "exitCode": 0,
+    "elapsedSeconds": 9.987484612996923,
+    "GPUCommandsSubmitted": false,
+    "descriptorStateApproximate": true,
+    "pipelines": 36,
+    "failures": []
+  },
+  {
+    "mode": "async-link-gated",
+    "exitCode": 0,
+    "elapsedSeconds": 0.13188333000289276,
+    "GPUCommandsSubmitted": false,
+    "descriptorStateApproximate": true,
+    "pipelines": 36,
+    "failures": []
+  },
+  {
+    "mode": "sync-link-gated",
+    "exitCode": 0,
+    "elapsedSeconds": 0.12949372199364007,
+    "GPUCommandsSubmitted": false,
+    "descriptorStateApproximate": true,
+    "pipelines": 36,
+    "failures": []
+  }
+]

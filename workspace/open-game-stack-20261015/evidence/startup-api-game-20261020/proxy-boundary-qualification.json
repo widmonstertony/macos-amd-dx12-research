@@ -1,0 +1,7 @@
+{
+  "candidateSHA256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68",
+  "allNativeAPIResultsSuccessful": true,
+  "initializationReturnRecords": 16,
+  "originalWineReadbackCacheAndPresentPassed": true,
+  "originalWineEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261020T170759Z/run.json"
+}

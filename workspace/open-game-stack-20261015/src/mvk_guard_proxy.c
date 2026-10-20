@@ -11,12 +11,17 @@
 #include <strings.h>
 #include <unistd.h>
 #include <crt_externs.h>
+#ifdef MVK_GUARD_TRACE_VULKAN_STARTUP
+#define VK_NO_PROTOTYPES 1
+#include <vulkan/vulkan_core.h>
+#endif
 
 #ifdef MVK_GUARD_GAME_CONFIG_HEADER
 #include MVK_GUARD_GAME_CONFIG_HEADER
 #endif
 
 typedef void *(*get_proc_addr_fn)(void *, const char *);
+static void append_record(const char *message);
 
 /* A probe build can select a private candidate at compile time. Keeping the
  * default fixed preserves the deployed launch path and avoids replacing a
@@ -37,6 +42,35 @@ static void *candidate_symbol(const char *name) {
     return candidate ? dlsym(candidate, name) : NULL;
 }
 
+#ifdef MVK_GUARD_TRACE_VULKAN_STARTUP
+// Owned diagnostic proxy only: forward every argument/result unchanged and
+// record public API boundaries. No shader, capability, login or game changes.
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateInstance(const VkInstanceCreateInfo* info,
+        const VkAllocationCallbacks* allocator, VkInstance* instance) {
+    append_record("step=vkCreateInstance-enter");
+    PFN_vkCreateInstance function = (PFN_vkCreateInstance)candidate_symbol("vkCreateInstance");
+    VkResult result = function ? function(info, allocator, instance) : VK_ERROR_INITIALIZATION_FAILED;
+    char record[160]; snprintf(record, sizeof(record), "step=vkCreateInstance-return result=%d", result);
+    append_record(record); return result;
+}
+VKAPI_ATTR VkResult VKAPI_CALL vkEnumeratePhysicalDevices(VkInstance instance,
+        uint32_t* count, VkPhysicalDevice* devices) {
+    append_record("step=vkEnumeratePhysicalDevices-enter");
+    PFN_vkEnumeratePhysicalDevices function = (PFN_vkEnumeratePhysicalDevices)candidate_symbol("vkEnumeratePhysicalDevices");
+    VkResult result = function ? function(instance, count, devices) : VK_ERROR_INITIALIZATION_FAILED;
+    char record[160]; snprintf(record, sizeof(record), "step=vkEnumeratePhysicalDevices-return result=%d", result);
+    append_record(record); return result;
+}
+VKAPI_ATTR VkResult VKAPI_CALL vkCreateDevice(VkPhysicalDevice physical,
+        const VkDeviceCreateInfo* info, const VkAllocationCallbacks* allocator, VkDevice* device) {
+    append_record("step=vkCreateDevice-enter");
+    PFN_vkCreateDevice function = (PFN_vkCreateDevice)candidate_symbol("vkCreateDevice");
+    VkResult result = function ? function(physical, info, allocator, device) : VK_ERROR_INITIALIZATION_FAILED;
+    char record[160]; snprintf(record, sizeof(record), "step=vkCreateDevice-return result=%d", result);
+    append_record(record); return result;
+}
+#endif
+
 // Wine's macOS Vulkan thunk resolves these two dispatcher exports directly.
 // Explicit trampolines keep that lookup reliable even when dyld treats the
 // re-export dependency as local to this proxy's dlopen handle.
@@ -44,7 +78,15 @@ __attribute__((visibility("default")))
 void *vkGetInstanceProcAddr(void *instance, const char *name) {
     static get_proc_addr_fn function;
     if (!function) function = (get_proc_addr_fn)candidate_symbol("vkGetInstanceProcAddr");
-    return function ? function(instance, name) : NULL;
+    void* resolved = function ? function(instance, name) : NULL;
+#ifdef MVK_GUARD_TRACE_VULKAN_STARTUP
+    if (resolved && name) {
+        if (!strcmp(name, "vkCreateInstance")) return (void*)&vkCreateInstance;
+        if (!strcmp(name, "vkEnumeratePhysicalDevices")) return (void*)&vkEnumeratePhysicalDevices;
+        if (!strcmp(name, "vkCreateDevice")) return (void*)&vkCreateDevice;
+    }
+#endif
+    return resolved;
 }
 
 __attribute__((visibility("default")))

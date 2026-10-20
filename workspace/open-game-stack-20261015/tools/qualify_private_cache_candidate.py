@@ -31,6 +31,8 @@ def main():
     parser.add_argument('--replay-only', action='store_true')
     parser.add_argument('--fresh-mesh-libraries', action='store_true')
     parser.add_argument('--safe-mesh-libraries', action='store_true')
+    parser.add_argument('--sync-mesh-libraries', action='store_true')
+    parser.add_argument('--sync-mesh-pipelines',action='store_true')
     parser.add_argument('--disable-mesh-replay', action='store_true')
     parser.add_argument('--gpu-timeout-trace', action='store_true')
     parser.add_argument('--specialized-queues', action='store_true')
@@ -71,6 +73,10 @@ def main():
     if args.safe_mesh_libraries:
         if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
         env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
+    if args.sync_mesh_libraries:
+        if not args.safe_mesh_libraries:parser.error('--sync-mesh-libraries requires safe mesh libraries')
+        env['MVK_AMD_SYNC_MESH_LIBRARIES']='1'
+    if args.sync_mesh_pipelines:env['MVK_AMD_SYNC_MESH_PIPELINES']='1'
     if args.disable_mesh_replay:env.pop('MVK_AMD_REPLAY_FAILED_MESH', None)
     if args.render_shards:
         env.pop('MVK_AMD_RENDER_BINARY_ARCHIVE_PATH', None)

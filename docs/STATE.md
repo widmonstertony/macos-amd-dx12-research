@@ -1,3 +1,6 @@
+> 最新核对（2026-10-20 10:13 PDT）：游戏仍未修好。最新实机在同步库与同步管线创建下仍有 2 次 mesh/fragment locn2 链接失败并显示显存错误；初始化 API 返回成功不能替代编译或可玩验收。所有失败候选均为研究快照，不是可玩推荐版本。
+> Latest: the game remains unplayable. Synchronous library and mesh-pipeline creation did not eliminate two initial locn2 link failures. Native device creation succeeds; actual VRAM exhaustion is unproven. Failed candidates are research checkpoints.
+
 # 保存时的真实状态
 
 2026-10-20，Intel / AMD Radeon Pro 5600M，macOS 26.7.1。
@@ -116,3 +119,24 @@ Compilation audit found no unrecovered pipeline-creation failure in the observed
 这些源码、测试和精确候选运行库已存入附加快照 `runtime-first-pass-controls-20261020.tar.gz`；它们是**失败试验及研究恢复材料**，不是推荐给用户的可玩版本。游戏派生源码、SPIR-V、原始转储和用户截图未发布。历史下载版 v0.1.0 保持诊断基线。
 
 The user confirmed the previous run entered a controllable scene with unusably low performance. New fresh-function and conservative-math controls passed owned GPU readback tests, but **all three normal-Steam trials failed initial mesh linkage** (4, 2, and 2 errors). The last proxy explicitly enables mesh-link serialization; this did not eliminate the failure. The generic out-of-video-memory dialog does not establish physical VRAM exhaustion. Exact failed source/options link successfully in isolated controls, so the runtime cause remains unproven. Failed candidates and tests are preserved for recovery, not promoted as a playable release. Caches, saves, original Steam and the YYB engine are preserved. No game is currently running.
+
+
+## 同步 API 对照失败，补齐初始化边界证据（2026-10-20 10:13 本地）
+
+没有根据猜测删除缓存、改游戏着色器逻辑或修改闭源驱动。隔离对照继续未复现本轮错误：历史 35 条并发序列全部链接；加入本轮完整来源后，36 条同步/异步库与门控对照均链接；另在 128 次混合链接中查询实际 functionConstantsDictionary，三个阶段均为 0 常量且全部链接。**这些阴性结果不证明根因已修复**，因此没有基于常量查询猜测去跳过特化处理。
+
+新增默认关闭的两个 API 对照：`MVK_AMD_SYNC_MESH_LIBRARIES` 仅作用于已有保守 AMD geometry 链，`MVK_AMD_SYNC_MESH_PIPELINES` 仅切换 AMD mesh 管线的公开同步创建 API。参数、完整描述符、特化值、原生返回结果和原有超时/延迟销毁契约保留；阻塞驱动调用不占用设备共享监视锁。编译失败重放继续关闭，不把重试恢复当作初次成功。
+
+候选 `fa163dc9fc8216d1e9bce6e7a1fb69531447ec2cfec79829e5646e9b16db7a61`（仅同步库）：普通几何和特化测试各 8 次绘制、512 像素、0 差异；实际来源确认 24 个函数走同步库创建，Metal Validation 开启；原 Wine 计算/严格缓存/呈现通过。实机 PID18527 仍出现 2 次相同 locn2 链接错误并退出，**试验失败**。
+
+候选 `5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68`（同步库与管线）：两组 GPU 输出各 512 像素 0 差异，逐项确认各 8 条实际同步 mesh 链接，原 Wine 回归通过。首次实机 PID19392 在着色器记录产生前无提示退出，用户确认不是手动关闭；Steam 记录退出码 0x80000101，具体退出点未确定，不能归因为 mesh 编译、Wine 断言或 DRM。
+
+为定位该早退，新增编译期选择的自建代理诊断：只包装 Vulkan 实例、物理设备枚举与设备创建边界，原样转发全部参数及实际返回值。不读取凭据，不改能力位。新代理在原 Wine 的实际 GPU 读回、33 条严格计算命中、5 条严格图形命中和呈现均通过，并核对 16 条初始化返回为真实 VK_SUCCESS。
+
+同一候选带边界日志经原 Steam 启动 PID21119，实际映射与原资产写保护核实：2 次设备创建都返回 VK_SUCCESS，随后仍有 2 次 locn2 链接失败，错误记录明确显示三阶段库创建与管线链接均为同步。用户再次提供显存不足弹窗。**同步/异步 API 选择不是充分修复条件；没有达到编译无错误，更没有通过场景帧率验收。**
+
+系统盘检查仅约 5.3 GiB 可用、物理内存聚合空闲约 76%；这不能代替独立显存预算测量，也未证明磁盘或物理显存耗尽导致本次链接错误。未删除用户数据、缓存或原始失败材料。后续应找到运行时函数生成与成功完整源码重建之间可复现的差异，再更改行为；不继续相同配置反复启动。
+
+源码与精确失败试验运行库保存到 `runtime-sync-mesh-api-controls-20261020.tar.gz`。新代理宏需使用已固定 Vulkan-Headers include；默认代理行为不启用边界包装。两个 API 对照开关默认关闭。实验二进制不是新可玩发布，v0.1.0 历史下载基线没有被替换。
+
+The synchronous-library candidate passed both owned GPU output tests and original-Wine strict cache/presentation regressions, but its game trial still failed twice. The synchronous-library-plus-pipeline candidate also passed real GPU output and exact API-provenance checks. One game trial exited before shader tracing; a separately qualified, argument-preserving startup-boundary proxy then established that native instance/device creation succeeded before the same two mesh linkage errors. The user again observed the out-of-video-memory dialog. **Neither API selection nor these microtests fixes or validates the game.** Constant-reflection and mixed-link controls did not reproduce the runtime fault, so no speculative specialization bypass was introduced. Source, exact binaries and failures remain recoverable; caches, saves, original Wine/Steam and proprietary drivers are preserved.

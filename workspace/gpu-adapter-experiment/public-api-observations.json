@@ -1,4 +1,70 @@
 {
+  "current_checkpoint_20261020_sync_library_and_pipeline_failed": {
+    "timeUTC": "2026-10-20T17:12:42.549031+00:00",
+    "gamePID": 21119,
+    "candidateSHA256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68",
+    "userReport": "Out of video memory",
+    "normalSteamLaunchVerified": true,
+    "initialNativeDeviceCreationReturnRecords": [
+      "pid=21119 ppid=1 step=vkCreateDevice-return result=0",
+      "pid=21119 ppid=1 step=vkCreateDevice-return result=0"
+    ],
+    "nativeDevicesCreatedSuccessfully": 2,
+    "actualSynchronousLibraryAndPipelineVerified": true,
+    "firstPassCompilationPassed": false,
+    "gamePlayable": false,
+    "initialLinkFailures": 2,
+    "failureMessages": [
+      "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+      "Link failed: fragment input user(locn2) was not found in vertex shader outputs"
+    ],
+    "physicalVRAMExhaustionProven": false,
+    "replayEnabled": false,
+    "cachesDeleted": false,
+    "runtimeRootCauseProven": false,
+    "next": "Stop changing API/math/scheduling switches without a reproducible discriminator. Preserve both startup failure and mesh failure. Compare actual MTLFunction acquisition with successful complete source rebuild, using isolated controls before another game trial."
+  },
+  "current_checkpoint_20261020_sync_pipeline_startup_exit": {
+    "timeUTC": "2026-10-20T17:05:48.640405+00:00",
+    "gamePID": 19392,
+    "candidateSHA256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68",
+    "normalSteamLaunchVerified": true,
+    "gameExited": true,
+    "userReport": "Exited without popup, not manually closed",
+    "windowsExitCode": "0x80000101",
+    "shaderTraceFiles": 0,
+    "firstPassCompilationPassed": false,
+    "gamePlayable": false,
+    "nativeAndOriginalWineQualificationPassed": true,
+    "runtimeMeshLinkFixVerified": false,
+    "stage": "Startup before any captured shader trace; exact exit site unknown",
+    "rawGameLaunchEvidence": "evidence/tencent-normal-game-deferred-20261020T170201Z/launch.json",
+    "cachesDeleted": false,
+    "systemDiskFreeGiBAtInspection": 5.3,
+    "diskOrPhysicalVRAMExhaustionCausalProven": false,
+    "next": "Do not relaunch unchanged. Locate startup exit from existing logs/module boundaries; preserve separate earlier locn2 failures. No DRM or protection bypass."
+  },
+  "current_checkpoint_20261020_sync_library_trial": {
+    "timeUTC": "2026-10-20T16:58:17.574415+00:00",
+    "gamePID": 18527,
+    "candidateSHA256": "fa163dc9fc8216d1e9bce6e7a1fb69531447ec2cfec79829e5646e9b16db7a61",
+    "normalSteamLaunchVerified": true,
+    "recordCounts": {
+      "trace-compute-map": 97,
+      "trace-render-archive": 520,
+      "trace-compute-archive": 93,
+      "trace-present-progress": 6,
+      "trace-fresh-mesh-function": 97,
+      "trace-queue-config": 6,
+      "trace-pipeline-failure": 2
+    },
+    "firstPassLinkFailures": 2,
+    "actualSynchronousFreshFunctions": 97,
+    "gamePlayable": false,
+    "firstPassCompilationPassed": false,
+    "cacheDeleted": false,
+    "next": "Observe actual new game compile records without failed-link replay. Preserve errors if they recur; no success claim until full compilation and scene operation verified."
+  },
   "current_checkpoint_20261020_safe_mesh_serialized_failed": {
     "timeUTC": "2026-10-20T16:45:13.363524+00:00",
     "gamePID": 15420,

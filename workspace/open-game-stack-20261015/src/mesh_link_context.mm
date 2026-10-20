@@ -39,6 +39,8 @@ int main(int argc, const char** argv) { @autoreleasepool {
         options.preserveInvariance = [provenance[@"preserveInvariance"] boolValue];
         id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
         id<MTLFunction> f = [library newFunctionWithName:item[@"entry"]];
+        if ([mode isEqualToString:@"constant-reflection"] && f)
+            fprintf(stderr,"constant-count=%lu\n",(unsigned long)f.functionConstantsDictionary.count);
         [library release]; [options release];
         if (!f) { fprintf(stderr,"%s\n",error.localizedDescription.UTF8String); return 7; }
         [meshFunctions addObject:f]; [f release];

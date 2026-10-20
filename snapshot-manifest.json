@@ -340,8 +340,8 @@
     },
     {
       "path": "gpu-adapter-experiment/public-api-observations.json",
-      "bytes": 398858,
-      "sha256": "278cf2e96bef98475dea07c045525e0dd1991772642f0db26750910e07e6eba8",
+      "bytes": 402114,
+      "sha256": "45536ad618f6e6512b7366551a530b324752e4e063b08ed2cc54aa7b7f200848",
       "executable": false
     },
     {
@@ -759,9 +759,27 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/mesh-context-repro-20261020/constant-reflection-run.json",
+      "bytes": 274,
+      "sha256": "5a21dedfdf5ad86bd38242aa5c01e132b6343cf3344ee37f9d248d21ffd729b3",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/mesh-context-repro-20261020/context-run.json",
       "bytes": 537,
       "sha256": "3bd6e3a7985a2817e10543d0845c68d0e267d6654242d0b4b8bd3d8bd3d03fcf",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/mesh-context-repro-20261020/historical-sequence-run.json",
+      "bytes": 166,
+      "sha256": "10d81bd9df67d56e77f4bc3e1b472c205533fb02399beebc964e93558a866e6e",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/mesh-context-repro-20261020/library-context-run.json",
+      "bytes": 652,
+      "sha256": "bdc8489c711fd974712cc3838820f7c6c848062f3e275aa9b64ec3ed29d7bf65",
       "executable": false
     },
     {
@@ -858,6 +876,24 @@
       "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T163335Z/run.json",
       "bytes": 52952,
       "sha256": "632c8c8e360e60eeb13fd94111c8714abdc1df9f0e68c30a462b5a6079f08eec",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T165609Z/run.json",
+      "bytes": 52973,
+      "sha256": "7dad0b5ffb0f76825fec772186ef502b64171a90494f1ea6bd5c133c868f081c",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T170101Z/run.json",
+      "bytes": 52963,
+      "sha256": "a549127fcab8d8a5ce54c17e05e112796cadd87df7eb646a4d15eaaeb77539ba",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/private-cache-wine-20261020T170759Z/run.json",
+      "bytes": 52949,
+      "sha256": "f14e23e771480cc9845c9ab9a0c0b2ee4dbddad536f66264cc1b9b323868e368",
       "executable": false
     },
     {
@@ -1095,6 +1131,30 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/startup-api-game-20261020/failure-summary.json",
+      "bytes": 1197,
+      "sha256": "b3b44f18b38a949c969d570c23f9acd669b09e602bd60c15eaadf62f8461058d",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/startup-api-game-20261020/game-trial-config.h",
+      "bytes": 1915,
+      "sha256": "7712ad23294b7c11652e367f09e837e2935f2de5184febc63ab3dd2f22a907dc",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/startup-api-game-20261020/launch-proof.json",
+      "bytes": 1498,
+      "sha256": "94a06a4edf8a0da7fc7fa005c902fb361db14b1f25f2ca2474b9c34fbd2bb825",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/startup-api-game-20261020/proxy-boundary-qualification.json",
+      "bytes": 392,
+      "sha256": "fbba574002c97ca9f2f043697d7c07e90110d5800fc93509fad97cbf6b0b600c",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/support-cache-game-20261020/compile-audit-final.json",
       "bytes": 1315,
       "sha256": "9927bdeed6779dbcbd953f3255a4aea6d4bf250b78be35a7aa3dd858ebfd03c1",
@@ -1140,6 +1200,66 @@
       "path": "open-game-stack-20261015/evidence/support-function-cache-20261020/checkpoint.json",
       "bytes": 2009,
       "sha256": "012f71753af16783ecba73f0025ab290f0f9b5044480c6be5c4d3a8ec787186f",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-geometry/run.json",
+      "bytes": 1643,
+      "sha256": "c19599d0c1b9852da3b2a43adc7acc8ef158bae3d92da3b07362d6263c770339",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-library-20261020/failure-summary.json",
+      "bytes": 8819,
+      "sha256": "d2161f7b66cc4bd6296e79830ea0591bee23d222a4083df407467bec438330bc",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-library-20261020/game-trial-config.h",
+      "bytes": 1853,
+      "sha256": "77c91fe7612e491038f03da8476b08bdc885adc09d7013f4db19c56672ecac52",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-library-20261020/native-qualification.json",
+      "bytes": 999,
+      "sha256": "a715e3dc137c6aaa08a873b0939eae2d3c16a94db944bd838aa853134b7b0a84",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-pipeline-20261020/failure-summary.json",
+      "bytes": 961,
+      "sha256": "0d5308a6f0fb557b784b050406e4dcc6cfeb2a8d1c89778465eb7a00957a4678",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-pipeline-20261020/game-trial-config.h",
+      "bytes": 1921,
+      "sha256": "8ff804ca7ea64567ff057f95e90ce2c96e39c26fd1c4c6ed1e80d0e3b882cc9c",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-pipeline-20261020/qualification.json",
+      "bytes": 1200,
+      "sha256": "fd4f716483926d4fae08d9f6a6b4f2367ed96b14512cde762a7627939de2b706",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-pipeline-geometry/run.json",
+      "bytes": 1681,
+      "sha256": "2673e3941ae5012666e9b36b90d74c4a4570e75f216a23802ee013a8c0d68a58",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-pipeline-specialization/run.json",
+      "bytes": 962,
+      "sha256": "e313eea9a08a6e33e91c3d1dc8389a50ffda67a1b7a257e0382ce6cb9669de79",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sync-mesh-specialization/run.json",
+      "bytes": 924,
+      "sha256": "675c3d374c5f76861df0657ec12a29a586a11193076126a5fac1106db04a5c9f",
       "executable": false
     },
     {
@@ -2104,8 +2224,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm",
-      "bytes": 216110,
-      "sha256": "b81c8dd23e1d20f557479c5ede426f00cd710de248857a153d5cf1ff3cce07f0",
+      "bytes": 216991,
+      "sha256": "38d598908b2ea553eeb2e60f2d067b1c16346060deaeff3f3b7ff6004b8d060a",
       "executable": false
     },
     {
@@ -2206,8 +2326,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm",
-      "bytes": 42222,
-      "sha256": "fb0e6316d217e0792d41e914587566b73eb456b82c13399171835616cdad769f",
+      "bytes": 43741,
+      "sha256": "65573a2e5bb9a6757ac8a9ec9dbd5c5931eef86d537d77b526d547ae206bc52c",
       "executable": false
     },
     {
@@ -33490,8 +33610,8 @@
     },
     {
       "path": "open-game-stack-20261015/run_gpu.py",
-      "bytes": 12982,
-      "sha256": "ce864fbd66746e9aec24fdf15b412b9839fbe3ba2bf60473a0c9346e8e280134",
+      "bytes": 13460,
+      "sha256": "52794723b83ae25e7fa6f9346e4f9694ec2c3c98c50b0a3e61c64af2ace5a1e1",
       "executable": false
     },
     {
@@ -33651,9 +33771,15 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/mesh_library_context.mm",
+      "bytes": 5466,
+      "sha256": "689e3208b28b9d8f72e8b0a577d2da35cf4c4e0bef5cc55492543c8f75c23f2b",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/mesh_link_context.mm",
-      "bytes": 7655,
-      "sha256": "896e0bc824e8da397f599a15a1f7118608a3fa84299a288057dd0c2c87b80093",
+      "bytes": 7822,
+      "sha256": "39060327a6b61413e1f3140e6423d4c1e4340382525ad267f1afcf4aee484455",
       "executable": false
     },
     {
@@ -33670,8 +33796,8 @@
     },
     {
       "path": "open-game-stack-20261015/src/mvk_guard_proxy.c",
-      "bytes": 4680,
-      "sha256": "64998c75cbb0a5880bd29e851785a7c7a7e968207a3d0d834cbb19b6eb8898d2",
+      "bytes": 7103,
+      "sha256": "17b015831306f52a02cefc951fcd7a71d8a0c1668be10e3e6e24e3e032c4ff68",
       "executable": false
     },
     {
@@ -33910,8 +34036,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_geometry_specialization.py",
-      "bytes": 2889,
-      "sha256": "17e53992c01e9ce7e8b27ef5d18a7d70a8fa89ea3dec91b680b463ee04b0982f",
+      "bytes": 3369,
+      "sha256": "ab57de67cf8b6bf0ed0ea1ff0f756bf001ad854d3890ae609c957ba32ea6897d",
       "executable": false
     },
     {
@@ -33922,8 +34048,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "bytes": 9761,
-      "sha256": "c4f6c3672728faa7281035af89d2b5e26cdb5556d7cff5729d5bd2ac124472d4",
+      "bytes": 10158,
+      "sha256": "3147cb8973f9babb6a21e577ffde97c50e62ad22f2ed3dc803d25bce35bd01ce",
       "executable": false
     },
     {
@@ -69031,8 +69157,104 @@
           "sha256": "22f9dc3ceb289e606eff8dc7fa8f1b4a7de048af94afc47a0d42e99bca157411"
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-sync-mesh-api-controls-20261020.tar.gz",
+      "sha256": "472f4b91b842237aff8008dbea611be387d2f9224e589b750b3689603a68e920",
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-probe/libCandidate.dylib",
+          "bytes": 5964128,
+          "sha256": "fa163dc9fc8216d1e9bce6e7a1fb69531447ec2cfec79829e5646e9b16db7a61"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-probe/libProbeGuard.dylib",
+          "bytes": 28128,
+          "sha256": "f5525ff1996e6c6fd4ae14123d5ee66670f8b5e7a7de68cb7204477648b722f8"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-probe/build.json",
+          "bytes": 937,
+          "sha256": "4332d49f4d4812b697928263ff95966c84f1090070999ccd422c21a1abcdc790"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-game/libCandidate.dylib",
+          "bytes": 5964128,
+          "sha256": "fa163dc9fc8216d1e9bce6e7a1fb69531447ec2cfec79829e5646e9b16db7a61"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-game/libProbeGuard.dylib",
+          "bytes": 32352,
+          "sha256": "50b0dbe18012481e8605402f7089d83440482248bea3530eb2116f22ea4e2977"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-game/build.json",
+          "bytes": 1096,
+          "sha256": "17545bd3bee7193c9238be6e630cd172e381cfb4f109eabd388367dd9715c1ff"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-pipeline-probe/libCandidate.dylib",
+          "bytes": 5964128,
+          "sha256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-pipeline-probe/libProbeGuard.dylib",
+          "bytes": 28128,
+          "sha256": "a99182c40fa61ea2be8fc8fe708b06fe920dce81ed992872cbca07628a62dd98"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-pipeline-probe/build.json",
+          "bytes": 952,
+          "sha256": "85397a8ecab0898287496e44688f8a15705aeec9a220a6f1fd69c99a235a3a60"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-pipeline-game/libCandidate.dylib",
+          "bytes": 5964128,
+          "sha256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-pipeline-game/libProbeGuard.dylib",
+          "bytes": 32352,
+          "sha256": "def508144587e06a083dc2b524f730ab944e82a0b810cadc34e8cac8c9a6bb2e"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-sync-mesh-pipeline-game/build.json",
+          "bytes": 1133,
+          "sha256": "86184edc53099c94882fe97ec3038c5070bfab978daf12ed3efc720b2776917b"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-startup-api-probe/libCandidate.dylib",
+          "bytes": 5964128,
+          "sha256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-startup-api-probe/libProbeGuard.dylib",
+          "bytes": 32656,
+          "sha256": "0f74b474abfd8d352cdac2d86f2b54da85490ca8c40c47b5419c24d51f5fd881"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-startup-api-probe/build.json",
+          "bytes": 1139,
+          "sha256": "60d4a3ee7359b801258dd55cbfa912bc17d7d58e90b77aa446ab9f962eb31d09"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-startup-api-game/libCandidate.dylib",
+          "bytes": 5964128,
+          "sha256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-startup-api-game/libProbeGuard.dylib",
+          "bytes": 32752,
+          "sha256": "ca8cc39271005d5ccbf52079d3e9cba29365055ce90b33b1f9bd0d4f1971993a"
+        },
+        {
+          "path": "open-game-stack-20261015/build/mvk-startup-api-game/build.json",
+          "bytes": 1318,
+          "sha256": "8e8526e05b6415a7c954738fc7a934b927052120af56903faae25a2207255a8e"
+        }
+      ]
     }
   ],
-  "updatedUTC": "2026-10-20T16:48:51.504305+00:00",
+  "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Live support-cache candidate retained; compilation audit matches all 50 intermediate mesh failures to real successful recovery. Prospective qualified compiler provenance/presentation-filter diagnostics are saved but NOT deployed. Initial mesh-link root cause and sustained playability unresolved."
 }

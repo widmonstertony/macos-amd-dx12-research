@@ -703,9 +703,13 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
                                                      bool conservativeMeshLibrary) {
 	unique_lock<mutex> lock(_completionLock);
 	_mslSourceCode = mslSourceCode;		// For logMSLSource(), from handleError() within compile().
+	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_LIBRARIES");
+	bool synchronousMesh = conservativeMeshLibrary && syncOption && !strcmp(syncOption, "1");
 
 	compile(lock, ^{
 		auto mtlDev = getMTLDevice();
+		MTLCompileOptions* synchronousOptions = nil;
+		NSDictionary* synchronousProvenance = nil;
 		@synchronized (mtlDev) {
 			@autoreleasepool {
 				auto mtlCompileOptions = getDevice()->getMTLCompileOptions(shaderConversionResults.entryPoint.fpFastMathFlags,
@@ -736,7 +740,20 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 				}
 				logCompilation(mtlCompileOptions);
                 NSDictionary* provenance = mvkCompileProvenance(mslSourceCode, mtlCompileOptions);
+				if (provenance) {
+					NSMutableDictionary* detail = [[provenance mutableCopy] autorelease];
+					detail[@"libraryCreationAPI"] = synchronousMesh ? @"synchronous" : @"asynchronous";
+					provenance = detail;
+				}
 
+				if (synchronousMesh) {
+					// Match the public API used by successful diagnostic source
+					// rebuilds, without disk replay or a hidden retry. Keep source,
+					// macros, entry and specialization semantics unchanged. Compile
+					// outside the device monitor so unrelated requests can proceed.
+					synchronousOptions = [mtlCompileOptions retain];
+					synchronousProvenance = [provenance retain];
+				} else {
 				[mtlDev newLibraryWithSource: mslSourceCode
 									options: mtlCompileOptions
 						completionHandler: ^(id<MTLLibrary> mtlLib, NSError* error) {
@@ -744,7 +761,21 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 							bool isLate = compileComplete(mtlLib, error);
 							if (isLate) { destroy(); }
 						}];
+				}
 			}
+		}
+		if (synchronousOptions) {
+			NSError* error = nil;
+			id<MTLLibrary> library = [mtlDev newLibraryWithSource:mslSourceCode options:synchronousOptions error:&error];
+			if (library && synchronousProvenance)
+				objc_setAssociatedObject(library, mvkCompileProvenanceKey(), synchronousProvenance, OBJC_ASSOCIATION_COPY);
+			bool isLate = compileComplete(library, error);
+			[library release];
+			[synchronousOptions release];
+			[synchronousProvenance release];
+			// The existing timeout/deferred-destroy contract also applies to
+			// this blocking native call on the compiler's worker queue.
+			if (isLate) { destroy(); }
 		}
 	});
 	_mslSourceCode = nil;

@@ -1,0 +1,13 @@
+{
+  "exitCode": 0,
+  "elapsedSeconds": 1.328581295994809,
+  "requests": 128,
+  "failures": 0,
+  "GPUWorkDispatched": false,
+  "runtimeFailureReproduced": false,
+  "actualFunctionConstantCounts": [
+    "constant-count=0",
+    "constant-count=0",
+    "constant-count=0"
+  ]
+}

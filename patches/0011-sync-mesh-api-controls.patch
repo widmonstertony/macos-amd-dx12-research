@@ -1,0 +1,374 @@
+--- a/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm
++++ b/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm
+@@ -703,9 +703,13 @@
+                                                      bool conservativeMeshLibrary) {
+ 	unique_lock<mutex> lock(_completionLock);
+ 	_mslSourceCode = mslSourceCode;		// For logMSLSource(), from handleError() within compile().
++	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_LIBRARIES");
++	bool synchronousMesh = conservativeMeshLibrary && syncOption && !strcmp(syncOption, "1");
+ 
+ 	compile(lock, ^{
+ 		auto mtlDev = getMTLDevice();
++		MTLCompileOptions* synchronousOptions = nil;
++		NSDictionary* synchronousProvenance = nil;
+ 		@synchronized (mtlDev) {
+ 			@autoreleasepool {
+ 				auto mtlCompileOptions = getDevice()->getMTLCompileOptions(shaderConversionResults.entryPoint.fpFastMathFlags,
+@@ -736,7 +740,20 @@
+ 				}
+ 				logCompilation(mtlCompileOptions);
+                 NSDictionary* provenance = mvkCompileProvenance(mslSourceCode, mtlCompileOptions);
+-
++				if (provenance) {
++					NSMutableDictionary* detail = [[provenance mutableCopy] autorelease];
++					detail[@"libraryCreationAPI"] = synchronousMesh ? @"synchronous" : @"asynchronous";
++					provenance = detail;
++				}
++
++				if (synchronousMesh) {
++					// Match the public API used by successful diagnostic source
++					// rebuilds, without disk replay or a hidden retry. Keep source,
++					// macros, entry and specialization semantics unchanged. Compile
++					// outside the device monitor so unrelated requests can proceed.
++					synchronousOptions = [mtlCompileOptions retain];
++					synchronousProvenance = [provenance retain];
++				} else {
+ 				[mtlDev newLibraryWithSource: mslSourceCode
+ 									options: mtlCompileOptions
+ 						completionHandler: ^(id<MTLLibrary> mtlLib, NSError* error) {
+@@ -744,7 +761,21 @@
+ 							bool isLate = compileComplete(mtlLib, error);
+ 							if (isLate) { destroy(); }
+ 						}];
+-			}
++				}
++			}
++		}
++		if (synchronousOptions) {
++			NSError* error = nil;
++			id<MTLLibrary> library = [mtlDev newLibraryWithSource:mslSourceCode options:synchronousOptions error:&error];
++			if (library && synchronousProvenance)
++				objc_setAssociatedObject(library, mvkCompileProvenanceKey(), synchronousProvenance, OBJC_ASSOCIATION_COPY);
++			bool isLate = compileComplete(library, error);
++			[library release];
++			[synchronousOptions release];
++			[synchronousProvenance release];
++			// The existing timeout/deferred-destroy contract also applies to
++			// this blocking native call on the compiler's worker queue.
++			if (isLate) { destroy(); }
+ 		}
+ 	});
+ 	_mslSourceCode = nil;
+--- a/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm
++++ b/open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm
+@@ -4105,6 +4105,8 @@
+ #if MVK_XCODE_14
+ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLMeshRenderPipelineDescriptor* mtlRPLDesc) {
+     if (mvkGPUTimeoutTraceEnabled()) mtlRPLDesc.label = [NSString stringWithFormat:@"obj=%@;mesh=%@;fs=%@", mtlRPLDesc.objectFunction.label ?: @"", mtlRPLDesc.meshFunction.label ?: @"", mtlRPLDesc.fragmentFunction.label ?: @""];
++	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_PIPELINES");
++	bool synchronousMesh = getPhysicalDevice()->isAMDHardware() && syncOption && !strcmp(syncOption, "1");
+ 
+ 	unique_lock<mutex> lock(_completionLock);
+ 	VkResult previousResult = _owner->getConfigurationResult();
+@@ -4116,6 +4118,20 @@
+ 		// Keep mesh submissions serialized through their completion callback.
+ 		dispatch_semaphore_t linkGate = mvkGetPipelineLinkGate(getPhysicalDevice()->isAMDHardware());
+ 		if (linkGate) dispatch_semaphore_wait(linkGate,DISPATCH_TIME_FOREVER);
++		if (synchronousMesh) {
++			// Public API control matching the successful diagnostic rebuild.
++			// Preserve the complete descriptor, native result and timeout;
++			// this is a first attempt, not a retry or a fabricated success.
++			// Do not hold the device monitor across a blocking driver call.
++			NSError* error = nil;
++			id<MTLRenderPipelineState> ps = [mtlDev newRenderPipelineStateWithMeshDescriptor:mtlRPLDesc
++				options:MTLPipelineOptionNone reflection:nil error:&error];
++			if (linkGate) dispatch_semaphore_signal(linkGate);
++			bool isLate = compileComplete(ps, error);
++			[ps release];
++			if (isLate) { destroy(); }
++			return;
++		}
+ 		@synchronized (mtlDev) {
+ 			[mtlDev newRenderPipelineStateWithMeshDescriptor: mtlRPLDesc
+ 													 options: MTLPipelineOptionNone
+@@ -4128,7 +4144,7 @@
+ 	});
+ 
+ 	if (mvkRuntimeTraceEnabled(getMVKConfig()) && (!mvkRuntimeReplayOnly() || !_mtlRenderPipelineState))
+-		mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"pipeline-failure" : @"pipeline", @{@"kind":@"mesh",@"object":mvkTraceFunction(mtlRPLDesc.objectFunction),@"mesh":mvkTraceFunction(mtlRPLDesc.meshFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil),@"error":_compileError.localizedDescription?:@"",@"errorCode":@(_compileError.code)});
++		mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"pipeline-failure" : @"pipeline", @{@"kind":@"mesh",@"linkCreationAPI":synchronousMesh ? @"synchronous" : @"asynchronous",@"object":mvkTraceFunction(mtlRPLDesc.objectFunction),@"mesh":mvkTraceFunction(mtlRPLDesc.meshFunction),@"fragment":mvkTraceFunction(mtlRPLDesc.fragmentFunction),@"descriptor":mtlRPLDesc.description?:@"",@"created":@(_mtlRenderPipelineState!=nil),@"error":_compileError.localizedDescription?:@"",@"errorCode":@(_compileError.code)});
+ 	if (!_mtlRenderPipelineState && _compileError.code == 2 &&
+ 		[_compileError.localizedDescription containsString:@"fragment input"] && getPhysicalDevice()->isAMDHardware()) {
+ 		_mtlRenderPipelineState = mvkReplayFailedMesh(getMTLDevice(),mtlRPLDesc,getMVKConfig());
+--- a/open-game-stack-20261015/run_gpu.py
++++ b/open-game-stack-20261015/run_gpu.py
+@@ -12,6 +12,8 @@
+ parser.add_argument('--specialized-queues',action='store_true')
+ parser.add_argument('--fresh-mesh-libraries',action='store_true')
+ parser.add_argument('--safe-mesh-libraries',action='store_true')
++parser.add_argument('--sync-mesh-libraries',action='store_true')
++parser.add_argument('--sync-mesh-pipelines',action='store_true')
+ parser.add_argument('--replay-only',action='store_true')
+ parser.add_argument('--replay-failed-mesh',action='store_true')
+ parser.add_argument('--serialize-pipeline-link',action='store_true')
+@@ -56,6 +58,10 @@
+ if args.safe_mesh_libraries:
+     if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
+     env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
++if args.sync_mesh_libraries:
++    if not args.safe_mesh_libraries:parser.error('--sync-mesh-libraries requires safe mesh libraries')
++    env['MVK_AMD_SYNC_MESH_LIBRARIES']='1'
++if args.sync_mesh_pipelines:env['MVK_AMD_SYNC_MESH_PIPELINES']='1'
+ if args.replay_only:
+     if not args.runtime_trace or not args.replay_failed_mesh:parser.error('--replay-only requires runtime trace and mesh replay')
+     env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
+@@ -141,6 +147,8 @@
+ record['specializedQueues']=args.specialized_queues
+ record['freshMeshLibraries']=args.fresh_mesh_libraries
+ record['safeMeshLibraries']=args.safe_mesh_libraries
++record['syncMeshLibraries']=args.sync_mesh_libraries
++record['syncMeshPipelines']=args.sync_mesh_pipelines
+ record['failedMeshReplayEnabled']=args.replay_failed_mesh
+ record['gpuTimeoutTrace']=args.gpu_timeout_trace
+ record['liveLookupFastCache']=args.live_lookup_fast_cache
+--- a/open-game-stack-20261015/tools/qualify_private_cache_candidate.py
++++ b/open-game-stack-20261015/tools/qualify_private_cache_candidate.py
+@@ -31,6 +31,8 @@
+     parser.add_argument('--replay-only', action='store_true')
+     parser.add_argument('--fresh-mesh-libraries', action='store_true')
+     parser.add_argument('--safe-mesh-libraries', action='store_true')
++    parser.add_argument('--sync-mesh-libraries', action='store_true')
++    parser.add_argument('--sync-mesh-pipelines',action='store_true')
+     parser.add_argument('--disable-mesh-replay', action='store_true')
+     parser.add_argument('--gpu-timeout-trace', action='store_true')
+     parser.add_argument('--specialized-queues', action='store_true')
+@@ -71,6 +73,10 @@
+     if args.safe_mesh_libraries:
+         if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
+         env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
++    if args.sync_mesh_libraries:
++        if not args.safe_mesh_libraries:parser.error('--sync-mesh-libraries requires safe mesh libraries')
++        env['MVK_AMD_SYNC_MESH_LIBRARIES']='1'
++    if args.sync_mesh_pipelines:env['MVK_AMD_SYNC_MESH_PIPELINES']='1'
+     if args.disable_mesh_replay:env.pop('MVK_AMD_REPLAY_FAILED_MESH', None)
+     if args.render_shards:
+         env.pop('MVK_AMD_RENDER_BINARY_ARCHIVE_PATH', None)
+--- a/open-game-stack-20261015/tools/qualify_geometry_specialization.py
++++ b/open-game-stack-20261015/tools/qualify_geometry_specialization.py
+@@ -18,6 +18,8 @@
+     ap.add_argument('--label', required=True)
+     ap.add_argument('--shaders', type=Path, required=True)
+     ap.add_argument('--safe-math', action='store_true')
++    ap.add_argument('--sync-mesh-libraries', action='store_true')
++    ap.add_argument('--sync-mesh-pipelines', action='store_true')
+     args = ap.parse_args()
+     lib, shaders = args.library.resolve(), args.shaders.resolve()
+     assert lib.is_relative_to(ROOT / 'build') and lib.is_file()
+@@ -40,6 +42,11 @@
+                MVK_AMD_SERIALIZE_PIPELINE_LINK='1')
+     if args.safe_math:
+         env['MVK_AMD_SAFE_MESH_LIBRARIES'] = '1'
++    if args.sync_mesh_libraries:
++        assert args.safe_math, 'Synchronous mesh control requires conservative mesh mode'
++        env['MVK_AMD_SYNC_MESH_LIBRARIES'] = '1'
++    if args.sync_mesh_pipelines:
++        env['MVK_AMD_SYNC_MESH_PIPELINES'] = '1'
+     command = [str(ROOT / 'build/probes/geometry_specialization_gpu'), str(shaders), str(out / 'output.json')]
+     start = time.monotonic()
+     p = subprocess.run(command, env=env, capture_output=True, text=True, timeout=35)
+@@ -48,7 +55,7 @@
+     result = json.loads((out / 'output.json').read_text()) if (out / 'output.json').exists() else {}
+     row = {'command': command, 'exitCode': p.returncode, 'elapsedSeconds': time.monotonic() - start,
+            'candidateSHA256': hashlib.sha256(lib.read_bytes()).hexdigest(), 'result': result,
+-           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math,
++           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math, 'syncMeshLibraries': args.sync_mesh_libraries, 'syncMeshPipelines': args.sync_mesh_pipelines,
+            'metalValidationEnabled': 'Metal API Validation Enabled' in p.stderr}
+     row['passed'] = p.returncode == 0 and result.get('passed', False)
+     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')
+--- a/open-game-stack-20261015/src/mesh_link_context.mm
++++ b/open-game-stack-20261015/src/mesh_link_context.mm
+@@ -39,6 +39,8 @@
+         options.preserveInvariance = [provenance[@"preserveInvariance"] boolValue];
+         id<MTLLibrary> library = [device newLibraryWithSource:source options:options error:&error];
+         id<MTLFunction> f = [library newFunctionWithName:item[@"entry"]];
++        if ([mode isEqualToString:@"constant-reflection"] && f)
++            fprintf(stderr,"constant-count=%lu\n",(unsigned long)f.functionConstantsDictionary.count);
+         [library release]; [options release];
+         if (!f) { fprintf(stderr,"%s\n",error.localizedDescription.UTF8String); return 7; }
+         [meshFunctions addObject:f]; [f release];
+--- a/open-game-stack-20261015/src/mesh_library_context.mm
++++ b/open-game-stack-20261015/src/mesh_library_context.mm
+@@ -0,0 +1,100 @@
++#import <Foundation/Foundation.h>
++#import <Metal/Metal.h>
++#include <cstdio>
++#include <cstdlib>
++#include <mutex>
++static std::mutex compileGate;
++
++// Compare public synchronous/asynchronous MSL compilation on a supplied sequence.
++// REPRO_ASYNC_LIBRARY selects asynchronous creation; no failed-link retries.
++// This is a linkage control: no GPU commands; non-depth descriptor state is
++// approximate and results must not be presented as full game reproduction.
++int main(int argc, const char **argv) { @autoreleasepool {
++    if (argc != 2) return 2;
++    NSArray *items = [NSJSONSerialization JSONObjectWithData:
++        [NSData dataWithContentsOfFile:@(argv[1])] options:0 error:nil];
++    id<MTLDevice> device = nil;
++    for (id<MTLDevice> d in MTLCopyAllDevices())
++        if ([d.name isEqualToString:@"AMD Radeon Pro 5600M"]) device = d;
++    if (!device || !items) return 3;
++    NSMutableDictionary *functions = [NSMutableDictionary dictionary];
++    NSMutableArray *results = [NSMutableArray array];
++    void (^process)(NSDictionary *) = ^(NSDictionary *item) { @autoreleasepool {
++        NSArray *files = item[@"files"];
++        NSMutableArray *stages = [NSMutableArray array];
++        NSError *error = nil;
++        for (unsigned stage = 0; stage < 3; ++stage) {
++            NSString *path = files[stage];
++            id<MTLFunction> function = nil;
++            @synchronized (functions) { function = functions[path]; }
++            if (!function) {
++                NSString *source = [NSString stringWithContentsOfFile:path
++                    encoding:NSUTF8StringEncoding error:&error];
++                MTLCompileOptions *options = [MTLCompileOptions new];
++                options.languageVersion = MTLLanguageVersion4_0;
++                options.mathMode = MTLMathModeSafe;
++                options.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsPrecise;
++                options.preserveInvariance = stage == 1;
++                NSString *entry = @"main0";
++                std::unique_lock<std::mutex> libraryGate(compileGate,std::defer_lock);
++                if (getenv("REPRO_SERIALIZE_LIBRARY")) libraryGate.lock();
++                id<MTLLibrary> library = nil;
++                if (getenv("REPRO_ASYNC_LIBRARY")) {
++                    dispatch_semaphore_t done = dispatch_semaphore_create(0);
++                    __block id<MTLLibrary> compiled = nil;
++                    __block NSError* compileError = nil;
++                    [device newLibraryWithSource:source options:options completionHandler:^(id<MTLLibrary> lib, NSError* e) {
++                        compiled = [lib retain]; compileError = [e retain];
++                        dispatch_semaphore_signal(done);
++                    }];
++                    dispatch_semaphore_wait(done,DISPATCH_TIME_FOREVER);
++                    library = compiled; error = [compileError autorelease];
++                    dispatch_release(done);
++                } else {
++                    library = [device newLibraryWithSource:source options:options error:&error];
++                }
++                function = [library newFunctionWithName:entry];
++                if (function) { @synchronized (functions) { functions[path] = function; } }
++            }
++            if (!function) break;
++            [stages addObject:function];
++        }
++        id<MTLRenderPipelineState> pipeline = nil;
++        if (stages.count == 3) {
++            MTLMeshRenderPipelineDescriptor *descriptor = [MTLMeshRenderPipelineDescriptor new];
++            descriptor.objectFunction = stages[0];
++            descriptor.meshFunction = stages[1];
++            descriptor.fragmentFunction = stages[2];
++            descriptor.rasterSampleCount = 1;
++            descriptor.depthAttachmentPixelFormat = [item[@"depth16"] boolValue]
++                ? MTLPixelFormatDepth16Unorm : MTLPixelFormatDepth32Float;
++            std::unique_lock<std::mutex> linkGate(compileGate,std::defer_lock);
++            if (getenv("REPRO_SERIALIZE_LINK")) linkGate.lock();
++            pipeline = [device newRenderPipelineStateWithMeshDescriptor:descriptor
++                options:MTLPipelineOptionNone reflection:nil error:&error];
++        }
++        NSDictionary *result = @{@"sequence":item[@"sequence"],
++            @"created":@(pipeline != nil), @"runtimeCreated":item[@"runtimeCreated"],
++            @"error":error.localizedDescription ?: @""};
++        @synchronized (results) { [results addObject:result]; }
++        fprintf(stderr,"sequence %u created=%d %s\n",
++            [item[@"sequence"] unsignedIntValue],pipeline != nil,
++            error.localizedDescription.UTF8String ?: "");
++        fflush(stderr);
++    }};
++    bool concurrent = getenv("REPRO_MESH_CONCURRENT") != nullptr;
++    if (concurrent) {
++        dispatch_semaphore_t slots = dispatch_semaphore_create(4);
++        dispatch_apply(items.count, dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^(size_t i) {
++            dispatch_semaphore_wait(slots, DISPATCH_TIME_FOREVER);
++            process(items[i]);
++            dispatch_semaphore_signal(slots);
++        });
++    } else { for (NSDictionary *item in items) process(item); }
++    NSDictionary *output = @{@"results":results, @"GPUCommandsSubmitted":@NO,
++        @"descriptorStateApproximate":@YES, @"concurrent":@(concurrent), @"device":device.name};
++    NSData *data = [NSJSONSerialization dataWithJSONObject:output
++        options:NSJSONWritingPrettyPrinted error:nil];
++    fwrite(data.bytes,1,data.length,stdout); puts("");
++    return 0;
++}}
+--- a/open-game-stack-20261015/src/mvk_guard_proxy.c
++++ b/open-game-stack-20261015/src/mvk_guard_proxy.c
+@@ -11,12 +11,17 @@
+ #include <strings.h>
+ #include <unistd.h>
+ #include <crt_externs.h>
++#ifdef MVK_GUARD_TRACE_VULKAN_STARTUP
++#define VK_NO_PROTOTYPES 1
++#include <vulkan/vulkan_core.h>
++#endif
+ 
+ #ifdef MVK_GUARD_GAME_CONFIG_HEADER
+ #include MVK_GUARD_GAME_CONFIG_HEADER
+ #endif
+ 
+ typedef void *(*get_proc_addr_fn)(void *, const char *);
++static void append_record(const char *message);
+ 
+ /* A probe build can select a private candidate at compile time. Keeping the
+  * default fixed preserves the deployed launch path and avoids replacing a
+@@ -37,6 +42,35 @@
+     return candidate ? dlsym(candidate, name) : NULL;
+ }
+ 
++#ifdef MVK_GUARD_TRACE_VULKAN_STARTUP
++// Owned diagnostic proxy only: forward every argument/result unchanged and
++// record public API boundaries. No shader, capability, login or game changes.
++VKAPI_ATTR VkResult VKAPI_CALL vkCreateInstance(const VkInstanceCreateInfo* info,
++        const VkAllocationCallbacks* allocator, VkInstance* instance) {
++    append_record("step=vkCreateInstance-enter");
++    PFN_vkCreateInstance function = (PFN_vkCreateInstance)candidate_symbol("vkCreateInstance");
++    VkResult result = function ? function(info, allocator, instance) : VK_ERROR_INITIALIZATION_FAILED;
++    char record[160]; snprintf(record, sizeof(record), "step=vkCreateInstance-return result=%d", result);
++    append_record(record); return result;
++}
++VKAPI_ATTR VkResult VKAPI_CALL vkEnumeratePhysicalDevices(VkInstance instance,
++        uint32_t* count, VkPhysicalDevice* devices) {
++    append_record("step=vkEnumeratePhysicalDevices-enter");
++    PFN_vkEnumeratePhysicalDevices function = (PFN_vkEnumeratePhysicalDevices)candidate_symbol("vkEnumeratePhysicalDevices");
++    VkResult result = function ? function(instance, count, devices) : VK_ERROR_INITIALIZATION_FAILED;
++    char record[160]; snprintf(record, sizeof(record), "step=vkEnumeratePhysicalDevices-return result=%d", result);
++    append_record(record); return result;
++}
++VKAPI_ATTR VkResult VKAPI_CALL vkCreateDevice(VkPhysicalDevice physical,
++        const VkDeviceCreateInfo* info, const VkAllocationCallbacks* allocator, VkDevice* device) {
++    append_record("step=vkCreateDevice-enter");
++    PFN_vkCreateDevice function = (PFN_vkCreateDevice)candidate_symbol("vkCreateDevice");
++    VkResult result = function ? function(physical, info, allocator, device) : VK_ERROR_INITIALIZATION_FAILED;
++    char record[160]; snprintf(record, sizeof(record), "step=vkCreateDevice-return result=%d", result);
++    append_record(record); return result;
++}
++#endif
++
+ // Wine's macOS Vulkan thunk resolves these two dispatcher exports directly.
+ // Explicit trampolines keep that lookup reliable even when dyld treats the
+ // re-export dependency as local to this proxy's dlopen handle.
+@@ -44,7 +78,15 @@
+ void *vkGetInstanceProcAddr(void *instance, const char *name) {
+     static get_proc_addr_fn function;
+     if (!function) function = (get_proc_addr_fn)candidate_symbol("vkGetInstanceProcAddr");
+-    return function ? function(instance, name) : NULL;
++    void* resolved = function ? function(instance, name) : NULL;
++#ifdef MVK_GUARD_TRACE_VULKAN_STARTUP
++    if (resolved && name) {
++        if (!strcmp(name, "vkCreateInstance")) return (void*)&vkCreateInstance;
++        if (!strcmp(name, "vkEnumeratePhysicalDevices")) return (void*)&vkEnumeratePhysicalDevices;
++        if (!strcmp(name, "vkCreateDevice")) return (void*)&vkCreateDevice;
++    }
++#endif
++    return resolved;
+ }
+ 
+ __attribute__((visibility("default")))

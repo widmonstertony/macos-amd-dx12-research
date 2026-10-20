@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/probes/geometry_specialization_gpu",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/fresh-mesh-spec-input",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/sync-mesh-pipeline-specialization/output.json"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 0.14153059999807738,
+  "candidateSHA256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68",
+  "result": {
+    "passed": true,
+    "actualDraws": 8,
+    "concurrentPipelineRequests": 8,
+    "checkedPixels": 512,
+    "mismatchedComponents": 0,
+    "geometryToMesh": true
+  },
+  "failedMeshReplayEnabled": false,
+  "freshMeshLibraries": true,
+  "safeMeshLibraries": true,
+  "syncMeshLibraries": true,
+  "syncMeshPipelines": true,
+  "metalValidationEnabled": true,
+  "passed": true
+}

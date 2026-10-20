@@ -1,0 +1,25 @@
+{
+  "timeUTC": "2026-10-20T17:12:42.549031+00:00",
+  "gamePID": 21119,
+  "candidateSHA256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68",
+  "userReport": "Out of video memory",
+  "normalSteamLaunchVerified": true,
+  "initialNativeDeviceCreationReturnRecords": [
+    "pid=21119 ppid=1 step=vkCreateDevice-return result=0",
+    "pid=21119 ppid=1 step=vkCreateDevice-return result=0"
+  ],
+  "nativeDevicesCreatedSuccessfully": 2,
+  "actualSynchronousLibraryAndPipelineVerified": true,
+  "firstPassCompilationPassed": false,
+  "gamePlayable": false,
+  "initialLinkFailures": 2,
+  "failureMessages": [
+    "Link failed: fragment input user(locn2) was not found in vertex shader outputs",
+    "Link failed: fragment input user(locn2) was not found in vertex shader outputs"
+  ],
+  "physicalVRAMExhaustionProven": false,
+  "replayEnabled": false,
+  "cachesDeleted": false,
+  "runtimeRootCauseProven": false,
+  "next": "Stop changing API/math/scheduling switches without a reproducible discriminator. Preserve both startup failure and mesh failure. Compare actual MTLFunction acquisition with successful complete source rebuild, using isolated controls before another game trial."
+}

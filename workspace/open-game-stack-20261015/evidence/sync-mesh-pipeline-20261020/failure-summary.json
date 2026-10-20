@@ -1,0 +1,20 @@
+{
+  "timeUTC": "2026-10-20T17:05:48.640405+00:00",
+  "gamePID": 19392,
+  "candidateSHA256": "5361b48e6dc645d71ae4977c6629a7e74ff7dc4736d2b0eb2a9df569bd3e2f68",
+  "normalSteamLaunchVerified": true,
+  "gameExited": true,
+  "userReport": "Exited without popup, not manually closed",
+  "windowsExitCode": "0x80000101",
+  "shaderTraceFiles": 0,
+  "firstPassCompilationPassed": false,
+  "gamePlayable": false,
+  "nativeAndOriginalWineQualificationPassed": true,
+  "runtimeMeshLinkFixVerified": false,
+  "stage": "Startup before any captured shader trace; exact exit site unknown",
+  "rawGameLaunchEvidence": "evidence/tencent-normal-game-deferred-20261020T170201Z/launch.json",
+  "cachesDeleted": false,
+  "systemDiskFreeGiBAtInspection": 5.3,
+  "diskOrPhysicalVRAMExhaustionCausalProven": false,
+  "next": "Do not relaunch unchanged. Locate startup exit from existing logs/module boundaries; preserve separate earlier locn2 failures. No DRM or protection bypass."
+}

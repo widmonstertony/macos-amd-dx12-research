@@ -12,6 +12,8 @@ parser.add_argument('--gpu-timeout-trace',action='store_true')
 parser.add_argument('--specialized-queues',action='store_true')
 parser.add_argument('--fresh-mesh-libraries',action='store_true')
 parser.add_argument('--safe-mesh-libraries',action='store_true')
+parser.add_argument('--sync-mesh-libraries',action='store_true')
+parser.add_argument('--sync-mesh-pipelines',action='store_true')
 parser.add_argument('--replay-only',action='store_true')
 parser.add_argument('--replay-failed-mesh',action='store_true')
 parser.add_argument('--serialize-pipeline-link',action='store_true')
@@ -56,6 +58,10 @@ if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
 if args.safe_mesh_libraries:
     if not args.fresh_mesh_libraries:parser.error('--safe-mesh-libraries requires fresh libraries')
     env['MVK_AMD_SAFE_MESH_LIBRARIES']='1'
+if args.sync_mesh_libraries:
+    if not args.safe_mesh_libraries:parser.error('--sync-mesh-libraries requires safe mesh libraries')
+    env['MVK_AMD_SYNC_MESH_LIBRARIES']='1'
+if args.sync_mesh_pipelines:env['MVK_AMD_SYNC_MESH_PIPELINES']='1'
 if args.replay_only:
     if not args.runtime_trace or not args.replay_failed_mesh:parser.error('--replay-only requires runtime trace and mesh replay')
     env['MVK_AMD_RUNTIME_REPLAY_ONLY']='1'
@@ -141,6 +147,8 @@ record={'timeUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'libr
 record['specializedQueues']=args.specialized_queues
 record['freshMeshLibraries']=args.fresh_mesh_libraries
 record['safeMeshLibraries']=args.safe_mesh_libraries
+record['syncMeshLibraries']=args.sync_mesh_libraries
+record['syncMeshPipelines']=args.sync_mesh_pipelines
 record['failedMeshReplayEnabled']=args.replay_failed_mesh
 record['gpuTimeoutTrace']=args.gpu_timeout_trace
 record['liveLookupFastCache']=args.live_lookup_fast_cache

@@ -24,6 +24,7 @@
 #include "MVKBuffer.h"
 #include "NSString+MoltenVK.h"
 #include "MTLRenderPipelineDescriptor+MoltenVK.h"
+#include "MVKSupportFunctionRecipe.h"
 
 using namespace std;
 
@@ -620,6 +621,7 @@ id<MTLFunction> MVKCommandResourceFactory::newFunctionNamed(const char* funcName
 	uint64_t startTime = getPerformanceTimestamp();
 	NSString* nsFuncName = [[NSString alloc] initWithUTF8String: funcName];		// temp retained
 	id<MTLFunction> mtlFunc = [_mtlLibrary newFunctionWithName: nsFuncName];	// retained
+	mvkSetSupportFunctionRecipe(mtlFunc, _mtlLibrary, nsFuncName);
 	[nsFuncName release];														// temp release
 	addPerformanceInterval(getPerformanceStats().shaderCompilation.functionRetrieval, startTime);
 	return mtlFunc;
@@ -631,8 +633,9 @@ id<MTLFunction> MVKCommandResourceFactory::newMTLFunction(NSString* mslSrcCode, 
 		NSError* err = nil;
 
 		uint64_t startTime = getPerformanceTimestamp();
+		MTLCompileOptions* compileOptions = getDevice()->getMTLCompileOptions();
 		id<MTLLibrary> mtlLib = [getMTLDevice() newLibraryWithSource: mslSrcCode
-															 options: getDevice()->getMTLCompileOptions()
+															 options: compileOptions
 															   error: &err];	// temp retain
 		addPerformanceInterval(getPerformanceStats().shaderCompilation.mslCompile, startTime);
 
@@ -642,7 +645,9 @@ id<MTLFunction> MVKCommandResourceFactory::newMTLFunction(NSString* mslSrcCode, 
 						(long)err.code, mslSrcCode.UTF8String, err.localizedDescription.UTF8String);
 		} else {
 			startTime = getPerformanceTimestamp();
+			mvkSetSupportLibraryRecipe(mtlLib, mslSrcCode, compileOptions);
 			mtlFunc = [mtlLib newFunctionWithName: funcName];
+			mvkSetSupportFunctionRecipe(mtlFunc, mtlLib, funcName);
 			addPerformanceInterval(getPerformanceStats().shaderCompilation.functionRetrieval, startTime);
 		}
 
@@ -688,9 +693,11 @@ void MVKCommandResourceFactory::initMTLLibrary() {
     @autoreleasepool {
         NSError* err = nil;
 		uint64_t startTime = getPerformanceTimestamp();
+        MTLCompileOptions* compileOptions = getDevice()->getMTLCompileOptions();
         _mtlLibrary = [getMTLDevice() newLibraryWithSource: _MVKStaticCmdShaderSource
-                                                   options: getDevice()->getMTLCompileOptions()
+                                                   options: compileOptions
                                                      error: &err];    // retained
+		mvkSetSupportLibraryRecipe(_mtlLibrary, _MVKStaticCmdShaderSource, compileOptions);
 		MVKAssert( !err, "Could not compile command shaders (Error code %li):\n%s", (long)err.code, err.localizedDescription.UTF8String);
 		addPerformanceInterval(getPerformanceStats().shaderCompilation.mslCompile, startTime);
     }

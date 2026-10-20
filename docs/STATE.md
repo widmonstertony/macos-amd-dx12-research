@@ -69,3 +69,15 @@
 通过原Steam重新启动的PID2306已核实新候选/代理/窗口模块映射与原资产写保护。系统激活和窗口抬升成功，用户明确确认“能看到，正在加载或编译”。保留全部游戏缓存、存档和原Steam服务。新一轮仍未验收到可玩场景；不能承诺修复概率或所有DX12游戏兼容。
 
 New candidate adds bounded encoder/pipeline/fence observations and native presentation timestamps. It passed owned real-GPU graphics, compute, occlusion and timestamp output checks, plus the original Wine cache/presentation probes. The previous game trial still timed out. A new normal-Steam trial is visible and compiling; **playability and sustained frame rate remain unverified**. No proprietary driver changes or fabricated GPU results are included. The v0.1.0 public diagnostic download remains its historical baseline.
+
+## 补齐内部着色器缓存标识并部署（2026-10-20 08:38 本地）
+
+新增的原Wine严格图形归档测试先确实失败：内部 `vtxCmdBlitImageLayered` 与生成的 `fragCmdBlitImage` 没有稳定函数配方，导致严格模式发生原生归档miss。失败记录保留在 `private-cache-wine-20261020T153315Z/run.json`，没有关闭严格检查来掩盖失败。
+
+现在为MoltenVK自己的静态/生成命令着色器按实际MSL源码、入口、语言版本、数学/优化选项生成稳定标识；未知宏输入拒绝缓存。实际GPU程序和同步语义不变。新候选 `0b72f494a7fc8279261f2b62889e3a5b7581ba4bb6a4d32dc8c11417b499842e` 在原Wine跨进程呈现测试中5条图形管线全部严格命中，计算33条严格命中；12项原生冷/热、混合变体、类型根、特化布局等价、损坏或错误归档回退测试通过，实际输出0差异。
+
+按照用户已给出的修复后直接重启授权，仅结束PID2306，保留全部缓存、原Steam和Wine服务。PID3767经原Steam正常启动，新库与原资产写保护核实，窗口抬升成功且系统读到640×428可见游戏窗口。本轮开启有界原生图形分片；游戏不要求强制命中，缺失或错误归档继续真实编译，保留已有归档及已验证的拒绝名单。
+
+首批实际游戏164条图形归档记录中，134条发布新分片、10条严格原生命中、0条管线创建失败，约10.7MB归档落盘。这个结果证明缓存路径在游戏中运行，不是游戏已经可玩或GPU超时修好的证明。当前尚未核实正常场景和持续帧率。公开v0.1.0诊断下载保持旧基线，新精确运行库另存 `runtime-support-cache-20261020.tar.gz`。
+
+The original Wine strict graphics-cache test exposed missing identities for internal blit shaders. Source/entry/compiler-option recipes now cover these support functions; all five presentation pipelines strictly hit native archives across processes with correct GPU output. Twelve native cache/variant/fallback cases also passed. The normal Steam game trial now writes bounded render shards and reports actual strict hits. **Scene correctness, GPU timeout resolution and sustained playability remain unverified.**

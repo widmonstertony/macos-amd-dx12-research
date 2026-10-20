@@ -1,0 +1,8 @@
+{
+  "timeUTC": "2026-10-20T15:38:20.355749+00:00",
+  "oldGamePID": 2306,
+  "oldProcess": " 2306 Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\SteamClient\\steamapps\\common\\StellarBlade\\SB\\Binaries\\Win64\\SB-Win64-Shipping.exe",
+  "reason": "Validated native render shard/cache support-function repair",
+  "originalSteamNotStopped": true,
+  "cacheDeleted": false
+}

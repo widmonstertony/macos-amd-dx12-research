@@ -1,0 +1,12 @@
+{
+  "timeUTC": "2026-10-20T15:39:02.761250+00:00",
+  "gamePID": 3767,
+  "renderArchiveRecords": 164,
+  "strictNativeHits": 10,
+  "published": 134,
+  "failedPipelines": 0,
+  "shardFiles": 134,
+  "shardBytes": 10678544,
+  "gpuTimeoutRecords": 0,
+  "gamePlayable": false
+}

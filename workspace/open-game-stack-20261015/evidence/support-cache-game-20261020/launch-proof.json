@@ -1,0 +1,21 @@
+{
+  "timeUTC": "2026-10-20T15:37:49.611923+00:00",
+  "nativeRegressionPassed": true,
+  "originalTencentPresentationPassed": true,
+  "deferredGameGuardPassed": true,
+  "gamePlayable": false,
+  "GPUTimeoutFixed": false,
+  "cacheDeleted": false,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-support-cache-game/libCandidate.dylib",
+    "candidateSHA256": "0b72f494a7fc8279261f2b62889e3a5b7581ba4bb6a4d32dc8c11417b499842e",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-support-cache-game/libProbeGuard.dylib",
+    "proxySHA256": "7cd0d1fe128383da771f96ec82864e4c8743fe08e401dffe77c84da125901ee2",
+    "presentationPassed": true
+  },
+  "evidence": [
+    "evidence/support-cache-native/summary.json",
+    "evidence/private-cache-wine-20261020T153624Z/run.json"
+  ],
+  "scope": "Stable support-function recipes and persistent bounded native render shards; preserve old archives and synchronization diagnosis. Strict misses fall back to real compilation in game."
+}

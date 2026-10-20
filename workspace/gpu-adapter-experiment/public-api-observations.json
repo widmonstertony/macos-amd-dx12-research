@@ -1,4 +1,59 @@
 {
+  "current_checkpoint_20261020_support_shader_render_cache": {
+    "timeUTC": "2026-10-20T15:39:38.940074+00:00",
+    "gamePID": 3767,
+    "originalSteamPID": 25028,
+    "gamePlayable": false,
+    "GPUTimeoutFixed": false,
+    "candidateSHA256": "0b72f494a7fc8279261f2b62889e3a5b7581ba4bb6a4d32dc8c11417b499842e",
+    "normalSteamLaunchVerified": true,
+    "windowActivationSucceeded": true,
+    "nativeWindowBounds": {
+      "width": 640,
+      "height": 428
+    },
+    "cachesRetained": true,
+    "changes": [
+      "Stable source/name/compile-option recipes for internal static and generated command shaders",
+      "Enable existing bounded native render shards in game with correctness-preserving miss fallback; no forced hits"
+    ],
+    "priorFailure": {
+      "test": "Original Wine strict render cache reuse",
+      "cacheSubsetMissing": "vtxCmdBlitImageLayered + generated fragCmdBlitImage helper recipes",
+      "strictWarmExitCode": 3,
+      "evidence": "evidence/private-cache-wine-20261020T153315Z/run.json"
+    },
+    "qualification": {
+      "originalWineRenderWarmStrictHits": 5,
+      "originalWineComputeWarmStrictHits": 33,
+      "allPassed": true,
+      "nativeRenderCases": 12,
+      "GPUOutputMismatches": 0,
+      "evidence": [
+        "evidence/support-cache-native/summary.json",
+        "evidence/private-cache-wine-20261020T153624Z/run.json"
+      ]
+    },
+    "actualGameCache": {
+      "timeUTC": "2026-10-20T15:39:02.761250+00:00",
+      "gamePID": 3767,
+      "renderArchiveRecords": 164,
+      "strictNativeHits": 10,
+      "published": 134,
+      "failedPipelines": 0,
+      "shardFiles": 134,
+      "shardBytes": 10678544,
+      "gpuTimeoutRecords": 0,
+      "gamePlayable": false
+    },
+    "launchEvidence": "evidence/tencent-normal-game-deferred-20261020T153821Z/launch.json",
+    "remaining": [
+      "GPU timeout culprit still unknown",
+      "Sustained scene rendering and frame rate unverified",
+      "Cold/native compile latency and full cache coverage not yet measured"
+    ],
+    "next": "Keep this current run. Inspect cache progress and unfinished work diagnostics; do not confuse persistent cache success with playable game."
+  },
   "current_checkpoint_20261020_encoder_work_trial": {
     "timeUTC": "2026-10-20T15:29:27.824315+00:00",
     "gamePID": 2306,

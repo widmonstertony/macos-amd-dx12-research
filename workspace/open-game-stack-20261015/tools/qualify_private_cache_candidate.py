@@ -27,6 +27,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--private-directory', type=Path, default=PRIVATE)
     parser.add_argument('--compute-shards', action='store_true')
+    parser.add_argument('--render-shards', action='store_true')
     parser.add_argument('--gpu-timeout-trace', action='store_true')
     parser.add_argument('--specialized-queues', action='store_true')
     args = parser.parse_args()
@@ -61,6 +62,12 @@ def main():
                    MVK_AMD_COMPUTE_ARCHIVE_TRACE='1')
     if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
     if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
+    if args.render_shards:
+        env.pop('MVK_AMD_RENDER_BINARY_ARCHIVE_PATH', None)
+        render_directory = out / 'render-shards'
+        render_directory.mkdir()
+        env.update(MVK_AMD_RENDER_ARCHIVE_DIR=str(render_directory),
+                   MVK_AMD_RENDER_ARCHIVE_TRACE='1')
     candidate = private / "libCandidate.dylib"
     proxy = private / "libProbeGuard.dylib"
     shared = Path("/private/tmp/mvk-guard-proxy/libQualifiedCandidateReexport.dylib")
@@ -73,6 +80,9 @@ def main():
         ("compute-load", "d3d12_compute_probe.exe", "compute.result=PASS"),
         ("present", "d3d12_presentation_probe.exe", "presentation.gpu_api_result=PASS"),
     ]
+    if args.render_shards:
+        probes[-1:] = [('present-seed', 'd3d12_presentation_probe.exe', 'presentation.gpu_api_result=PASS'),
+                       ('present-warm', 'd3d12_presentation_probe.exe', 'presentation.gpu_api_result=PASS')]
     for name, filename, marker in probes:
         d = out / name
         d.mkdir()
@@ -87,6 +97,8 @@ def main():
                          "VKD3D_LOG_FILE": "Z:" + str(d / "vkd3d.log").replace("/Users/tonytan", "").replace("/", "\\")}
         if args.compute_shards and name == 'compute-load':
             run_env['MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT'] = '1'
+        if args.render_shards and name == 'present-warm':
+            run_env['MVK_AMD_RENDER_ARCHIVE_REQUIRE_HIT'] = '1'
         with (d / "stdout.log").open("w") as stdout, (d / "stderr.log").open("w") as stderr:
             p = subprocess.Popen([str(qualified.SUPPORT / "wine-loader"), str(executable)],
                                  env=run_env, cwd=d, stdout=stdout, stderr=stderr,
@@ -124,6 +136,14 @@ def main():
                            and not entry["sharedGameCandidateMapped"])
         if args.compute_shards and name == 'compute-load':
             entry['passed'] = entry['passed'] and entry['nativeArchiveHitVerified']
+        if args.render_shards and name.startswith('present-'):
+            traces = [json.loads(f.read_text()) for f in (d / 'msl').glob('trace-render-archive-*.json')]
+            entry['renderArchiveRecords'] = traces
+            entry['strictNativeRenderHitVerified'] = bool(traces) and all(
+                row['strictArchiveHit'] and not row['fallback'] and row['pipelineCreated']
+                for row in traces)
+            if name == 'present-warm':
+                entry['passed'] = entry['passed'] and entry['strictNativeRenderHitVerified']
         result["results"][name] = entry
         print(json.dumps({name: {k:v for k,v in entry.items() if k!="computeArchiveRecords"}}), flush=True)
         if not entry["passed"]:

@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "library": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/mvk-support-cache-probe/libCandidate.dylib",
+  "SHA256": "0b72f494a7fc8279261f2b62889e3a5b7581ba4bb6a4d32dc8c11417b499842e",
+  "cases": [
+    "seed",
+    "warm",
+    "blend-miss",
+    "blend-seed",
+    "blend-warm",
+    "typed-seed",
+    "typed-warm",
+    "spec-a",
+    "spec-b",
+    "invalid",
+    "wrong-valid",
+    "compute-warm"
+  ],
+  "gameStartedOrRestarted": false,
+  "liveGameLibrariesChanged": false,
+  "sourceGameCacheModified": false,
+  "specializationLayoutEquivalentKeysVerified": true,
+  "actualGamePerformanceMeasured": false
+}

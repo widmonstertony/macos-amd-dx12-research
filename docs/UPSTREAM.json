@@ -59,14 +59,16 @@
       "MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVReflection.h",
       "MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVToMSLConverter.cpp",
       "MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVToMSLConverter.h",
-      "MoltenVK/MoltenVK/GPUObjects/MVKPresentedFrameTrace.h"
+      "MoltenVK/MoltenVK/GPUObjects/MVKPresentedFrameTrace.h",
+      "MoltenVK/MoltenVK/GPUObjects/MVKSupportFunctionRecipe.h"
     ],
     "binaryChanges": [],
     "patch": "patches/MoltenVK-cumulative.patch",
     "postV010Patches": [
       "patches/MoltenVK-native-queue-leases-after-v0.1.0.patch",
       "patches/MoltenVK-archive-lock-scope-after-v0.1.0.patch",
-      "patches/MoltenVK-encoder-work-trace-after-archive-unlock.patch"
+      "patches/MoltenVK-encoder-work-trace-after-archive-unlock.patch",
+      "patches/MoltenVK-support-function-recipes-after-encoder-trace.patch"
     ],
     "currentWorkspaceAlreadyContainsPostV010Patches": true
   },

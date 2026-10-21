@@ -30,3 +30,14 @@ Use the saved vkd3d-proton Meson options, pinned llvm-mingw toolchain, and match
 Wine window-module rebuilding requires the fixed complete CrossOver public-source baseline plus our patch/overlay and configuration. Releases provide the baseline archive as a separate source asset. The server request mapping is engine-specific; re-audit before deploying to a different version. See [RESTORE.md](RESTORE.md) / [RESTORE.en.md](RESTORE.en.md).
 
 Existing build scripts have historical absolute paths. They are preserved for reproducibility/context, not automatically executed by the public kit. Do not bulk-apply all experimental patches: use the full source snapshot or the component's cumulative patch against its exact baseline.
+
+## 描述符诊断对照 / Descriptor diagnostic control
+
+In a restored snapshot, build the UAV-table fixture without starting Wine:
+
+```sh
+cd /new/research-restored/open-game-stack-20261015
+python3 tools/build_descriptor_validation_control.py --compiler /path/to/clang++ --linker /path/to/lld-link
+```
+
+This uses the saved shader and kernel32 import library, binds a shader-visible UAV heap, dispatches sixteen times with UAV ordering, and checks 1,024 GPU output words. 对照使用真实描述符堆和 GPU 回读；通过不代表游戏可玩。 `qualify_private_cache_candidate.py --descriptor-only --d3d12-directory ...` stages owned DLLs in each probe directory. It requires an already audited Tencent probe environment; it does not configure or replace a user's Wine installation.

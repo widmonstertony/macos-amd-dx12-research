@@ -34188,6 +34188,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/build_descriptor_validation_control.py",
+      "bytes": 1411,
+      "sha256": "c4d11cffc8eaa80ab0d44d3c7cb3ad0a93facc3e1cce309e23e272d65c6ecef6",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/tools/build_heap_write_fixture.py",
       "sha256": "cab5055007e39d816a18f76f3f241728ebd01af4fe4214413a103a326b3b296a",
       "bytes": 1311

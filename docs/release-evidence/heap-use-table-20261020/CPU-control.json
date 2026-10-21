@@ -1,0 +1,105 @@
+{
+  "passed": true,
+  "runs": 5,
+  "cases": [
+    {
+      "heaps": 1,
+      "shuffled": false,
+      "originalMedianMS": 28.834,
+      "candidateMedianMS": 20.403,
+      "ratio": 0.7076021363667891
+    },
+    {
+      "heaps": 1,
+      "shuffled": true,
+      "originalMedianMS": 27.906,
+      "candidateMedianMS": 15.828,
+      "ratio": 0.5671898516448076
+    },
+    {
+      "heaps": 2,
+      "shuffled": false,
+      "originalMedianMS": 26.234,
+      "candidateMedianMS": 16.313,
+      "ratio": 0.6218266371883814
+    },
+    {
+      "heaps": 2,
+      "shuffled": true,
+      "originalMedianMS": 26.851,
+      "candidateMedianMS": 14.909,
+      "ratio": 0.5552493389445459
+    },
+    {
+      "heaps": 4,
+      "shuffled": false,
+      "originalMedianMS": 26.559,
+      "candidateMedianMS": 16.413,
+      "ratio": 0.6179826047667457
+    },
+    {
+      "heaps": 4,
+      "shuffled": true,
+      "originalMedianMS": 25.788,
+      "candidateMedianMS": 17.425,
+      "ratio": 0.675701876841942
+    },
+    {
+      "heaps": 8,
+      "shuffled": false,
+      "originalMedianMS": 26.706,
+      "candidateMedianMS": 18.392,
+      "ratio": 0.6886841908185426
+    },
+    {
+      "heaps": 8,
+      "shuffled": true,
+      "originalMedianMS": 32.122,
+      "candidateMedianMS": 19.91,
+      "ratio": 0.6198244194010336
+    },
+    {
+      "heaps": 9,
+      "shuffled": false,
+      "originalMedianMS": 40.568,
+      "candidateMedianMS": 24.176,
+      "ratio": 0.5959376848747782
+    },
+    {
+      "heaps": 9,
+      "shuffled": true,
+      "originalMedianMS": 46.047,
+      "candidateMedianMS": 27.318,
+      "ratio": 0.5932634047820705
+    },
+    {
+      "heaps": 64,
+      "shuffled": false,
+      "originalMedianMS": 126.485,
+      "candidateMedianMS": 27.435,
+      "ratio": 0.21690319010159306
+    },
+    {
+      "heaps": 64,
+      "shuffled": true,
+      "originalMedianMS": 92.425,
+      "candidateMedianMS": 20.811,
+      "ratio": 0.22516635109548283
+    },
+    {
+      "heaps": 512,
+      "shuffled": false,
+      "originalMedianMS": 452.586,
+      "candidateMedianMS": 32.186,
+      "ratio": 0.07111576584339771
+    },
+    {
+      "heaps": 512,
+      "shuffled": true,
+      "originalMedianMS": 403.942,
+      "candidateMedianMS": 43.395,
+      "ratio": 0.10742878928162955
+    }
+  ],
+  "gameFPSClaim": false
+}

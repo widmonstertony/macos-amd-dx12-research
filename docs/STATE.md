@@ -1,3 +1,10 @@
+> 最新实机场景（2026-10-20）：绑定修复版已经通过原应用宝 Wine / Steam 进入营地。60/60 次采样确认前台且可见，原生呈现 **3.22 FPS**，本轮未见新的 GPU 超时，但仍不可玩。CPU 采样显示瓶颈集中在提交线程的资源表检查、去重和堆声明。
+> Latest actual-scene measurement: the binding repair reaches camp through original Tencent Wine/Steam. All 60 observations confirm foreground visibility; native presentation is **3.22 FPS**, with no new GPU timeout files in this run. It remains unplayable. CPU submission, resource validation and heap residency bookkeeping are measured hotspots.
+
+新候选 `57948db5…` 用可复用的开放寻址堆计数表消除每次绘制的哈希节点分配，保留逐 encoder 的所有 Metal 声明。14 组计数/阈值控制正确，五轮 CPU 对照均加快；真实 GPU 的绘制/清除、16 堆描述符和越界/空描述符回读均无差异，原 Wine 严格缓存/呈现通过。**这是局部 CPU 改善，游戏加速仍待本轮实测；FSR3 超分和帧生成仍未验证，未发布可玩承诺。**
+
+The next candidate reuses an open-addressed heap-count scratch table, keeping all per-encoder Metal declarations. All 14 controlled CPU cases improve over five runs, and real AMD graphics/clear, multiheap descriptors, robustness/null and original Wine strict-cache/presentation regressions pass. **These are local CPU controls, not game FPS gains. Normal-Steam game validation is in progress; FSR3 upscaling and frame generation remain required and unvalidated.** [Evidence](release-evidence/heap-use-table-20261020/).
+
 > 最新（2026-10-20）：已拿到前台失败证据，仍未达到可玩。旧 EF 候选前台/可见 60/60 次采样，首尾场景图相同，期间无新原生呈现记录；计算和图形队列均发生真实超时。错误前最后一段有效呈现约 3 FPS，该更早窗口未独立验证前台。
 > Latest: not playable. The old EF candidate froze through all 60 foreground/visible samples, with identical scene captures and no new presentation records; native compute and graphics command buffers timed out. The last earlier valid presentation window was ~3 FPS, but that earlier window did not independently establish foreground visibility.
 

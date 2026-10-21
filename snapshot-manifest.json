@@ -2026,15 +2026,13 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "bytes": 35347,
-      "sha256": "444bce20f5d8377b84aeb8121ea774b8ed136ab5b105d8338e046c5e4309e1b7",
-      "executable": false
+      "sha256": "7c727bbec57915560cf55f2b054ad82ec043ec2b87f03720a8c5d3e73a6cf48f",
+      "bytes": 35418
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 127389,
-      "sha256": "a9feace0efb3af8d0277665e72f9395a5ff30571049aa1e4fa92e942abc4f235",
-      "executable": false
+      "sha256": "279f19924e388d40e106ab5f853f1a3fc99fb5c96ad3a2f8e8184c92416f6271",
+      "bytes": 127525
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncodingPool.h",
@@ -2089,6 +2087,11 @@
       "bytes": 1510,
       "sha256": "13935df0801b60d78155d4319615d575332590dc88063a18504650f733cc2041",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKHeapUseTable.h",
+      "sha256": "e16f4bb58ce7e10f40412f18c33ca210e1a8a698598ef1a6cccac92038e59241",
+      "bytes": 1863
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKMTLBufferAllocation.h",
@@ -33837,6 +33840,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/heap_use_table_control.cpp",
+      "sha256": "68fb238bd05542ee349ca03cee776ef29aec87eed11c72ec76d1d16ed9cc4a4f",
+      "bytes": 3004
+    },
+    {
       "path": "open-game-stack-20261015/src/mesh_archive_gpu_probe.mm",
       "bytes": 6352,
       "sha256": "022d89b88b0b7336f542b22b7328e1ba8256beb71be8ccf19ca9b7a94493cb34",
@@ -34120,9 +34128,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "bytes": 3015,
-      "sha256": "1e24e7974a5acd9e9456b7a0ca7f4e2436d5def10ee9556c0967762bf2bcf6f4",
-      "executable": false
+      "sha256": "9bc77cd76db23f594d50a7587ccfde7829f3c41298fa5eccd0ee64099a5af614",
+      "bytes": 3194
     },
     {
       "path": "open-game-stack-20261015/tools/build_queue_burst_probe.py",
@@ -69665,9 +69672,51 @@
           "sha256": "f351ce8602fc82ef8c276c79596b95029051304211ea55aa25af90b498bdb28d"
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-heap-use-table-20261020.tar.gz",
+      "sha256": "b5087e4e50362fe261b0a42c117ea1e75e10df32fd2a75d4ae9f3c54f049e1a9",
+      "bytes": 3694241,
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/heap-use-table-20261020-probe/libCandidate.dylib",
+          "sha256": "57948db5d789f3e6fac3f082ded44051c919216d4bcc05bdb51dd3d4526bec1e",
+          "bytes": 5953744
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-use-table-20261020-probe/libProbeGuard.dylib",
+          "sha256": "a6629b681bfc447142cb1e2f6937917bcb98b81eacb448329a2d77a6fedc89dd",
+          "bytes": 32256
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-use-table-20261020-probe/build.json",
+          "sha256": "98b5eeb32efbbeb8f95a8a019a4af46ba4799ee4e7f3c2cc856ac1001b2e82a0",
+          "bytes": 731
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-use-table-20261020-game/libCandidate.dylib",
+          "sha256": "57948db5d789f3e6fac3f082ded44051c919216d4bcc05bdb51dd3d4526bec1e",
+          "bytes": 5953744
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-use-table-20261020-game/libProbeGuard.dylib",
+          "sha256": "5433594bc33798e860cfb458947244609307aad067e7d0ed44ea6aa1bb6ebc46",
+          "bytes": 36480
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-use-table-20261020-game/build.json",
+          "sha256": "6c14171252808eda9d29d989c82b88e2cc53b0218263cbb4d3a9145ea39cce8d",
+          "bytes": 865
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/heap-use-table-20261020/game-trial-config.h",
+          "sha256": "b30ec971d3e933c9f140dd624e3a12b77da08f9bc9f1fa112d1dedf16ae54f2d",
+          "bytes": 3086
+        }
+      ]
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Confirmed helper argument-buffer binding regression, adapted upstream PR2822. Old GPU compute output wrong and graphics draw-clear-draw times out; repaired owned controls pass. New qualified 5987d7 candidate is running through original Tencent Wine/Steam. Sustained game performance and both FSR3 features remain unvalidated; no playable release claimed.",
-  "lastSourceUpdateUTC": "2026-10-21T06:25:20.123253+00:00"
+  "currentSourceState": "Helper-binding fix reached actual camp scene: all 60 foreground samples verified, native presentation 3.2157 FPS, no GPU failure files during run; still unplayable. Reusable flat heap-count scratch table reduces a measured CPU hotspot; five controlled CPU runs and real graphics/multiheap/memory plus original Tencent Wine cache/presentation passed. Candidate57948d is in normal Steam game validation; sustained gameplay and both FSR3 functions unvalidated.",
+  "lastSourceUpdateUTC": "2026-10-21T06:45:04.502638+00:00"
 }

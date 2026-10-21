@@ -1,0 +1,33 @@
+{
+  "start": {
+    "timeUTC": "2026-10-21T06:31:59.402040+00:00",
+    "referenceTime": 814257119.40204,
+    "pid": 68159,
+    "nativeSHA256": "5987d724da4329f86f3f2add1a204a4d084d0c1cd80f4b1fa59328504836dc36",
+    "actualSceneSeen": true,
+    "outputPixels": [
+      3072,
+      1920
+    ],
+    "internalResolutionUnverified": true,
+    "publicCommit": "2773d31"
+  },
+  "endUTC": "2026-10-21T06:33:55.356505+00:00",
+  "endReferenceTime": 814257235.3565049,
+  "foregroundSamples": 60,
+  "allSamplesForeground": true,
+  "nativePresentWindows": 11,
+  "nativeTimestampIntervals": 171,
+  "nativeIntervalSeconds": 53.176094631,
+  "nativePresentationFPS": 3.215730699792917,
+  "maxNativeGapMS": 1540.347241,
+  "imageChanged": true,
+  "gpuFailureFiles": 0,
+  "cacheDeleted": false,
+  "gamePlayable": false,
+  "measurementReferenceRange": [
+    814257119.719932,
+    814257179.173478
+  ],
+  "samplingScopeNote": "Native time windows fully contained within the 60 one-second foreground observations; screenshot end is later."
+}

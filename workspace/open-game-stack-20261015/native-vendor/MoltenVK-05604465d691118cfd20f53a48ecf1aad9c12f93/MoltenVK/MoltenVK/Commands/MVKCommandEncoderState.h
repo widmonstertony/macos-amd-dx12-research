@@ -22,6 +22,7 @@
 #include "MVKCommandResourceFactory.h"
 #include "MVKDevice.h"
 #include "MVKDescriptorUseCache.h"
+#include "MVKHeapUseTable.h"
 #include "MVKPipeline.h"
 #include "MVKSmallVector.h"
 #include "MVKBitArray.h"
@@ -256,6 +257,7 @@ struct MVKUseResourceHelper {
 	bool crossEncoderLiveCache = false;
 	bool batchLiveResources = false;
 	bool batchArgumentHeaps = false;
+	MVKHeapUseTable<id<MTLHeap>> heapCounts;
 	uint32_t heapBatchThreshold = 16;
 	bool traceArgumentHeaps = false;
 	bool traceLiveCache = false;

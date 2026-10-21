@@ -23,6 +23,10 @@ for kind in ['probe','game']:
  subprocess.run(cmd,check=True)
  subprocess.run(['install_name_tool','-change','@rpath/libMoltenVK.1.dylib',str(candidate),str(proxy)],check=True)
  subprocess.run(['codesign','--force','--sign','-',str(proxy)],check=True)
+ if kind=='probe':
+  select=folder/'select';select.mkdir()
+  for name in ('libMoltenVK.dylib','libMoltenVK.1.dylib','libMoltenVK.1.4.2.dylib'):
+   (select/name).symlink_to(proxy)
  record={'timeUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'candidate':str(candidate),'candidateSHA256':sha(candidate),'proxy':str(proxy),'proxySHA256':sha(proxy),'profileHeader':str(header) if kind=='game' else None,'resourceStatistics':a.resource_stats,'snapshotReuse':a.snapshot_reuse,'negativeCache':a.negative_cache,'crossEncoderSnapshotReuse':a.cross_snapshot_reuse,'failureContext':a.failure_context,'deployed':False}
  (folder/'build.json').write_text(json.dumps(record,indent=2)+'\n');records.append(record)
 (evidence/'build.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps(records,indent=2))

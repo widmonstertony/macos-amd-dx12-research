@@ -1,0 +1,22 @@
+{
+  "timeUTC": "2026-10-21T16:53:55.320382+00:00",
+  "gamePID": 12446,
+  "candidateSHA256": "6e7d6b8100643d5e0d735fb45eda99cee061085911820fed16fc1d212597be72",
+  "sceneConfirmedFromOwnWindow": true,
+  "preexistingFailureFiles": [
+    "trace-gpu-timeout-12446-0.json",
+    "trace-gpu-timeout-12446-1.json",
+    "trace-gpu-timeout-12446-2.json"
+  ],
+  "cacheDeleted": false,
+  "samples": [],
+  "armedUTC": "2026-10-21T16:53:55.945911+00:00",
+  "inputExitCode": 0,
+  "inputOutput": "{\"pid\":12446,\"button\":\"left\",\"holdMS\":80,\"sent\":true}\n",
+  "inputDiagnostic": "gamePID=12446 active=1 frontmostAttributeResult=0\n",
+  "inputCompletedUTC": "2026-10-21T16:53:59.551871+00:00",
+  "invalidCaptureReason": "Three GPU timeouts already existed before the marker was created; subsequent input is not a fresh failure reproduction",
+  "captureFailedWithENOSPC": true,
+  "markerRemovedVerified": true,
+  "gamePlayable": false
+}

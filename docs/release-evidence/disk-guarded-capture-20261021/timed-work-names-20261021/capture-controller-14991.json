@@ -1,0 +1,23 @@
+{
+  "pid": 14991,
+  "controllerPID": 15771,
+  "timeUTC": "2026-10-21T17:12:31.128393+00:00",
+  "maximumControllerSeconds": 180,
+  "nativeMarkerFreshnessSeconds": 30,
+  "refreshEverySeconds": 20,
+  "diagnosticOnly": true,
+  "refreshes": [
+    0.025313518999610096,
+    20.594841559999622,
+    41.18041164599708,
+    61.78700508399925,
+    82.39487010499579,
+    102.97184472999652,
+    123.47390297500533,
+    143.99597665200417,
+    164.54242742000497
+  ],
+  "markerRemoved": true,
+  "elapsedSeconds": 180.90978994399484,
+  "endUTC": "2026-10-21T17:15:32.040267+00:00"
+}

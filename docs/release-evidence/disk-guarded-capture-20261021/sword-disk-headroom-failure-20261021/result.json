@@ -1,0 +1,38 @@
+{
+  "timeUTC": "2026-10-21T17:17:07.031091+00:00",
+  "gamePID": 14991,
+  "failureFiles": [
+    "trace-gpu-timeout-14991-0.json",
+    "trace-gpu-timeout-14991-1.json",
+    "trace-gpu-timeout-14991-2.json"
+  ],
+  "freeBytesNow": 17492103168,
+  "markerExpiredBeforeFailure": true,
+  "exactShaderNotIdentified": true,
+  "noAdditionalAttackSent": true,
+  "cacheDeleted": false,
+  "gamePlayable": false,
+  "failures": [
+    {
+      "queue": 2,
+      "createdTime": 814295732.680547,
+      "failureTime": 814295737.699694,
+      "workCount": 0,
+      "submission": 691581
+    },
+    {
+      "queue": 0,
+      "createdTime": 814295732.563715,
+      "failureTime": 814295739.229395,
+      "workCount": 0,
+      "submission": 691574
+    },
+    {
+      "queue": 0,
+      "createdTime": 814295732.721368,
+      "failureTime": 814295739.244859,
+      "workCount": 0,
+      "submission": 691586
+    }
+  ]
+}

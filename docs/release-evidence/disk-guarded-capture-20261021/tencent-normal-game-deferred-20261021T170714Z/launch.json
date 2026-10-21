@@ -1,0 +1,45 @@
+{
+  "timeUTC": "2026-10-21T17:07:14.919809+00:00",
+  "diskFreeBytesAtLaunch": 21780766720,
+  "normalLicensedSteamRequest": true,
+  "existingSteamPID": 31815,
+  "clientPID": 14979,
+  "privateCrashState": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/stellar-crash-report-state",
+  "proxySHA256": "e6536b0aadb4a4efce232d9ce579ab3b2f78aaf2bb6e218092deca3282dce75e",
+  "candidateSHA256": "6e7d6b8100643d5e0d735fb45eda99cee061085911820fed16fc1d212597be72",
+  "command": [
+    "/Users/tonytan/Library/Application Support/YYBIntelLauncher/wine-loader",
+    "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine/wine/drive_c/Program Files (x86)/Steam/Steam.exe",
+    "-applaunch",
+    "3489700",
+    "-dx12",
+    "-windowed",
+    "-ResX=1280",
+    "-ResY=800"
+  ],
+  "observed": {
+    "14991": {
+      "pid": 14991,
+      "ppid": 1,
+      "comm": "Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\SteamClient\\steamapps\\common\\StellarBlade\\SB\\Binaries\\Win64\\SB-Win64-Shipping.exe",
+      "mappings": [
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/timed-work-names-20261021-game/libCandidate.dylib",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/timed-work-names-20261021-game/libProbeGuard.dylib",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-leaf-select/winemac.so",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/stellar-overlay/SB/Binaries/Win64/dxgi.dll",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/ntdll.so",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/win32u.so"
+      ],
+      "candidateMapped": true,
+      "proxyMapped": true,
+      "fixedWindowModuleMapped": true,
+      "originalWriteDenied": true
+    }
+  },
+  "verified": true,
+  "diskBudgetMonitor": {
+    "pid": 15034,
+    "maximumSeconds": 900,
+    "minimumReserveBytes": 3221225472
+  }
+}

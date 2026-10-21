@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import time
 from prepare_stellar_crash_state import main as prepare_crash_state
 
@@ -53,6 +54,8 @@ def main() -> int:
     steam_rows = [(pid, ppid, comm) for pid, ppid, comm in rows if comm.casefold() == str(STEAM).casefold()]
     assert len(steam_rows) == 1, "Expected one running original Steam client"
     assert not any("SB-Win64-Shipping.exe" in comm or "/StellarBlade/SB.exe" in comm for _, _, comm in rows), "Game already running"
+    disk_free_at_launch = shutil.disk_usage(ROOT).free
+    assert disk_free_at_launch >= 10 * 1024**3, "At least 10 GiB free is required for this research game test after actual ENOSPC"
     prepare_crash_state()
 
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -96,7 +99,7 @@ def main() -> int:
     client = subprocess.Popen(command, cwd=STEAM.parent, env=env, stdout=stdout, stderr=stderr, start_new_session=True)
     record = {
         "timeUTC": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "normalLicensedSteamRequest": True, "existingSteamPID": steam_rows[0][0], "clientPID": client.pid,
+        "diskFreeBytesAtLaunch": disk_free_at_launch, "normalLicensedSteamRequest": True, "existingSteamPID": steam_rows[0][0], "clientPID": client.pid,
         "privateCrashState": str(ROOT / "build/stellar-crash-report-state"),
         "proxySHA256": deferred["proxySHA256"], "candidateSHA256": deferred["candidateSHA256"],
         "command": command, "observed": {}, "verified": False,
@@ -136,6 +139,14 @@ def main() -> int:
             print(json.dumps({"elapsedSeconds": elapsed, "gamePIDs": alive, "verified": record["verified"]}), flush=True)
         (out / "launch.json").write_text(json.dumps(record, indent=2) + "\n")
         if record["verified"]:
+            guard = subprocess.Popen(["/usr/local/bin/python3", str(ROOT / "tools/watch_game_disk_budget.py"),
+                                      "--launch-record", str(out / "launch.json"), "--seconds", "900"],
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                     start_new_session=True)
+            record["diskBudgetMonitor"] = {"pid": guard.pid, "maximumSeconds":900, "minimumReserveBytes":3*1024**3}
+            temporary_record = out / "launch.with-budget.json"
+            temporary_record.write_text(json.dumps(record, indent=2)+"\n")
+            os.replace(temporary_record, out / "launch.json")
             print(json.dumps({"verified": True, "directory": str(out), "gamePIDs": alive}), flush=True)
             return 0
         time.sleep(1)

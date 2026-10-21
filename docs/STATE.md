@@ -1,3 +1,12 @@
+> 2026-10-21 更新：已确认一次真实磁盘写满（最低约 139MB 空闲）。仅压缩校验过的旧研究文本日志，保留恢复元数据；游戏、存档和所有着色器缓存未删除。正常 Steam 测试现增加启动前 10GiB 空间检查及限时磁盘监测。
+> Update: actual ENOSPC occurred with about 139MB free. Only old owned text research logs were losslessly compressed with decompressed SHA verification and recovery metadata. Game, saves and all shader caches remain intact. Normal-Steam tests now require 10GiB free before launch and use a bounded disk monitor.
+
+恢复到约 19GiB 空闲后，游戏仍复现挥剑 GPU 超时，因此磁盘耗尽不是唯一原因。该次详细记录在故障前到期，未获取具体管线，不能声称已经定位或修复。下一轮只延长限时诊断覆盖，不改变 GPU 同步语义。仍不可玩，FSR3 两项未验证。
+
+A sword-related GPU timeout still reproduced with about 19GiB free, so ENOSPC is not the sole cause. Detailed recording expired before that fault: no exact pipeline has been identified or fixed. The next run extends bounded diagnostic coverage without changing GPU synchronization semantics. Still not playable; both FSR3 features are unvalidated.
+
+[Disk guard and failed-capture evidence](release-evidence/disk-guarded-capture-20261021/)
+
 > 最新实际游戏结果（2026-10-21）：营地能正常显示，13,779 条计算管线全部从缓存加载/重建成功，0 创建错误；但用户挥剑后发生 **3 次原生 GPU 超时并退出**，仍不可玩。本轮为 3072×1920 输出，一分钟前台观测包含故障，期间呈现统计 8.76 FPS **不能当成稳定帧率或成功结果**。
 > Latest actual game: the camp rendered correctly and all 13,779 compute archives loaded/rehydrated with zero creation errors, but a sword attack triggered **three native GPU timeouts and game exit**. **Not playable.** Output was 3072×1920; the one-minute foreground observation includes that failure. Its 8.76 FPS presentation statistic is not a sustained-performance or success claim.
 

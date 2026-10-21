@@ -34153,6 +34153,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/arm_game_work_capture.py",
+      "sha256": "fcb349be4c42adc29172ef093aaebdfa3dc529ad2640325d0bd28351e158b6d9",
+      "bytes": 2201
+    },
+    {
       "path": "open-game-stack-20261015/tools/audit_winemac_abi.py",
       "bytes": 3386,
       "sha256": "492f83daaff5ed679602ca438c158119716f361136e6298a50432508d53b038a",
@@ -34204,6 +34209,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/capture_sword_attack.py",
+      "sha256": "42c1c149b7474d6963c0325103bff76b1705171cc6ecc3928a530c46d5a65ae5",
+      "bytes": 3789
+    },
+    {
       "path": "open-game-stack-20261015/tools/check_crash_metadata.py",
       "bytes": 2312,
       "sha256": "6b2140df65f1861a4cca33d4eb30087f386526109279de1a39a9104e1c5cd515",
@@ -34252,9 +34262,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/launch_stellar_deferred_proxy.py",
-      "bytes": 8483,
-      "sha256": "7bc89c84c6922fbf911679b589bb5c988d71ee6756f97b735d5db968ec2b1402",
-      "executable": false
+      "sha256": "81099aa198ca6893e19fdf839102ed85882dbc967419cd2e83c05d9e3ad5e2e3",
+      "bytes": 9438
     },
     {
       "path": "open-game-stack-20261015/tools/mac_session_state.py",
@@ -34398,6 +34407,11 @@
       "path": "open-game-stack-20261015/tools/thermal_pause_game.py",
       "sha256": "d6ff53c67321aa46b04cdbce9eeff906f9a6c5fbfca42df964951f1e66fdd0c7",
       "bytes": 1818
+    },
+    {
+      "path": "open-game-stack-20261015/tools/watch_game_disk_budget.py",
+      "sha256": "8df2b86ab69c09c80be3a42bf927693de238ecca249eae9c8646a40f4bc43163",
+      "bytes": 1852
     },
     {
       "path": "open-game-stack-20261015/vendor/SPIRV-Headers-c8ad050fcb29e42a2f57d9f59e97488f465c436d/.gitattributes",
@@ -69918,6 +69932,6 @@
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "b48f473actualgamefull3072x1920campvisibleand13,779computearchivesloaded/rehydratedwithoutcreationerrors. Userattacktriggered3GPUtimeoutsandgameexit;foreground60seccontainsfailure,presented8.76FPSisnotstableplayability. Q2waitgraphics166151timesout5sec;producerQ0alsofailslater. Independent3queue/separateeventforward+reverse8,388,608GPUwords0mismatch,didnotreproducegamefailure. Diagnostic6e7d6bsource/runtimeandbounded30secarmedworkcapturevalidated,activework115,expired0;originalWinecompute/present/cachepassed;newgame12446viaoriginalSteamwarmloading,captureunarmed,cachesintact. No synchronizationsemanticschanged,notplayable,bothFSR3featuresunvalidated.",
-  "lastSourceUpdateUTC": "2026-10-21T16:46:59.372862+00:00"
+  "currentSourceState": "Attack GPU timeout still unresolved. Actual ENOSPC observed at139MBfree; only old owned text research logs gzip-compressed with decompressed hash verification. Game/save/shader caches untouched. New normal-Steam launch preflight10GiBfree and900sec identity-guarded disk monitor preserving3GiBreserve. Game14991 reproduced3GPUtimeouts with about19GiBfree,soENOSPCnotsolecause. Detailed marker expired beforefault;no exactshaderidentified. Current24562 repeat unchanged6e7d diagnostic with600sec bounded capture after cache completion. No GPU synchronization semantics changed. Notplayable;bothFSR3unvalidated.",
+  "lastSourceUpdateUTC": "2026-10-21T17:19:26.752061+00:00"
 }

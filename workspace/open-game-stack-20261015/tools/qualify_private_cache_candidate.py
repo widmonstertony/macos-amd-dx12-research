@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--negative-live-cache',action='store_true')
     parser.add_argument('--batch-argument-heaps', action='store_true')
     parser.add_argument('--argument-heap-threshold', type=int, default=16)
+    parser.add_argument('--gpu-counter-trace',action='store_true',help='Qualify timed native GPU counter collection on owned probes')
     args = parser.parse_args()
     if args.compute_only and args.descriptor_only:
         parser.error('Select either compute-only or descriptor-only')
@@ -184,6 +185,10 @@ def main():
             run_env['MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT'] = '1'
         if args.render_shards and name == 'present-warm':
             run_env['MVK_AMD_RENDER_ARCHIVE_REQUIRE_HIT'] = '1'
+        if args.gpu_counter_trace:
+            arm=d/'gpu-counter.arm';arm.touch()
+            run_env['MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH']=str(arm)
+            run_env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
         with (d / "stdout.log").open("w") as stdout, (d / "stderr.log").open("w") as stderr:
             p = subprocess.Popen([str(qualified.SUPPORT / "wine-loader"), str(executable)],
                                  env=run_env, cwd=d, stdout=stdout, stderr=stderr,
@@ -233,6 +238,12 @@ def main():
                 for row in traces)
             if name == 'present-warm':
                 entry['passed'] = entry['passed'] and entry['strictNativeRenderHitVerified']
+        if args.gpu_counter_trace:
+            counter_records=[json.loads(f.read_text()) for f in (d/'msl').glob('trace-gpu-timestamps-*.json')]
+            samples=[s for row in counter_records for s in row.get('gpuTimestamps',{}).get('samples',[]) if s.get('valid') is True]
+            entry['actualNativeGPUCounterRecords']=len(counter_records)
+            entry['validNativeGPUTimestamps']=len(samples)
+            entry['passed']=entry['passed'] and len(samples)>=2
         result["results"][name] = entry
         print(json.dumps({name: {k:v for k,v in entry.items() if k!="computeArchiveRecords"}}), flush=True)
         if not entry["passed"]:

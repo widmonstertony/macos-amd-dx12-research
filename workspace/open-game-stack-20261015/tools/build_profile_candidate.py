@@ -2,7 +2,8 @@
 """Stage owned MoltenVK and unchanged asset-guard proxies; never deploy or launch."""
 import argparse,datetime,hashlib,json,pathlib,re,shutil,subprocess
 ROOT=pathlib.Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--label',required=True);p.add_argument('--resource-stats',action='store_true');p.add_argument('--snapshot-reuse',action='store_true');p.add_argument('--negative-cache',action='store_true');p.add_argument('--cross-snapshot-reuse',action='store_true');p.add_argument('--failure-context',action='store_true');p.add_argument('--registration-delta-cache',action='store_true');p.add_argument('--armed-work-trace',action='store_true');p.add_argument('--continuous-work-trace',action='store_true');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--label',required=True);p.add_argument('--resource-stats',action='store_true');p.add_argument('--snapshot-reuse',action='store_true');p.add_argument('--negative-cache',action='store_true');p.add_argument('--cross-snapshot-reuse',action='store_true');p.add_argument('--failure-context',action='store_true');p.add_argument('--registration-delta-cache',action='store_true');p.add_argument('--armed-work-trace',action='store_true');p.add_argument('--continuous-work-trace',action='store_true');p.add_argument('--gpu-counters',action='store_true',help='Enable only timed, bounded native GPU counter diagnostics');a=p.parse_args()
+if a.gpu_counters and not a.continuous_work_trace:p.error('Timed GPU counters require bounded work context')
 if a.continuous_work_trace and (a.armed_work_trace or not a.failure_context):p.error('Continuous bounded work history requires failure context and excludes timed arming')
 if not re.fullmatch('[a-z0-9-]{1,64}',a.label):p.error('Safe label required')
 evidence=ROOT/'evidence'/a.label;evidence.mkdir(exist_ok=False);(evidence/'msl').mkdir()
@@ -14,6 +15,8 @@ for name,value in [('MVK_AMD_REGISTRATION_DELTA_CACHE',a.registration_delta_cach
  config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("{name}", "{int(value)}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
 if a.armed_work_trace:
  config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("MVK_AMD_GPU_WORK_TRACE_ARM_PATH", "{evidence}/gpu-work-trace.arm", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
+if a.gpu_counters:
+ config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH", "{evidence}/gpu-counter.arm", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
 header=evidence/'game-trial-config.h';header.write_text(config)
 if a.continuous_work_trace:
  config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"','    setenv("MVK_AMD_GPU_TIMEOUT_TRACE", "1", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
@@ -36,5 +39,6 @@ for kind in ['probe','game']:
    (select/name).symlink_to(proxy)
  record={'timeUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'candidate':str(candidate),'candidateSHA256':sha(candidate),'proxy':str(proxy),'proxySHA256':sha(proxy),'profileHeader':str(header) if kind=='game' else None,'resourceStatistics':a.resource_stats,'snapshotReuse':a.snapshot_reuse,'negativeCache':a.negative_cache,'crossEncoderSnapshotReuse':a.cross_snapshot_reuse,'failureContext':a.failure_context,'registrationDeltaCache':a.registration_delta_cache,'armedWorkTrace':a.armed_work_trace,'workCaptureMaximumSeconds':30 if a.armed_work_trace else None,'deployed':False}
  record['continuousBoundedWorkTrace']=a.continuous_work_trace
+ record['timedGPUCounters']=a.gpu_counters
  (folder/'build.json').write_text(json.dumps(record,indent=2)+'\n');records.append(record)
 (evidence/'build.json').write_text(json.dumps(records,indent=2)+'\n');print(json.dumps(records,indent=2))

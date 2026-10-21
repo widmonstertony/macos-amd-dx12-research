@@ -2205,6 +2205,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKGPUTimestampTrace.h",
+      "bytes": 3912,
+      "sha256": "1b50fa996ca117e87cfe89dd662d3fa8120abdea3d98b849dd7c2bad268448b7",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKImage.h",
       "bytes": 27529,
       "sha256": "f3f2990289db19891df1f42f37696dc1403b02b78b6483fa8e9de621e54adf6d",
@@ -2302,14 +2308,15 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueue.mm",
-      "bytes": 38687,
-      "sha256": "0b9f445d8bd5d3f7e4efdf21ce576c7c3964bd2767d0923719e8bbd44fc2d20c",
+      "bytes": 38915,
+      "sha256": "065a57c6c3f56cf8da44d833c5a3d4cc1b04c13f1f0c67f7c742fe3170d6420b",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueDependencyTrace.h",
-      "sha256": "ca43dfd7a654464ccf04503f1f113f682e26e3d26d67d69beb11d0b08ca1a572",
-      "bytes": 8146
+      "bytes": 8748,
+      "sha256": "951ff34048bc2c97d0596f1bd0dc9cf879a43d6c491c8aeb42b84ad768722d2f",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueTimingTrace.h",
@@ -2354,8 +2361,9 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRuntimeTrace.h",
-      "sha256": "037437f3419d51ef8bc95c7cae61e27840c56e2dca0a32a13267439b969a0546",
-      "bytes": 7655
+      "bytes": 7758,
+      "sha256": "1f167a8b881baa6652fa3c7698c3183bf9ab4723770df608f6f2ed1bc8251bcd",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.h",
@@ -33700,6 +33708,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/atmosphere_fault_gpu.mm",
+      "bytes": 10818,
+      "sha256": "f7ec40b3946076876da75e6e1b573445428e6efeebd247426760abf51471110c",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/check_vkd3d_stream_cache.c",
       "bytes": 2840,
       "sha256": "74d8ad651d31c748410ee4d17946b033fa53629da77d87497157794facd0d763",
@@ -33790,6 +33804,12 @@
       "path": "open-game-stack-20261015/src/gpu_common.hpp",
       "bytes": 8202,
       "sha256": "904769f8cbd94dd6b912ad2b04ebdfb174b61a6a98252f2373a7564b2f099398",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/gpu_counter_fault_control.mm",
+      "bytes": 4358,
+      "sha256": "9fbf06ceae40f9b4f55a66aed4224bca3210013b47a330dc0a980e411de521b1",
       "executable": false
     },
     {
@@ -34246,8 +34266,9 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "sha256": "f2053631a102ad1e848c8ee5a5077d6a0e73faa79093d3ab82bcf454c62c1329",
-      "bytes": 4358
+      "bytes": 4828,
+      "sha256": "f0bbd29dc8deb4df7a6003c001c78ec17afa4b22c649e56a5954326cf684007a",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/build_queue_burst_probe.py",
@@ -34397,8 +34418,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "bytes": 15662,
-      "sha256": "e78bb2b71afe05eef1a74d39504ea211f043c149ea570a33822f12683f341b0d",
+      "bytes": 16472,
+      "sha256": "ce4beae2f4c6514c1966845cda9aa1f80bf2e0306a335ae618114ca51339681e",
       "executable": false
     },
     {
@@ -34502,6 +34523,12 @@
       "path": "open-game-stack-20261015/tools/summarize_game_gpu_fault.py",
       "sha256": "54fbe4c33f39cbc6b073adaf1b74b0ccb4b35d4fae500f04b093ca628cd76062",
       "bytes": 2122
+    },
+    {
+      "path": "open-game-stack-20261015/tools/summarize_gpu_counter_intervals.py",
+      "bytes": 2979,
+      "sha256": "ccd1f687dfa46b2b02e8b6a14fe8c99715f454610b6e2c105ae57e78c3bd0981",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/thermal_pause_game.py",
@@ -70092,5 +70119,6 @@
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
-  "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00"
+  "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
+  "latestSourceUpdateUTC": "2026-10-21T23:28:33.525225+00:00"
 }

@@ -54,6 +54,7 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
         ![kind isEqualToString:@"mesh-link-differential"] &&
         ![kind isEqualToString:@"compute-failure"] &&
         ![kind isEqualToString:@"slow-compute"] &&
+        !([kind isEqualToString:@"gpu-timestamps"] && getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH")) &&
         !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
         !([kind isEqualToString:@"compute-archive"] && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
         !([kind isEqualToString:@"present-progress"] && getenv("MVK_AMD_QUEUE_TIMING") && !strcmp(getenv("MVK_AMD_QUEUE_TIMING"), "1")) &&

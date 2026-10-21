@@ -8,6 +8,7 @@
 #include <mutex>
 #include "MVKTimedTraceArm.h"
 #include "MVKEncodedWorkRing.h"
+#include "MVKGPUTimestampTrace.h"
 
 inline bool mvkEncoderWorkTraceEnabled() {
     static const bool enabled = [] { const char* v=getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v,"1"); }();
@@ -46,6 +47,7 @@ inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, ui
         @"phases":[NSMutableArray array],
         @"workEvents":[NSMutableArray array], @"workCount":@0, @"truncatedWorkEvents":@0,
         @"events":[NSMutableArray array], @"truncatedEvents":@0} mutableCopy];
+    mvkBeginGPUTimestamps(record, cb, family);
     objc_setAssociatedObject(cb, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
     {
         std::lock_guard<std::mutex> lock(state.lock);
@@ -65,12 +67,15 @@ inline void mvkAssociateEncoderTrace(id<MTLCommandBuffer> cb, id<MTLCommandEncod
         NSMutableData* data = record[@"workBuffer"];
         if (!data) { data = mvkNewEncodedWorkRing(); record[@"workBuffer"] = data; }
         objc_setAssociatedObject(encoder, mvkEncodedWorkKey(), data, OBJC_ASSOCIATION_RETAIN);
+        if(record[@"gpuCounterBuffer"])objc_setAssociatedObject(encoder, sel_registerName("mvkGPUCounterRecordV1"), record, OBJC_ASSOCIATION_RETAIN);
     }
 }
 inline void mvkRecordEncoderWorkImpl(id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
     if (!encoder || !mvkEncoderWorkTraceEnabled()) return;
     NSMutableData* data = objc_getAssociatedObject(encoder, mvkEncodedWorkKey());
     if (data) mvkAppendEncodedWork(data, encoder, kind, label);
+    NSMutableDictionary* counterRecord=objc_getAssociatedObject(encoder,sel_registerName("mvkGPUCounterRecordV1"));
+    if(counterRecord)mvkSampleGPUTimestamp(counterRecord,encoder,kind,label);
 }
 // Lazy arguments matter: disabled diagnostics must not allocate NSString
 // labels for every fence, draw or dispatch before the helper can return.
@@ -80,6 +85,7 @@ inline void mvkRecordDependencyPhase(id<MTLCommandBuffer> cb, NSString* phase) {
     NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
     if (!record) return;
     @synchronized (record) {
+        if([phase isEqualToString:@"completed"])record[@"nativeCompleted"]=@YES;
         NSMutableArray* phases = record[@"phases"];
         if (phases.count < 8) [phases addObject:@{
             @"phase":phase, @"order":@(mvkPendingDependencies().sequence.fetch_add(1)),
@@ -121,6 +127,7 @@ inline NSDictionary* mvkSnapshotDependencyRecord(NSDictionary* record) {
             @"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
             @"queueIndex":record[@"queueIndex"], @"createdTime":record[@"createdTime"],
             @"events":events, @"truncatedEvents":record[@"truncatedEvents"],
+            @"gpuTimestamps":mvkSnapshotGPUTimestamps(record),
             @"workEvents":work[@"workEvents"],
             @"workCount":work[@"workCount"], @"truncatedWorkEvents":work[@"truncatedWorkEvents"]};
     }
@@ -149,6 +156,7 @@ inline void mvkEndDependencyTrace(id<MTLCommandBuffer> cb) {
         std::lock_guard<std::mutex> lock(state.lock);
         [state.records removeObjectForKey:record[@"submission"]];
     }
+    mvkEndGPUTimestamps(record);
     // Releasing native event objects must not hold the registry mutex.
     objc_setAssociatedObject(cb, mvkDependencyKey(), nil, OBJC_ASSOCIATION_RETAIN);
 }

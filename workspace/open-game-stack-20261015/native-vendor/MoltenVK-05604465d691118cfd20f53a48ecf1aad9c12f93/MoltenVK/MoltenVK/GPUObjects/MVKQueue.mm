@@ -204,6 +204,8 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
     }];
 	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) {
         mvkRecordDependencyPhase(mtlCB, @"completed");
+        NSDictionary* counterRecord=objc_getAssociatedObject(mtlCB,mvkDependencyKey());
+        if(counterRecord[@"gpuCounterBuffer"])mvkWriteRuntimeTrace(getMVKConfig(), @"gpu-timestamps", mvkCommandBufferDependencies(mtlCB));
 		handleMTLCommandBufferError(mtlCB);
 		if (mvkDependencyTraceEnabled() && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))
 			mvkWriteRuntimeTrace(getMVKConfig(), @"queue-dependencies", mvkCommandBufferDependencies(mtlCB));

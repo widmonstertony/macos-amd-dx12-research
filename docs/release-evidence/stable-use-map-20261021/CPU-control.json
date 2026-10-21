@@ -1,0 +1,94 @@
+{
+  "timeUTC": "2026-10-21T07:06:39.195961+00:00",
+  "passed": true,
+  "runs": 5,
+  "GPUWorkSubmitted": false,
+  "stableValueAddressesChecked": true,
+  "gameFPSClaim": false,
+  "cases": [
+    {
+      "resources": 64,
+      "shuffled": false,
+      "originalMedianMS": 2.58,
+      "candidateMedianMS": 1.694,
+      "ratio": 0.6565891472868217
+    },
+    {
+      "resources": 64,
+      "shuffled": true,
+      "originalMedianMS": 2.678,
+      "candidateMedianMS": 1.77,
+      "ratio": 0.660941000746826
+    },
+    {
+      "resources": 512,
+      "shuffled": false,
+      "originalMedianMS": 35.55,
+      "candidateMedianMS": 15.897,
+      "ratio": 0.4471729957805908
+    },
+    {
+      "resources": 512,
+      "shuffled": true,
+      "originalMedianMS": 25.518,
+      "candidateMedianMS": 20.975,
+      "ratio": 0.8219688063327847
+    },
+    {
+      "resources": 1024,
+      "shuffled": false,
+      "originalMedianMS": 58.487,
+      "candidateMedianMS": 31.939,
+      "ratio": 0.5460871646690717
+    },
+    {
+      "resources": 1024,
+      "shuffled": true,
+      "originalMedianMS": 65.05,
+      "candidateMedianMS": 40.6,
+      "ratio": 0.6241352805534205
+    },
+    {
+      "resources": 2048,
+      "shuffled": false,
+      "originalMedianMS": 191.695,
+      "candidateMedianMS": 144.196,
+      "ratio": 0.7522157594094786
+    },
+    {
+      "resources": 2048,
+      "shuffled": true,
+      "originalMedianMS": 157.588,
+      "candidateMedianMS": 69.501,
+      "ratio": 0.4410297738406478
+    },
+    {
+      "resources": 4096,
+      "shuffled": false,
+      "originalMedianMS": 401.174,
+      "candidateMedianMS": 195.323,
+      "ratio": 0.48687851156854633
+    },
+    {
+      "resources": 4096,
+      "shuffled": true,
+      "originalMedianMS": 328.68,
+      "candidateMedianMS": 202.848,
+      "ratio": 0.6171595472800292
+    },
+    {
+      "resources": 8192,
+      "shuffled": false,
+      "originalMedianMS": 801.662,
+      "candidateMedianMS": 435.811,
+      "ratio": 0.5436343496386257
+    },
+    {
+      "resources": 8192,
+      "shuffled": true,
+      "originalMedianMS": 783.563,
+      "candidateMedianMS": 423.298,
+      "ratio": 0.5402220370282925
+    }
+  ]
+}

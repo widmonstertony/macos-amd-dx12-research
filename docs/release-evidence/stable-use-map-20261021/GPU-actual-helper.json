@@ -1,0 +1,48 @@
+{
+  "timeUTC": "2026-10-21T07:11:10.830183+00:00",
+  "nativeSHA256": "0da8acf5245587ce24571ef63d0ed7f4733b4a028fcd39e29149fd8418a60c34",
+  "exitCode": 0,
+  "metalValidationEnabled": true,
+  "result": {
+    "passed": true,
+    "GPUWordsChecked": 6,
+    "mismatches": 0,
+    "absentIdentities": 4096,
+    "initialLookups": 4098,
+    "lookupsAfterDuplicate": 4098,
+    "crossEncoderSnapshotReuse": true,
+    "negativeLiveCache": false,
+    "lastEncoderSnapshotSkips": 1,
+    "CPUControls": [
+      {
+        "snapshotReuse": false,
+        "negativeCache": false,
+        "CPUms": 115.136,
+        "liveLookups": 2096672,
+        "absenceHits": 480
+      },
+      {
+        "snapshotReuse": true,
+        "negativeCache": false,
+        "CPUms": 0.220935,
+        "liveLookups": 4096,
+        "absenceHits": 0
+      },
+      {
+        "snapshotReuse": false,
+        "negativeCache": true,
+        "CPUms": 265.935,
+        "liveLookups": 4096,
+        "absenceHits": 2093056
+      },
+      {
+        "snapshotReuse": true,
+        "negativeCache": true,
+        "CPUms": 1.47246,
+        "liveLookups": 4096,
+        "absenceHits": 0
+      }
+    ]
+  },
+  "passed": true
+}

@@ -1,0 +1,10 @@
+{
+  "timeUTC": "2026-10-21T06:59:54.451554+00:00",
+  "hashConflictHypothesisSupported": false,
+  "candidateSlowerInAllObservedCases": true,
+  "appliedToNativeMaps": false,
+  "deployedToGame": false,
+  "realMetalObjects": true,
+  "GPUWorkSubmitted": false,
+  "decision": "Retain original hash functions; do not guess-restart on a disproven hash-collision hypothesis."
+}

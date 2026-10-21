@@ -1,0 +1,33 @@
+{
+  "start": {
+    "timeUTC": "2026-10-21T06:57:06.458548+00:00",
+    "referenceTime": 814258626.4585481,
+    "pid": 70912,
+    "nativeSHA256": "57948db5d789f3e6fac3f082ded44051c919216d4bcc05bdb51dd3d4526bec1e",
+    "actualSceneSeen": true,
+    "WInputSentMS": 700,
+    "outputPixels": [
+      726,
+      526
+    ],
+    "internalResolutionUnverified": true,
+    "differentWindowSizeFromPriorBaseline": true,
+    "sourceChangeFPSRatioNotControlled": true,
+    "publicCommit": "f617315"
+  },
+  "measurementReferenceRange": [
+    814258627.659894,
+    814258687.228169
+  ],
+  "foregroundSamples": 60,
+  "allSamplesForeground": true,
+  "nativePresentWindows": 11,
+  "nativeTimestampIntervals": 280,
+  "nativeIntervalSeconds": 53.955792703,
+  "maxNativeGapMS": 388.27375,
+  "imageChanged": true,
+  "gpuFailureFiles": 0,
+  "gamePlayable": false,
+  "cacheDeleted": false,
+  "nativePresentationFPS": 5.189433533879518
+}

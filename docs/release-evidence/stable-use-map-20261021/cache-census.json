@@ -1,0 +1,12 @@
+{
+  "timeUTC": "2026-10-21T06:52:58.471150+00:00",
+  "computeRecords": 13779,
+  "loaded": 13779,
+  "rehydrated": 13779,
+  "creationFailures": 0,
+  "rehydrateErrors": 0,
+  "loadMedianMS": 6.361781,
+  "rehydrateMedianMS": 22.604678,
+  "mainMenuVisuallyVerified": true,
+  "gamePlayable": false
+}

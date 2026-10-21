@@ -2026,8 +2026,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "sha256": "7c727bbec57915560cf55f2b054ad82ec043ec2b87f03720a8c5d3e73a6cf48f",
-      "bytes": 35418
+      "sha256": "fe6fe413f157ffcb2961f9ec384cc2f847053c081f917e123c181c0f8eeefd40",
+      "bytes": 35444
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
@@ -2110,6 +2110,16 @@
       "bytes": 6285,
       "sha256": "d1b334c98836a092766001bcbb2297dc699d828b6a09ec5979f82157b7106a80",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKPointerHash.h",
+      "sha256": "486e496c272d009da5114f0bb7d75c386c002e754ec4cae6c581cf12a959a1be",
+      "bytes": 538
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKStableUseMap.h",
+      "sha256": "d43a85cf3e3a4ee5e622c352a7144237ebeddda1b4ecb1ed0f08f82b220270a5",
+      "bytes": 2370
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKBuffer.h",
@@ -33905,6 +33915,16 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/metal_pointer_hash_control.mm",
+      "sha256": "ec87796103bb12784c2643ab9265fd7a0278b472e01624b876e836393a19e166",
+      "bytes": 2947
+    },
+    {
+      "path": "open-game-stack-20261015/src/metal_stable_map_control.mm",
+      "sha256": "e662b946d866d964a65f9c430773625b0e47df902d9ed7535ba11db7a6659aa6",
+      "bytes": 3506
+    },
+    {
       "path": "open-game-stack-20261015/src/mixed_compute_barrier.comp",
       "bytes": 534,
       "sha256": "1b0e11472bfaee4968c91ebd2ca98e1ea882ce1febc42021a01b9e2812734bb8",
@@ -33966,9 +33986,8 @@
     },
     {
       "path": "open-game-stack-20261015/src/resource_lookup_epoch_gpu.mm",
-      "bytes": 7353,
-      "sha256": "e06b80010bc286f0fa8cfec90bd38a58c90dbea766600919f346839eed304ae6",
-      "executable": false
+      "sha256": "65089866061467140459f11bb62e374ee20a1d0a7c6ae28bfc72e2b08aaf2636",
+      "bytes": 7406
     },
     {
       "path": "open-game-stack-20261015/src/static_cbv.comp",
@@ -69714,9 +69733,51 @@
           "bytes": 3086
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-stable-use-map-20261021.tar.gz",
+      "sha256": "bf469bcfac0cfbfc45ca90c1534cd2bcf82a49ad9ccdfbf6cb50056cf43f2233",
+      "bytes": 3699091,
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/stable-use-map-20261021-probe/libCandidate.dylib",
+          "sha256": "0da8acf5245587ce24571ef63d0ed7f4733b4a028fcd39e29149fd8418a60c34",
+          "bytes": 5954208
+        },
+        {
+          "path": "open-game-stack-20261015/build/stable-use-map-20261021-probe/libProbeGuard.dylib",
+          "sha256": "b32f64644d82edf4f310ca9492cc17eb632483c3c3e3e5c957423d28aa182725",
+          "bytes": 32256
+        },
+        {
+          "path": "open-game-stack-20261015/build/stable-use-map-20261021-probe/build.json",
+          "sha256": "59bc85d89b2ff80984a7057d1c560b823e3a5a3dc7c32971ee7b5158bb36dfd1",
+          "bytes": 731
+        },
+        {
+          "path": "open-game-stack-20261015/build/stable-use-map-20261021-game/libCandidate.dylib",
+          "sha256": "0da8acf5245587ce24571ef63d0ed7f4733b4a028fcd39e29149fd8418a60c34",
+          "bytes": 5954208
+        },
+        {
+          "path": "open-game-stack-20261015/build/stable-use-map-20261021-game/libProbeGuard.dylib",
+          "sha256": "0d6a10914b0659ce178beaafc7dab07f23889feb802f81b51ddf15155cea272d",
+          "bytes": 36480
+        },
+        {
+          "path": "open-game-stack-20261015/build/stable-use-map-20261021-game/build.json",
+          "sha256": "7b4f198abc68d46ab6d804f8ec384a015b2ddbbc5ea891be09e26674fd37ff5b",
+          "bytes": 865
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/stable-use-map-20261021/game-trial-config.h",
+          "sha256": "f1bc75ab02146d480a62fd1b69bbad866408f08a4eafffcf9c4d10cebb1138af",
+          "bytes": 3086
+        }
+      ]
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Helper-binding fix reached actual camp scene: all 60 foreground samples verified, native presentation 3.2157 FPS, no GPU failure files during run; still unplayable. Reusable flat heap-count scratch table reduces a measured CPU hotspot; five controlled CPU runs and real graphics/multiheap/memory plus original Tencent Wine cache/presentation passed. Candidate57948d is in normal Steam game validation; sustained gameplay and both FSR3 functions unvalidated.",
-  "lastSourceUpdateUTC": "2026-10-21T06:45:04.502638+00:00"
+  "currentSourceState": "Still unplayable: actual camp5.189FPS in726x526 output with60/60 foreground samples; prior3.22FPS was3072x1920 so no causal speedup ratio.13,779 compute archives allloaded/rehydrated with0errors. Stable paged-value/flat-index map reduces measuredCPUcost and preservescachedValue addresses; all5CPUcontrolruns and actualMoltenVKhelperGPUplusgraphics,multiheap,memory,originalTencentWinecache/presentpass. Native0da8acf now normalSteam game validation. Extra pointer hash mixing disproven andnotintegrated. BothFSR3featuresunvalidated.",
+  "lastSourceUpdateUTC": "2026-10-21T07:14:44.517394+00:00"
 }

@@ -68,15 +68,15 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
     initialLookups=helper.statsLookups;
     helper.addLiveSnapshot(snapshot,list,enc,immediate,MVKResourceUsageStages::Compute,false);
     duplicateLookups=helper.statsLookups;
-    need(!helper.used.count(input),"unregistered resource was declared");
+    need(helper.used.find(input)==helper.used.end(),"unregistered resource was declared");
     list.add(input);
     helper.addLiveSnapshot(snapshot,list,enc,immediate,MVKResourceUsageStages::Compute,false);
-    need(helper.used.count(input)&&helper.used.find(input)->second.liveRetained,"registration did not invalidate absence");
+    need(helper.used.find(input)!=helper.used.end()&&helper.used.find(input)->second.liveRetained,"registration did not invalidate absence");
    }
    if(pass==2) {list.add(next);[args setBuffer:next offset:0 atIndex:0];}
    helper.addLiveSnapshot(snapshot,list,enc,immediate,MVKResourceUsageStages::Compute,true);
    id<MTLBuffer> active=pass<2?input:next;
-   need(helper.used.count(active)&&helper.used.find(active)->second.generation==helper.encoderGeneration,"new encoder missed resource declaration");
+   need(helper.used.find(active)!=helper.used.end()&&helper.used.find(active)->second.generation==helper.encoderGeneration,"new encoder missed resource declaration");
    need(helper.used.find(active)->second.write,"write upgrade missing");
    auto before=helper.statsCalls;
    helper.addLiveSnapshot(snapshot,list,enc,immediate,MVKResourceUsageStages::Compute,true);

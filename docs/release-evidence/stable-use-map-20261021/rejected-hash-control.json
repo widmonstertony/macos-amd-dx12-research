@@ -1,0 +1,102 @@
+{
+  "passed": true,
+  "GPUWorkSubmitted": false,
+  "cases": [
+    {
+      "resources": 512,
+      "shuffled": false,
+      "oldBuckets": 1024,
+      "oldOccupied": 395,
+      "oldLongestChain": 4,
+      "newBuckets": 1024,
+      "newOccupied": 403,
+      "newLongestChain": 3,
+      "oldMS": 3.148,
+      "newMS": 6.962
+    },
+    {
+      "resources": 512,
+      "shuffled": true,
+      "oldBuckets": 1024,
+      "oldOccupied": 395,
+      "oldLongestChain": 4,
+      "newBuckets": 1024,
+      "newOccupied": 403,
+      "newLongestChain": 3,
+      "oldMS": 3.296,
+      "newMS": 6.459
+    },
+    {
+      "resources": 1024,
+      "shuffled": false,
+      "oldBuckets": 1024,
+      "oldOccupied": 656,
+      "oldLongestChain": 6,
+      "newBuckets": 1024,
+      "newOccupied": 640,
+      "newLongestChain": 5,
+      "oldMS": 6.799,
+      "newMS": 9.412
+    },
+    {
+      "resources": 1024,
+      "shuffled": true,
+      "oldBuckets": 1024,
+      "oldOccupied": 656,
+      "oldLongestChain": 6,
+      "newBuckets": 1024,
+      "newOccupied": 640,
+      "newLongestChain": 5,
+      "oldMS": 7.316,
+      "newMS": 11.597
+    },
+    {
+      "resources": 2048,
+      "shuffled": false,
+      "oldBuckets": 2048,
+      "oldOccupied": 1293,
+      "oldLongestChain": 6,
+      "newBuckets": 2048,
+      "newOccupied": 1287,
+      "newLongestChain": 6,
+      "oldMS": 29.501,
+      "newMS": 67.534
+    },
+    {
+      "resources": 2048,
+      "shuffled": true,
+      "oldBuckets": 2048,
+      "oldOccupied": 1293,
+      "oldLongestChain": 6,
+      "newBuckets": 2048,
+      "newOccupied": 1287,
+      "newLongestChain": 6,
+      "oldMS": 44.516,
+      "newMS": 48.392
+    },
+    {
+      "resources": 4096,
+      "shuffled": false,
+      "oldBuckets": 4096,
+      "oldOccupied": 2604,
+      "oldLongestChain": 6,
+      "newBuckets": 4096,
+      "newOccupied": 2627,
+      "newLongestChain": 6,
+      "oldMS": 75.967,
+      "newMS": 119.226
+    },
+    {
+      "resources": 4096,
+      "shuffled": true,
+      "oldBuckets": 4096,
+      "oldOccupied": 2604,
+      "oldLongestChain": 6,
+      "newBuckets": 4096,
+      "newOccupied": 2627,
+      "newLongestChain": 6,
+      "oldMS": 83.461,
+      "newMS": 127.72
+    }
+  ]
+}

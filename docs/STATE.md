@@ -1,3 +1,12 @@
+> 最新实测（2026-10-21）：上一版营地 **5.19 FPS**，60/60 次前台可见，未见 GPU 超时，仍不可玩。窗口为 726×526；更早的 3.22 FPS 使用 3072×1920 输出，因此不能把差值全归于代码优化。13,779 条计算归档全部加载并重建成功，0 创建/重建错误，缓存未清除。
+> Latest actual scene: **5.19 FPS**, with 60/60 foreground/visible observations and no GPU timeout files. Still unplayable. Output was 726×526 versus 3072×1920 for the earlier 3.22 FPS run; this is not a controlled source-speedup ratio. All 13,779 compute archives loaded and rehydrated, with zero creation/rehydration errors. Caches remain preserved.
+
+新候选 `0da8acf5…` 将 helper 的逐节点资源状态表换为平坦查询索引与分页稳定值存储，保留查询、持有引用、逐 encoder 声明、权限升级和容量上限。真实 Metal 对象地址的五轮 CPU 对照，12 组场景中位耗时均降低；扩容后值地址、重复插入状态和清空重用检查正确。实际编译的 MoltenVK helper 真实 GPU 测试验证了缺失→注册、跨 encoder 和写权限升级，另有图形、多堆、越界/空描述符及原 Wine 缓存/呈现回归通过。已通过原 Steam 启动，**游戏帧率效果待当前轮测量，FSR3 超分/帧生成仍未验证**。
+
+The new candidate replaces node-per-resource state with a flat lookup index and stable paged values, preserving all liveness, ownership, encoder declarations, access upgrades and bounds. Twelve real-Metal-identity CPU cases improve in five-run medians, including value-address stability through growth. The exact compiled helper's GPU registration/encoder/write-upgrade controls pass, as do graphics, multiheap, robustness/null and original Tencent Wine cache/presentation. It is now in normal-Steam game validation. **No playable result or FSR3 support claim is made.** [Evidence](release-evidence/stable-use-map-20261021/).
+
+额外混合指针哈希的对照反而更慢，未接入原生资源表，也未因此重启游戏。The suspected pointer-hash collision was disproven by real Metal identities; the slower alternative remains a saved, rejected experiment.
+
 > 最新实机场景（2026-10-20）：绑定修复版已经通过原应用宝 Wine / Steam 进入营地。60/60 次采样确认前台且可见，原生呈现 **3.22 FPS**，本轮未见新的 GPU 超时，但仍不可玩。CPU 采样显示瓶颈集中在提交线程的资源表检查、去重和堆声明。
 > Latest actual-scene measurement: the binding repair reaches camp through original Tencent Wine/Steam. All 60 observations confirm foreground visibility; native presentation is **3.22 FPS**, with no new GPU timeout files in this run. It remains unplayable. CPU submission, resource validation and heap residency bookkeeping are measured hotspots.
 

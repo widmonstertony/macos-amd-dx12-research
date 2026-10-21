@@ -23,6 +23,7 @@
 #include "MVKDevice.h"
 #include "MVKDescriptorUseCache.h"
 #include "MVKHeapUseTable.h"
+#include "MVKStableUseMap.h"
 #include "MVKPipeline.h"
 #include "MVKSmallVector.h"
 #include "MVKBitArray.h"
@@ -252,7 +253,7 @@ struct MVKUseResourceHelper {
 	};
 	std::vector<RecentLiveResource> recentLiveResources;
 	MVKOnePerEnumEntry<Entry, MVKResourceUsageStages> entries;
-	std::unordered_map<id<MTLResource>, ResourceInfo> used;
+	MVKStableUseMap<id<MTLResource>, ResourceInfo> used;
 	bool cacheLiveResources = false;
 	bool crossEncoderLiveCache = false;
 	bool batchLiveResources = false;

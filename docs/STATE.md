@@ -1,3 +1,6 @@
+> 描述符快照的存活过滤结果现在可跨着色器阶段和访问类型复用；读写权限用独立阶段掩码记录，编码器切换后重新声明，相关资源注册后仍强制校验。新增真实顶点/像素阶段间接原子写入和像素回读对照源码，保留堆写入、增量与注册失效回归。实际游戏收益仍需验证，尚未达到可玩结论。仅更新源码与通用说明，新的本机诊断数据未公开。
+> Share immutable snapshot liveness filtering across shader stages and access types. Separate read/write stage masks preserve encoder-local declarations and registration invalidation. Add real vertex/fragment indirect atomic writes and pixel readback fixture source, retaining heap-write, delta and registry regression coverage. Actual game benefit requires validation; playability remains unproven. Source and generic documentation only; new local diagnostics remain private.
+
 > 修正描述符集合路径误用描述符缓冲区状态的诊断检查，避免正常描述符表更新触发同步重复警告。保留描述符缓冲区路径的缺堆/越界检查及所有实际 GPU 命令。新增 UAV 描述符表 GPU 回读对照、隔离 D3D12 库选择与有界线程 CPU 计数工具。游戏性能仍未达到可玩结论；FSR3 超分及帧生成仍未验证。本次仅更新源码，未发布新的本机日志或环境数据。
 > Fix descriptor-buffer-only diagnostic checks incorrectly reading inactive heap state on the descriptor-set route, preventing synchronous false-warning floods on valid table updates. Buffer-path heap/bounds validation and all actual GPU commands remain intact. Add a UAV-table GPU readback control, isolated D3D12 library selection and bounded thread CPU counters. Game playability is still unproven; FSR3 upscaling and frame generation remain unvalidated. Source only; no new local logs or environment data are published.
 

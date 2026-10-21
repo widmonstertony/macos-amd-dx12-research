@@ -2026,13 +2026,15 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "sha256": "0c63e2ebfa3048f78fb39acb4533af0b9323646c1fd3ab3c07d8298b4f90bce4",
-      "bytes": 35636
+      "bytes": 35637,
+      "sha256": "5e4b842f1e68e5b7db735d145d80c9e753b69380789556acd4a2c1186e4e0782",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "sha256": "f3c44be0aa42e3d739a0049d848050bfbec76f05077b55fc37b4b5f21a59f273",
-      "bytes": 131088
+      "bytes": 132178,
+      "sha256": "8e73284ab4cd5c80243c27d8329c05c1e75bc76c976d390f20d06e0b7c25928e",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncodingPool.h",
@@ -34029,6 +34031,12 @@
       "bytes": 7872
     },
     {
+      "path": "open-game-stack-20261015/src/snapshot_stage_coverage_gpu.mm",
+      "bytes": 7303,
+      "sha256": "632ff5500fa4cecd703e3f7cbbd3d5b991c0acfbe8af9346742816d9a74a0db1",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/static_cbv.comp",
       "bytes": 1462,
       "sha256": "a36807ad0245d23c48ae7cc7ddde2aff78e3a0ffd25156094f153572b042a81c",
@@ -34217,8 +34225,9 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_resource_lookup_fixture.py",
-      "sha256": "3da9b887c3bbad3f435e6359c6179f1889141cfd3677380e07aa5bf7a9ec337a",
-      "bytes": 1423
+      "bytes": 1855,
+      "sha256": "1dee5bdd907830216bd9b34ac3c36dd5c8a7fee35eeb3ef76a37a3df80d30815",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/build_stable_moltenvk.py",

@@ -1092,10 +1092,15 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
     uint64_t additions = list.additionGeneration();
     DeclaredSnapshot* prior = nullptr;
     DeclaredSnapshot* deltaPrior = nullptr;
+    bool priorValid = false;
+    assert(stage <= MVKResourceUsageStages::All);
+    const uint32_t stageMask = stage == MVKResourceUsageStages::All
+        ? (1u << static_cast<uint32_t>(MVKResourceUsageStages::All)) - 1
+        : 1u << static_cast<uint32_t>(stage);
     auto previous = crossEncoderSnapshotReuse ? snapshot->previous.lock() : nullptr;
     if (descriptorSnapshotReuse) {
         for (auto& entry : declaredSnapshots) {
-            if (entry.list != &list || entry.stage != stage || entry.write != write) continue;
+            if (entry.list != &list) continue;
             if (previous && entry.snapshot == previous && entry.liveSnapshot) deltaPrior = &entry;
             if (entry.snapshot != snapshot) continue;
             prior = &entry;
@@ -1109,7 +1114,12 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
                 entry.additions = additions = observed;
                 if (resourceUseStats) ++statsRegistrationUnrelated;
             }
-            if (entry.generation == encoderGeneration) {
+            priorValid = true;
+            // Liveness depends on the table and registry, not shader stage.
+            // Access coverage remains per encoder and never substitutes read
+            // access for a required write or a declaration in a new stage.
+            uint32_t covered = write ? entry.writeStages : entry.readStages;
+            if (entry.generation == encoderGeneration && (covered & stageMask) == stageMask) {
                 if (resourceUseStats) { ++statsSnapshotSkips; statsSnapshotWordsSkipped+=snapshot->size(); }
                 return;
             }
@@ -1119,6 +1129,9 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
                 // stage/access declarations through the normal helper path.
                 if (resourceUseStats) { ++statsSnapshotFilterHits; statsSnapshotWordsSkipped+=snapshot->size()-entry.liveSnapshot->size(); }
                 for (id<MTLResource> resource : *entry.liveSnapshot) addImmediateLive(resource,list,encoder,func,stage,write);
+                if (entry.generation != encoderGeneration) entry.readStages = entry.writeStages = 0;
+                entry.readStages |= stageMask;
+                if (write) entry.writeStages |= stageMask;
                 entry.generation = encoderGeneration;
                 return;
             }
@@ -1178,7 +1191,12 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         // Admission/eviction affects only CPU metadata. The owned resource
         // references and per-encoder usage map are never discarded here.
         if (incoming <= 32768) {
-            DeclaredSnapshot updated{std::move(snapshot),&list,stage,write,additions,encoderGeneration,std::move(live)};
+            uint32_t readStages = stageMask, writeStages = write ? stageMask : 0;
+            if (prior && priorValid && prior->generation == encoderGeneration) {
+                readStages |= prior->readStages;
+                writeStages |= prior->writeStages;
+            }
+            DeclaredSnapshot updated{std::move(snapshot),&list,readStages,writeStages,additions,encoderGeneration,std::move(live)};
             if (prior) *prior=std::move(updated); else declaredSnapshots.push_back(std::move(updated));
             snapshotLiveIdentities=snapshotLiveIdentities-previous+incoming;
         }

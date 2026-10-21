@@ -271,8 +271,8 @@ struct MVKUseResourceHelper {
     struct DeclaredSnapshot {
         MVKDescriptorUseCache::Snapshot snapshot;
         MVKLiveList* list;
-        MVKResourceUsageStages stage;
-        bool write;
+        uint32_t readStages;
+        uint32_t writeStages;
         uint64_t additions;
         uint64_t generation;
         MVKDescriptorUseCache::Snapshot liveSnapshot;

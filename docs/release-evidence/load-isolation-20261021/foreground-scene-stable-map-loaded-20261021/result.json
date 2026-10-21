@@ -1,0 +1,51 @@
+{
+  "start": {
+    "timeUTC": "2026-10-21T07:28:49.501899+00:00",
+    "referenceTime": 814260529.501899,
+    "pid": 74290,
+    "nativeSHA256": "0da8acf5245587ce24571ef63d0ed7f4733b4a028fcd39e29149fd8418a60c34",
+    "actualSceneSeen": true,
+    "WInputSentMS": 700,
+    "outputPixels": [
+      726,
+      526
+    ],
+    "externalSimulatorPID": 1443,
+    "externalCPUPercent": 882.6,
+    "CPUSpeedLimit": 42,
+    "NSProcessInfoThermalState": 1,
+    "lowPowerModeEnabled": false,
+    "otherProcessPauseApprovalPending": true,
+    "publicCommit": "ed46f22",
+    "gameFPSClaimPending": true
+  },
+  "measurementReferenceRange": [
+    814260530.343281,
+    814260589.846131
+  ],
+  "foregroundSamples": 60,
+  "allSamplesForeground": true,
+  "nativePresentWindows": 11,
+  "nativeTimestampIntervals": 309,
+  "nativeIntervalSeconds": 54.033561396,
+  "maxNativeGapMS": 484.927892,
+  "imageChanged": true,
+  "gpuFailureFiles": 0,
+  "gamePlayable": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "cacheDeleted": false,
+  "externalSimulatorNotModified": true,
+  "externalPauseApprovalPending": true,
+  "nativePresentationFPS": 5.7186680281058555,
+  "endCPULimits": {
+    "CPU_Scheduler_Limit": 100,
+    "CPU_Available_CPUs": 16,
+    "CPU_Speed_Limit": 42
+  },
+  "endThermalState": {
+    "thermalState": 1,
+    "lowPowerModeEnabled": false,
+    "activeProcessorCount": 16
+  }
+}

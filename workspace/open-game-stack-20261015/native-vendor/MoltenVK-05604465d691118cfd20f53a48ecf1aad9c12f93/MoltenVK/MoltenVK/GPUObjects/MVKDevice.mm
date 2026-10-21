@@ -3770,6 +3770,11 @@ MVKPhysicalDevice::~MVKPhysicalDevice() {
 
 #pragma mark - MVKLiveList
 
+MVKLiveList::MVKLiveList() {
+    const char* value = getenv("MVK_AMD_REGISTRATION_DELTA_CACHE");
+    if (value && !strcmp(value, "1")) _registrationLog.reset(new MVKRegistrationLog<id>());
+}
+
 MVKLiveList::Group* MVKLiveList::getGroup(id object) {
 	static constexpr size_t GOLDEN_RATIO = 0x9e3779b97f4a7c16ull;
 	size_t idx = reinterpret_cast<size_t>(object) * GOLDEN_RATIO;
@@ -3782,7 +3787,8 @@ void MVKLiveList::add(id object) {
 	std::lock_guard<Lock> guard(group->lock);
 	group->entries[object]++;
 	group->additions.fetch_add(1, std::memory_order_release);
-	_allAdditions.fetch_add(1, std::memory_order_release);
+	if (_registrationLog) _registrationLog->append(object);
+	else _allAdditions.fetch_add(1, std::memory_order_release);
 }
 
 void MVKLiveList::remove(id object) {

@@ -32,6 +32,8 @@
 #include <mutex>
 #include <atomic>
 #include <os/lock.h>
+#include "MVKRegistrationLog.h"
+#include <memory>
 
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
@@ -578,6 +580,7 @@ class MVKLiveList {
 	static constexpr size_t GROUP_BITS = 8;
 	Group groups[1 << GROUP_BITS];
 	std::atomic<uint64_t> _allAdditions{0};
+	std::unique_ptr<MVKRegistrationLog<id>> _registrationLog;
 	Group* getGroup(id object);
 
 public:
@@ -592,14 +595,20 @@ public:
 		operator bool() const { return _retainedObject != nil; }
 	};
 
+	MVKLiveList();
 	void add(id object);
 	void remove(id object);
 	IsLiveResult isLive(id object) { return isLive_(object); }
 	// A cached absence is valid only until another registration in this shard.
 	// Read before isLive(): registration during that query must invalidate it too.
-	uint64_t additionGeneration() { return _allAdditions.load(std::memory_order_acquire); }
+	uint64_t additionGeneration() { return _registrationLog ? _registrationLog->current() : _allAdditions.load(std::memory_order_acquire); }
 	uint64_t additionGeneration(id object) { return getGroup(object)->additions.load(std::memory_order_acquire); }
 
+    template<class Contains>
+    bool registrationRequiresValidation(uint64_t since, Contains contains, uint64_t& observed) {
+        if (!_registrationLog) { observed = additionGeneration(); return true; }
+        return _registrationLog->requiresValidation(since, contains, observed);
+    }
 private:
 	IsLiveResult isLive_(id object);
 };

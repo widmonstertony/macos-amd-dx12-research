@@ -279,6 +279,7 @@ struct MVKUseResourceHelper {
     };
     size_t snapshotLiveIdentities = 0;
     std::vector<DeclaredSnapshot> declaredSnapshots;
+    uint64_t statsRegistrationQueries=0, statsRegistrationUnrelated=0;
     uint64_t statsSnapshotCalls=0, statsSnapshotSkips=0, statsSnapshotWordsSkipped=0, statsSnapshotFilterHits=0;
     void addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                          id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,

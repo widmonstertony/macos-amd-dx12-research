@@ -1,0 +1,19 @@
+{
+  "timeUTC": "2026-10-21T08:01:07.722007+00:00",
+  "sourceChanges": [
+    "Opt-in bounded registration identity log; immutable descriptor snapshots skip full validation only when all new registrations are unrelated. Capacity/query overflow retains old full-validation fallback.",
+    "Metal heap batch declarations cover reads only; retain explicit write resource declarations in compute and graphics."
+  ],
+  "CPUControl": "evidence/registration-log-control-20261021/result.json",
+  "beforeGPUControls": [
+    "evidence/registration-delta-before-20261021/run.json",
+    "evidence/heap-write-declarations-before-20261021/run.json"
+  ],
+  "beforeHeapGPUOutputCorrect": true,
+  "beforeWriteDeclarationContractCorrect": false,
+  "actualGameCauseNotProven": true,
+  "gameCachesDeleted": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "gamePlayable": false
+}

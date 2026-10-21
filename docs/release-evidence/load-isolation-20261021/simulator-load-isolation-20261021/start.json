@@ -1,0 +1,12 @@
+{
+  "timeUTC": "2026-10-21T07:35:08.317537+00:00",
+  "targetPID": 1443,
+  "controllerPID": 75923,
+  "identity": [
+    "/Library/Developer/CoreSimulator/Volumes/iOS_23F77/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 26.5.simruntime/Contents/Resources/RuntimeRoot/System/Library/PrivateFrameworks/MediaAnalysis.framework/mediaanalysisd",
+    "Tue Oct 20 13:40:52 2026"
+  ],
+  "paused": true,
+  "maxSeconds": 600,
+  "dataDeleted": false
+}

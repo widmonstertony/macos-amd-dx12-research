@@ -1,0 +1,11 @@
+{
+  "timeUTC": "2026-10-21T07:50:38.973725+00:00",
+  "originalPID": 1443,
+  "SIGCONTSentAt": "2026-10-21T07:45:09.042252+00:00",
+  "originalExitedAfterResume": true,
+  "sameServiceRelaunchedPID": 76635,
+  "newObservedCPUPercent": 855.6,
+  "newProcessNotModified": true,
+  "simulatorShutdown": false,
+  "dataDeleted": false
+}

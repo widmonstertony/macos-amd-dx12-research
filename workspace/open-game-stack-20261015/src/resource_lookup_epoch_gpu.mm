@@ -35,8 +35,9 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
  *(uint32_t*)input.contents=0x12345678;*(uint32_t*)next.contents=0xface0000;memset(output.contents,0xcd,256);
  [args setArgumentBuffer:table offset:0];[args setBuffer:input offset:0 atIndex:0];
  id<MTLCommandQueue> queue=[device newCommandQueue];
+ id<MTLBuffer> unrelated[32];for(auto& b:unrelated)b=[device newBufferWithLength:256 options:MTLResourceStorageModeShared];
  MVKLiveList list;
- uint64_t initialLookups=0, duplicateLookups=0, skips=0;bool crossObserved=false,negativeObserved=false;
+ uint64_t initialLookups=0, duplicateLookups=0, skips=0, unrelatedLookupDelta=0;bool crossObserved=false,negativeObserved=false;
  struct Bench {double ms;uint64_t lookups=0,hits=0;};Bench benches[4];
  for(unsigned mode=0;mode<4;++mode) {
   fprintf(stderr,"stage=bench-%u\n",mode);
@@ -46,6 +47,7 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
   MVKLiveList empty;
   auto start=std::chrono::steady_clock::now();
   for(unsigned encoder=0;encoder<32;++encoder) {
+   empty.add(unrelated[encoder]);
    h.resetForEncoder();
    for(unsigned rebind=0;rebind<16;++rebind)h.addLiveSnapshot(stale,empty,nil,immediate,MVKResourceUsageStages::Compute,false);
    benches[mode].lookups+=h.statsLookups;benches[mode].hits+=h.statsAbsentHits;
@@ -62,6 +64,7 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
   MVKDescriptorUseCache::Snapshot snapshot=values;
   for(uint32_t pass=0;pass<4;++pass) {
    fprintf(stderr,"stage=gpu-pass-%u\n",pass);
+   list.add(unrelated[pass]);
    id<MTLCommandBuffer> cb=[queue commandBuffer];id<MTLComputeCommandEncoder> enc=[cb computeCommandEncoder];helper.resetForEncoder();
    if(!pass) {
     helper.addLiveSnapshot(snapshot,list,enc,immediate,MVKResourceUsageStages::Compute,false);
@@ -74,7 +77,9 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
     need(helper.used.find(input)!=helper.used.end()&&helper.used.find(input)->second.liveRetained,"registration did not invalidate absence");
    }
    if(pass==2) {list.add(next);[args setBuffer:next offset:0 atIndex:0];}
+   auto beforeUnrelated=helper.statsLookups;
    helper.addLiveSnapshot(snapshot,list,enc,immediate,MVKResourceUsageStages::Compute,true);
+   if(pass==1)unrelatedLookupDelta=helper.statsLookups-beforeUnrelated;
    id<MTLBuffer> active=pass<2?input:next;
    need(helper.used.find(active)!=helper.used.end()&&helper.used.find(active)->second.generation==helper.encoderGeneration,"new encoder missed resource declaration");
    need(helper.used.find(active)->second.write,"write upgrade missing");
@@ -93,8 +98,9 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
  if(*(uint32_t*)input.contents!=0x1234567a||*(uint32_t*)next.contents!=0xface0002)++mismatch;
  std::ofstream out(argv[1]);out<<"{\"passed\":"<<(mismatch?"false":"true")<<",\"GPUWordsChecked\":6,\"mismatches\":"<<mismatch<<",\"absentIdentities\":4096,\"initialLookups\":"<<initialLookups<<",\"lookupsAfterDuplicate\":"<<duplicateLookups<<",\"crossEncoderSnapshotReuse\":"<<(crossObserved?"true":"false")<<",\"negativeLiveCache\":"<<(negativeObserved?"true":"false")<<",\"lastEncoderSnapshotSkips\":"<<skips<<",\"CPUControls\":[";
  for(unsigned i=0;i<4;++i) {if(i)out<<",";out<<"{\"snapshotReuse\":"<<(i&1?"true":"false")<<",\"negativeCache\":"<<(i&2?"true":"false")<<",\"CPUms\":"<<benches[i].ms<<",\"liveLookups\":"<<benches[i].lookups<<",\"absenceHits\":"<<benches[i].hits<<"}";}
- out<<"]}\n";
+ out<<"],\"unrelatedRegistrationsPerCPUControl\":32,\"GPUUnrelatedOnlyLookupDelta\":"<<unrelatedLookupDelta<<"}\n";
  printf("RESOURCE_EPOCH_GPU mismatches=%llu initialLookups=%llu duplicateLookups=%llu\n",(unsigned long long)mismatch,(unsigned long long)initialLookups,(unsigned long long)duplicateLookups);
+ for(auto b:unrelated)[b release];
  [queue release];[table release];[output release];[next release];[input release];[args release];[pipeline release];[fn release];[library release];[device release];return mismatch?5:0;
  }catch(const std::exception&e){fprintf(stderr,"ERROR %s\n",e.what());return 2;}
 }}

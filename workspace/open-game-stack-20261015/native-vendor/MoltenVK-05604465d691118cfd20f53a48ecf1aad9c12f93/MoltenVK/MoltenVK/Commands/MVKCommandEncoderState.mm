@@ -1095,7 +1095,16 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         for (auto& entry : declaredSnapshots) {
             if (entry.snapshot != snapshot || entry.list != &list || entry.stage != stage || entry.write != write) continue;
             prior = &entry;
-            if (entry.additions != additions) break;
+            if (entry.additions != additions) {
+                if (resourceUseStats) ++statsRegistrationQueries;
+                uint64_t observed = additions;
+                bool validate = list.registrationRequiresValidation(entry.additions, [&](id resource) {
+                    return std::find(snapshot->begin(), snapshot->end(), resource) != snapshot->end();
+                }, observed);
+                if (validate) break;
+                entry.additions = additions = observed;
+                if (resourceUseStats) ++statsRegistrationUnrelated;
+            }
             if (entry.generation == encoderGeneration) {
                 if (resourceUseStats) { ++statsSnapshotSkips; statsSnapshotWordsSkipped+=snapshot->size(); }
                 return;
@@ -1136,7 +1145,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
 void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     if (!resourceUseStats) return;
     struct Totals {
-        uint64_t calls=0, lookups=0, retainedHits=0, absentHits=0, liveFound=0, snapshotCalls=0, snapshotSkips=0, snapshotWordsSkipped=0, snapshotFilterHits=0, resets=0, capClears=0, maxUsed=0;
+        uint64_t registrationQueries=0, registrationUnrelated=0, calls=0, lookups=0, retainedHits=0, absentHits=0, liveFound=0, snapshotCalls=0, snapshotSkips=0, snapshotWordsSkipped=0, snapshotFilterHits=0, resets=0, capClears=0, maxUsed=0;
         double start=0;
     };
     static std::mutex lock;
@@ -1146,6 +1155,8 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     double now=[NSDate timeIntervalSinceReferenceDate];
     if (!total.start) total.start=now;
     total.calls+=statsCalls; total.lookups+=statsLookups;
+    total.registrationQueries+=statsRegistrationQueries; total.registrationUnrelated+=statsRegistrationUnrelated;
+    statsRegistrationQueries=statsRegistrationUnrelated=0;
     total.snapshotCalls+=statsSnapshotCalls;total.snapshotSkips+=statsSnapshotSkips;total.snapshotWordsSkipped+=statsSnapshotWordsSkipped;total.snapshotFilterHits+=statsSnapshotFilterHits;
     statsSnapshotCalls=statsSnapshotSkips=statsSnapshotWordsSkipped=statsSnapshotFilterHits=0;
     total.retainedHits+=statsRetainedHits; total.absentHits+=statsAbsentHits; total.liveFound+=statsLiveFound;
@@ -1157,7 +1168,7 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     if (directory) {
         char path[4096];snprintf(path,sizeof(path),"%s/resource-use-%d.jsonl",directory,getpid());
         char line[2048];
-        snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed);
+        snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"registrationQueries\":%llu,\"registrationUnrelated\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.registrationQueries,(unsigned long long)total.registrationUnrelated,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed);
         if (records < 1024) {
             FILE* file=fopen(path,"a");
             if(file) { fputs(line,file); fclose(file); ++records; }
@@ -1355,13 +1366,10 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 			// indirect resources in one MTLHeap to be declared with one useHeap.
 			// Collapse only groups large enough to amortize the heap declaration;
 			// keep small and non-heap groups on the precise useResources path.
-			// Reuse CPU capacity only; every Metal encoder still gets its declarations.
+			// useHeaps declares read access only. Writable children stay in readWrite.
+		// Reuse CPU capacity only; every Metal encoder still gets its declarations.
 			heapCounts.reset();
 			for (id<MTLResource> resource : entry.read) {
-				id<MTLHeap> heap = resource.heap;
-				if (heap) heapCounts.add(heap);
-			}
-			for (id<MTLResource> resource : entry.readWrite) {
 				id<MTLHeap> heap = resource.heap;
 				if (heap) heapCounts.add(heap);
 			}
@@ -1373,7 +1381,6 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 					return !heap || heapCounts.count(heap) < heapBatchThreshold;
 				};
 				entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
-				entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());
 				[encoder useHeaps:heaps.data() count:heaps.size() stages:mtlStages];
 				if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS graphics resources=%u heaps=%zu stage=%u\n", collapsedResources, heaps.size(), i);
 			}
@@ -1393,13 +1400,10 @@ void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> enco
 	Entry& entry = entries[MVKResourceUsageStages::Compute];
 	MVKSmallVector<id<MTLHeap>> heaps;
 	if (batchArgumentHeaps) {
+		// useHeaps declares read access only. Writable children stay in readWrite.
 		// Reuse CPU capacity only; every Metal encoder still gets its declarations.
 			heapCounts.reset();
 		for (id<MTLResource> resource : entry.read) {
-			id<MTLHeap> heap = resource.heap;
-			if (heap) heapCounts.add(heap);
-		}
-		for (id<MTLResource> resource : entry.readWrite) {
 			id<MTLHeap> heap = resource.heap;
 			if (heap) heapCounts.add(heap);
 		}
@@ -1411,7 +1415,6 @@ void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> enco
 				return !heap || heapCounts.count(heap) < heapBatchThreshold;
 			};
 			entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
-			entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());
 			[encoder useHeaps:heaps.data() count:heaps.size()];
 			if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS compute resources=%u heaps=%zu\n", collapsedResources, heaps.size());
 		}

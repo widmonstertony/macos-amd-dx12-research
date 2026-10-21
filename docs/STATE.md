@@ -1,3 +1,14 @@
+> 最新状态（2026-10-21）：同一轮、同一场景、726×526 输出，外部模拟器高负载下 **5.72 FPS**；有时限的减载对照测得 **12.69 FPS**，冷却后 **13.33 FPS**，均未记录 GPU 错误，**仍不可玩**。模拟器原进程已在十分钟时限内恢复，没有关闭模拟器或删除数据。
+> Latest: the same game, scene and output delivered **5.72 FPS** under external simulator CPU load, **12.69 FPS** with bounded load isolation and **13.33 FPS** after cooling. No GPU failures were recorded in those controls. **Still unplayable.** The isolated simulator process was resumed at the ten-minute deadline; no simulator shutdown or data removal occurred.
+
+候选 `b48f4735…` 增加有界注册变化记录，仅当新增对象均与描述符快照无关时复用缓存；相关注册、记录溢出、变化超出查询预算均回退完整验证。同时保留 heap 子资源必须的显式写入声明。真实 helper 的 GPU 对照输出正确：无关注册的重复查询 **131,072→4,096**；必要写入声明 **0→2**。图形切换、多堆、内存保护及几何阶段回归通过。这些是独立回归，**尚未测得新候选的游戏帧率**。原 Wine 呈现与正常 Steam 游戏验证等待本机会话解锁；游戏缓存保留，FSR3 超分和帧生成仍未验证。
+
+Candidate `b48f4735…` adds a bounded registration log that preserves full validation for related registrations, overrun or excessive churn, while skipping provably unrelated invalidations. Heap-child writes now retain their required explicit write declarations. Exact native-helper GPU output passed: redundant lookups **131,072→4,096**, required write declarations **0→2**. Graphics transitions, multiple heaps, memory protections and geometry regressions passed. **No new game FPS result is claimed.** Original-Wine presentation and normal Steam game tests await local unlock. Caches are retained; FSR3 upscaling and frame generation remain required and unvalidated.
+
+[Load-isolation results](release-evidence/load-isolation-20261021/) · [New source/GPU controls, including retained before failures](release-evidence/registration-delta-20261021/)
+
+以下为历史记录。 / Earlier measurements follow.
+
 > 最新实测（2026-10-21）：`0da8acf5…` 实际营地 **5.72 FPS**，726×526 输出，60/60 次前台/可见，未记录 GPU 超时，**仍不可玩**。新发现：另一项 iOS 模拟器 `mediaanalysisd` 占 692–885% CPU，系统报告 CPU_Speed_Limit 36–46；接电 94W，低电量模式关闭。仅暂停本游戏的两分钟减载对照已自动恢复，尚不能分离外部负载的影响。模拟器进程未改，临时暂停等待用户确认。
 > Latest actual scene for `0da8acf5…`: **5.72 FPS** at 726×526, with 60/60 foreground/visible samples and no GPU timeout files. **Still unplayable.** A separate iOS Simulator media analyzer consumes 692–885% CPU while the system reports CPU_Speed_Limit 36–46. AC adapter is 94W and Low Power Mode is off. A bounded game-only pause auto-resumed; the simulator remains untouched pending approval for a temporary load-isolation control. This is an observed confounder, not proof that it explains all low FPS. FSR3 upscaling and frame generation remain required and unvalidated.
 

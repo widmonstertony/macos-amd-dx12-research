@@ -2026,13 +2026,13 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "sha256": "fe6fe413f157ffcb2961f9ec384cc2f847053c081f917e123c181c0f8eeefd40",
-      "bytes": 35444
+      "sha256": "26304c1f69ec02d6b294d4a2e49715a852879a6c3e2e1df6355182caa0accf1f",
+      "bytes": 35515
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "sha256": "279f19924e388d40e106ab5f853f1a3fc99fb5c96ad3a2f8e8184c92416f6271",
-      "bytes": 127525
+      "sha256": "644a2e22ca8f9f1052e35bf97c8165aadbbede8ae7f4317bfbfa7ac79cb862db",
+      "bytes": 127983
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncodingPool.h",
@@ -2159,15 +2159,13 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h",
-      "bytes": 58577,
-      "sha256": "13dccd8c34a59355f156e018534a3d24cd5a5a907fdcfa21c2125bb709fa83b6",
-      "executable": false
+      "sha256": "9806d563956108de80360b9b3cd26c83f10c93a421ebdf2b8c789a1e74664de0",
+      "bytes": 59044
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.mm",
-      "bytes": 267519,
-      "sha256": "eb30e27f630660d2b0e5291e972d5c70af865ffd03c78fb99b1cc08781f3fd78",
-      "executable": false
+      "sha256": "9708abc8a1d8391f1211c2025653bd37539f653a0475bae0d2c374a7317e589b",
+      "bytes": 267773
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDeviceFeatureStructs.def",
@@ -2312,6 +2310,11 @@
       "bytes": 4063,
       "sha256": "c563295793982fd613e2896dd77bc66692dd87e4dbd309036b3f40ecdbd51dce",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRegistrationLog.h",
+      "sha256": "46b05a3350758d8283f17647439f871ebaac77b3ac45d16ce4b2ac2a6d6cedc9",
+      "bytes": 1948
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRenderArchive.h",
@@ -33647,9 +33650,8 @@
     },
     {
       "path": "open-game-stack-20261015/run_gpu.py",
-      "bytes": 17067,
-      "sha256": "36e53b3267a9ca6a24832598067d4477a837be7f4461fad33edfc2804b240c26",
-      "executable": false
+      "sha256": "1a83dd5445377cbc9343d4e26d2ab39651ab81675e7743ef4901f5b627a27bf5",
+      "bytes": 17277
     },
     {
       "path": "open-game-stack-20261015/run_tencent_trial.py",
@@ -33984,6 +33986,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/registration_log_control.cpp",
+      "sha256": "49cab6cbbb5e34e320b408d484f9f0e18065ef57ac9a3c00df2eca012666652f",
+      "bytes": 1914
+    },
+    {
       "path": "open-game-stack-20261015/src/render_archive_lifetime_stress.mm",
       "bytes": 10066,
       "sha256": "baaa2b69f2bd70018552258a23c7f3cadb67219f2cd0e89100dd5f6793fa6181",
@@ -33991,8 +33998,8 @@
     },
     {
       "path": "open-game-stack-20261015/src/resource_lookup_epoch_gpu.mm",
-      "sha256": "65089866061467140459f11bb62e374ee20a1d0a7c6ae28bfc72e2b08aaf2636",
-      "bytes": 7406
+      "sha256": "5a9062365356fb6938365a434624fabf4d954239c14ab9c6ee8bf67d783ee223",
+      "bytes": 7872
     },
     {
       "path": "open-game-stack-20261015/src/static_cbv.comp",
@@ -34157,8 +34164,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "sha256": "9bc77cd76db23f594d50a7587ccfde7829f3c41298fa5eccd0ee64099a5af614",
-      "bytes": 3194
+      "sha256": "2b0e1deb57852d1b09916e06f81a83fc3bf5427e9820f2fd268b3cb9842b5e5a",
+      "bytes": 3502
     },
     {
       "path": "open-game-stack-20261015/tools/build_queue_burst_probe.py",
@@ -34168,9 +34175,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_resource_lookup_fixture.py",
-      "bytes": 1309,
       "sha256": "e7354918952e1032eed11066217eab30e71f27ceb1e0721ead17ef46cc58c189",
-      "executable": false
+      "bytes": 1309
     },
     {
       "path": "open-game-stack-20261015/tools/build_stable_moltenvk.py",
@@ -34293,9 +34299,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "bytes": 12759,
-      "sha256": "6f70a469c22f0ab15d1c201995415142a85f0c73a0bf7044ed9ba528410b9390",
-      "executable": false
+      "sha256": "eeaf11b86312f584647132780f82ae1fcd752573c6d1aa12ef7ea4c12390e9ac",
+      "bytes": 12914
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_query_output.py",
@@ -34349,6 +34354,11 @@
       "bytes": 2874,
       "sha256": "29c6051a07980e7c175021596b3fd1f6a668e87273998074529e014a778902e9",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/run_resource_helper_controls.py",
+      "sha256": "433be5e2f79d62eb96e11b952604e483801a5ffeab31e095fd3f11d0c83b483f",
+      "bytes": 2616
     },
     {
       "path": "open-game-stack-20261015/tools/run_window_controls.py",
@@ -69800,9 +69810,51 @@
           "bytes": 3086
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-registration-delta-20261021.tar.gz",
+      "sha256": "884111d34a73fa9555cb87cea83b44e713874760b44b7691cb7d828ebe01ee81",
+      "bytes": 3701531,
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/registration-delta-20261021-probe/libCandidate.dylib",
+          "sha256": "b48f473503ad06eb117b366343ccff661416ca480c30dcabdee021009f48fdd5",
+          "bytes": 5954688
+        },
+        {
+          "path": "open-game-stack-20261015/build/registration-delta-20261021-probe/libProbeGuard.dylib",
+          "sha256": "73caad615e6f6ec038fe3e6101b0d29c2d0d09f39c160814c8d98571a70b96e5",
+          "bytes": 32256
+        },
+        {
+          "path": "open-game-stack-20261015/build/registration-delta-20261021-probe/build.json",
+          "sha256": "87d92628a4f7264bf3c338b4588e554fd53ae8a562e9114991587433b382e1ba",
+          "bytes": 773
+        },
+        {
+          "path": "open-game-stack-20261015/build/registration-delta-20261021-game/libCandidate.dylib",
+          "sha256": "b48f473503ad06eb117b366343ccff661416ca480c30dcabdee021009f48fdd5",
+          "bytes": 5954688
+        },
+        {
+          "path": "open-game-stack-20261015/build/registration-delta-20261021-game/libProbeGuard.dylib",
+          "sha256": "055ae962c2b37341c0d782ab0acc7046edc77dee657b8faa52e2c4b5b80b36ba",
+          "bytes": 36480
+        },
+        {
+          "path": "open-game-stack-20261015/build/registration-delta-20261021-game/build.json",
+          "sha256": "a7e4c1f4158064ea5361287f534da0b4f699f91832c336330b10a3491ce3bb41",
+          "bytes": 911
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/registration-delta-20261021/game-trial-config.h",
+          "sha256": "46ef95982bb4e00df2b0cb64598d70aa1b1956cab19b16ae15c0b5d161130f9d",
+          "bytes": 3154
+        }
+      ]
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Actual stable-map game camp5.7187FPS in726x526 output,60/60foregroundvisible,0GPUfailurefiles;stillunplayable. ActiveiOSsimulatormediaanalysisd692-885%CPU andCPUSpeedLimit36-46observed,AC94W,lowpowermodeoff. Boundedgameonlypauseautomaticallyresumed;unrelatedsimulatorunchanged,pauseapprovalpending. Native0da8acfsourceandruntimequalified/backedup. BothFSR3featuresunvalidated. Heapwriteledgercompiledonly,notrunordeployed;donotclaimgamecause.",
-  "lastSourceUpdateUTC": "2026-10-21T07:32:03.632827+00:00"
+  "currentSourceState": "Same-scene0da8acf loaded5.72FPS, external-load-isolated12.69FPS and cooled13.33FPS. Simulator pause auto-restored after600sec. Newb48f473registrationdelta+explicitheapwrites nativeCPU/GPUqualified,notgame-tested; currentlocalsessionlocked and unlockrequested. Newfixture131072->4096lookups,6+128GPUwords correct;4additionalGPU suitespassed. Gamecachepreserved,gamecurrentlystopped; originalWinepresentationandactualgameFPSstillpending,FSR3bothunvalidated,notplayable.",
+  "lastSourceUpdateUTC": "2026-10-21T08:04:36.965563+00:00"
 }

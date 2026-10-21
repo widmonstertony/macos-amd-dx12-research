@@ -1,0 +1,60 @@
+{
+  "start": {
+    "timeUTC": "2026-10-21T07:36:21.603174+00:00",
+    "referenceTime": 814260981.603174,
+    "gamePID": 74290,
+    "nativeSHA256": "0da8acf5245587ce24571ef63d0ed7f4733b4a028fcd39e29149fd8418a60c34",
+    "sameGameAndScene": true,
+    "cameraInputNotChangedForControl": true,
+    "outputPixels": [
+      726,
+      526
+    ],
+    "externalSimulatorPID": 1443,
+    "externalSimulatorPaused": true,
+    "pauseControllerPID": 75923,
+    "maxExternalPauseSeconds": 600,
+    "CPUSpeedLimitAtStart": 48,
+    "cacheDeleted": false,
+    "otherGameSettingsChanged": false
+  },
+  "referenceRange": [
+    814260981.828553,
+    814261162.761868
+  ],
+  "activitySamples": 180,
+  "allForeground": true,
+  "nativePresentationFPS": 12.692770098671131,
+  "minuteWindows": [
+    {
+      "seconds": [
+        0,
+        60
+      ],
+      "records": 11,
+      "FPS": 12.575881161312033
+    },
+    {
+      "seconds": [
+        60,
+        120
+      ],
+      "records": 11,
+      "FPS": 12.66634217946829
+    },
+    {
+      "seconds": [
+        120,
+        180
+      ],
+      "records": 11,
+      "FPS": 12.897050500819342
+    }
+  ],
+  "GPUFailureFiles": 0,
+  "imageChanged": true,
+  "gamePlayable": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "cacheDeleted": false
+}

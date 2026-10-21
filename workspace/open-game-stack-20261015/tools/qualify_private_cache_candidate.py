@@ -26,6 +26,7 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--private-directory', type=Path, default=PRIVATE)
+    parser.add_argument('--compute-only', action='store_true', help='Headless compute/cache qualification; does not qualify presentation')
     parser.add_argument('--compute-shards', action='store_true')
     parser.add_argument('--render-shards', action='store_true')
     parser.add_argument('--render-global-read-only', type=Path)
@@ -132,6 +133,8 @@ def main():
               "liveGameLibrariesChanged": False, "gpuTimeoutTrace": args.gpu_timeout_trace,
               "specializedQueues": args.specialized_queues, "useMTLHeap": args.use_mtl_heap,
               "crossEncoderLiveCache": args.cross_encoder_live_cache,
+              "registrationDeltaCache": args.registration_delta_cache,
+              "qualificationScope": "compute-only" if args.compute_only else "compute-and-presentation",
               "batchArgumentHeaps": args.batch_argument_heaps,
               "argumentHeapThreshold": args.argument_heap_threshold, "results": {}}
     probes = [
@@ -142,6 +145,7 @@ def main():
     if args.render_shards:
         probes[-1:] = [('present-seed', 'd3d12_presentation_probe.exe', 'presentation.gpu_api_result=PASS'),
                        ('present-warm', 'd3d12_presentation_probe.exe', 'presentation.gpu_api_result=PASS')]
+    if args.compute_only: probes = [p for p in probes if p[0].startswith("compute-")]
     for name, filename, marker in probes:
         d = out / name
         d.mkdir()
@@ -212,6 +216,7 @@ def main():
                         and all(v["passed"] for v in result["results"].values())
                         and result["sharedGameCandidateUnchanged"])
     result["nativeArchiveHitRateMeasured"] = args.compute_shards and result['results'].get('compute-load', {}).get('nativeArchiveHitVerified', False)
+    result["presentationPassed"] = not args.compute_only and all(v["passed"] for k,v in result["results"].items() if k.startswith("present")) and any(k.startswith("present") for k in result["results"])
     result["actualGamePerformanceMeasured"] = False
     (out / "run.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"evidence": str(out), "passed": result["passed"]}), flush=True)

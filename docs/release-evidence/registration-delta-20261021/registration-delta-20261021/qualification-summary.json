@@ -1,5 +1,5 @@
 {
-  "timeUTC": "2026-10-21T08:03:15.641729+00:00",
+  "timeUTC": "2026-10-21T08:07:52.358900+00:00",
   "candidateSHA256": "b48f473503ad06eb117b366343ccff661416ca480c30dcabdee021009f48fdd5",
   "sourceStableBuild": "open-game-stack-20261015/evidence/registration-delta-native-20261021/build-proof.json",
   "sourceStable": true,
@@ -34,5 +34,16 @@
   "gamePlayable": false,
   "FSR3UpscalingValidated": false,
   "FSR3FrameGenerationValidated": false,
-  "next": "Preserve new source/runtime and failed original contracts. Wait for local unlock for originalWine presentation qualification and normal originalSteam game launch. Measure actual foreground scene plus registration skip counters; do not claim independent CPU fixture as FPS gain. Further focus perencoder residency repeat and descriptor churn only after profiling."
+  "next": "Preserve new source/runtime and failed original contracts. Wait for local unlock for originalWine presentation qualification and normal originalSteam game launch. Measure actual foreground scene plus registration skip counters; do not claim independent CPU fixture as FPS gain. Further focus perencoder residency repeat and descriptor churn only after profiling.",
+  "publicCommit": "0921953",
+  "publicBackupVerification": {
+    "sourceFiles": 11525,
+    "runtimeFiles": 123,
+    "passed": true
+  },
+  "headlessOriginalWineControlInProgress": false,
+  "originalWineComputeAndStrictCachePassed": true,
+  "originalWineComputeEvidence": "open-game-stack-20261015/evidence/private-cache-wine-20261021T080653Z/run.json",
+  "originalWinePresentationPassed": false,
+  "presentationStillRequiresUnlockedSession": true
 }

@@ -34299,8 +34299,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "sha256": "eeaf11b86312f584647132780f82ae1fcd752573c6d1aa12ef7ea4c12390e9ac",
-      "bytes": 12914
+      "sha256": "573dbb4a3d3b0aff6d78a6aeab95c05e85450eb0054b934ce46e73de74e1c217",
+      "bytes": 13517
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_query_output.py",
@@ -69855,6 +69855,6 @@
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Same-scene0da8acf loaded5.72FPS, external-load-isolated12.69FPS and cooled13.33FPS. Simulator pause auto-restored after600sec. Newb48f473registrationdelta+explicitheapwrites nativeCPU/GPUqualified,notgame-tested; currentlocalsessionlocked and unlockrequested. Newfixture131072->4096lookups,6+128GPUwords correct;4additionalGPU suitespassed. Gamecachepreserved,gamecurrentlystopped; originalWinepresentationandactualgameFPSstillpending,FSR3bothunvalidated,notplayable.",
-  "lastSourceUpdateUTC": "2026-10-21T08:04:36.965563+00:00"
+  "currentSourceState": "Same-scene0da8acf loaded5.72FPS, external-load-isolated12.69FPS and cooled13.33FPS. Simulator pause auto-restored after600sec. Newb48f473registrationdelta+explicitheapwrites nativeCPU/GPUqualified,notgame-tested; currentlocalsessionlocked and unlockrequested. Newfixture131072->4096lookups,6+128GPUwords correct;4additionalGPU suitespassed. Gamecachepreserved,gamecurrentlystopped; originalWinecomputeandstrictcachepassed;presentationandactualgameFPSstillpending,FSR3bothunvalidated,notplayable.",
+  "lastSourceUpdateUTC": "2026-10-21T08:07:52.358900+00:00"
 }

@@ -4,9 +4,11 @@
 #include <unistd.h>
 int main(int argc,const char**argv) {
  @autoreleasepool {
-  if((argc!=4 && argc!=6) || !AXIsProcessTrusted()) return 2;
+  if((argc!=4 && argc!=5 && argc!=6) || !AXIsProcessTrusted()) return 2;
   pid_t pid=atoi(argv[1]); int key=atoi(argv[2]), millis=atoi(argv[3]);
   if(pid<2 || key < -5 || key>126 || millis<1 || millis>3000) return 3;
+  BOOL hidKeys=argc==5 && key>=0 && !strcmp(argv[4],"hid");
+  if(argc==5 && !hidKeys)return 3;
   double relativeX=.5, relativeY=.5;
   if(argc==6) {
    if(key!=-4 && key!=-5)return 3;
@@ -68,6 +70,8 @@ int main(int argc,const char**argv) {
      if(CGRectContainsPoint(bounds,point)){hit=row;break;}
     }
     if(!hit||![hit[(id)kCGWindowNumber] isEqual:targetWindow]) {
+     // Never treat a modal window in the game process as the game surface.
+     if(hit && [hit[(id)kCGWindowOwnerPID] intValue]==pid)return 9;
      // CG ordering includes click-through Dock overlays. Ask the accessibility
      // hit-test for the actual input recipient before rejecting or clicking.
      AXUIElementRef system=AXUIElementCreateSystemWide(),recipient=NULL;
@@ -90,6 +94,7 @@ int main(int argc,const char**argv) {
    CGEventRef down=CGEventCreateMouseEvent(NULL,right?kCGEventRightMouseDown:kCGEventLeftMouseDown,point,right?kCGMouseButtonRight:kCGMouseButtonLeft);
    CGEventRef up=CGEventCreateMouseEvent(NULL,right?kCGEventRightMouseUp:kCGEventLeftMouseUp,point,right?kCGMouseButtonRight:kCGMouseButtonLeft);
    if(hid)CGEventPost(kCGHIDEventTap,down);else CGEventPostToPid(pid,down);
+   printf("{\"pid\":%d,\"buttonDownSent\":true}\n",pid);fflush(stdout);
    usleep(millis*1000);
    if(hid && [NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier==pid)CGEventPost(kCGHIDEventTap,up);else CGEventPostToPid(pid,up);
    CFRelease(down);CFRelease(up);
@@ -97,7 +102,10 @@ int main(int argc,const char**argv) {
   }
   CGEventRef down=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)key,true);
   CGEventRef up=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)key,false);
-  CGEventPostToPid(pid,down);usleep(millis*1000);CGEventPostToPid(pid,up);
+  if(hidKeys)CGEventPost(kCGHIDEventTap,down);else CGEventPostToPid(pid,down);
+  printf("{\"pid\":%d,\"keyDownSent\":true,\"HID\":%s}\n",pid,hidKeys?"true":"false");fflush(stdout);
+  usleep(millis*1000);
+  if(hidKeys && [NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier==pid)CGEventPost(kCGHIDEventTap,up);else CGEventPostToPid(pid,up);
   CFRelease(down);CFRelease(up);
   printf("{\"pid\":%d,\"keyCode\":%d,\"holdMS\":%d,\"sent\":true}\n",pid,key,millis);
  }

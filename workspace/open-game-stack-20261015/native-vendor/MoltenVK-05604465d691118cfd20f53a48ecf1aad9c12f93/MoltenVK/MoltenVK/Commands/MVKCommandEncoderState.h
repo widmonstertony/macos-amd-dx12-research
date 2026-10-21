@@ -244,6 +244,8 @@ struct MVKUseResourceHelper {
 		bool deferred;
 		bool liveRetained = false;
 		uint64_t generation = 0;
+        uint64_t pendingBatch = 0;
+        size_t pendingIndex = 0;
 	};
 	struct RecentLiveResource {
 		id<MTLResource> resource = nil;
@@ -287,6 +289,11 @@ struct MVKUseResourceHelper {
                          MVKResourceUsageStages stage, bool write);
 	uint64_t statsCalls=0, statsLookups=0, statsRetainedHits=0, statsAbsentHits=0, statsLiveFound=0;
 	void publishResourceUseStats(bool encoderReset);
+    uint64_t pendingBatchGeneration = 1;
+    uint64_t statsQueuedSuperseded = 0;
+    void supersedePending(id<MTLResource> resource, ResourceInfo& info);
+    void queuePending(id<MTLResource> resource, ResourceInfo& info);
+    void finishPendingBatch();
 	uint64_t encoderGeneration = 1;
 	uint64_t liveLookupCount = 0, liveReuseCount = 0;
 	uint64_t liveRecentReuseCount = 0, liveAbsentReuseCount = 0;

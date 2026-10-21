@@ -1,3 +1,6 @@
+> 合并同一批中被更完整阶段/写权限覆盖的待发资源声明；已经送入 Metal 的声明保留，用独立批次编号防止旧索引影响下一批。补充真实 GPU 多次绘制、资源身份核对与编号回绕对照，并完善受窗口限制的攻击输入记录。实际游戏仍未达到稳定可玩结论，FSR3 两项尚未验证。仅发布源码与通用说明，新的本机诊断数据未公开。
+> Coalesce pending resource declarations superseded by broader stage/write coverage within the same batch. Preserve already emitted Metal declarations; a separate batch serial prevents stale indices affecting later batches. Add real GPU multiple-draw, identity-contract and serial-wrap controls, plus scoped attack input records. Stable game playability remains unproven and both FSR3 features are unvalidated. Source and generic documentation only; new local diagnostics remain private.
+
 > 描述符快照的存活过滤结果现在可跨着色器阶段和访问类型复用；读写权限用独立阶段掩码记录，编码器切换后重新声明，相关资源注册后仍强制校验。新增真实顶点/像素阶段间接原子写入和像素回读对照源码，保留堆写入、增量与注册失效回归。实际游戏收益仍需验证，尚未达到可玩结论。仅更新源码与通用说明，新的本机诊断数据未公开。
 > Share immutable snapshot liveness filtering across shader stages and access types. Separate read/write stage masks preserve encoder-local declarations and registration invalidation. Add real vertex/fragment indirect atomic writes and pixel readback fixture source, retaining heap-write, delta and registry regression coverage. Actual game benefit requires validation; playability remains unproven. Source and generic documentation only; new local diagnostics remain private.
 

@@ -81,6 +81,10 @@ def watch(debugger, pid, directory, seconds=1200):
     try:
         error = process.Continue()
         assert error.Success(), str(error)
+        (directory / 'running.json').write_text(json.dumps({
+            'gamePID': pid, 'debuggerResumedGame': True,
+            'timeUTC': datetime.datetime.now(datetime.timezone.utc).isoformat()}) + '\n')
+        print(json.dumps({'gamePID': pid, 'debuggerResumedGame': True}), flush=True)
         while time.monotonic() - start < seconds:
             if _state["fault"] is not None:
                 record["finished"] = "matching-native-fault"

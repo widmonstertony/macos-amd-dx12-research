@@ -100,8 +100,8 @@
     },
     {
       "path": "compute-probe/d3d12_compute_probe.cpp",
-      "bytes": 10669,
-      "sha256": "e7a2743797f631218eeb1d43c98cbd47f8ecc6b076cf69b7b1e7fa061c78672a",
+      "bytes": 12996,
+      "sha256": "3c0218b580a83fdbc4aa997ca278ae2bb320cb5ecc4e4645b46153bcab8c33ab",
       "executable": false
     },
     {
@@ -33726,6 +33726,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/d3d12_descriptor_validation_control.cpp",
+      "bytes": 175,
+      "sha256": "4e4fa9b680c730458999da98d7419e385ef6e1f75deaf0d4f45140379edc947d",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/d3d12_observer_control.cpp",
       "bytes": 14084,
       "sha256": "01ba79f1a36b46d32bfe2b471fabeed320462e597ba12d56bb415a7ca8c8da19",
@@ -34336,8 +34342,9 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "sha256": "573dbb4a3d3b0aff6d78a6aeab95c05e85450eb0054b934ce46e73de74e1c217",
-      "bytes": 13517
+      "bytes": 15662,
+      "sha256": "e78bb2b71afe05eef1a74d39504ea211f043c149ea570a33822f12683f341b0d",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_query_output.py",
@@ -34417,6 +34424,12 @@
       "path": "open-game-stack-20261015/tools/run_window_present_stress.py",
       "bytes": 6698,
       "sha256": "f3ef8e72ed42eb931742b2a33c25960e1c2d0873313e108e3745e7f6582c5c42",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/sample_game_thread_cpu.py",
+      "bytes": 3460,
+      "sha256": "1bcb3da84ce0a2d39f6558b8b0b2d7b5df9b5cb6e1fa8e2962d9ac765a4fc660",
       "executable": false
     },
     {
@@ -58260,8 +58273,8 @@
     },
     {
       "path": "open-game-stack-20261015/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/command.c",
-      "bytes": 1069350,
-      "sha256": "8343eceecc5846ee26e588adf060e7d0a9c983b33134f6dd3b7a652464130fad",
+      "bytes": 1069817,
+      "sha256": "80d8809b0802624286d5112d7d00ff7710ce4fd56c1d25f938c37face982d6ae",
       "executable": false
     },
     {

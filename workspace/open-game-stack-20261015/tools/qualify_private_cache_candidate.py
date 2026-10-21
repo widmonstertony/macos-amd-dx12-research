@@ -27,6 +27,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--private-directory', type=Path, default=PRIVATE)
     parser.add_argument('--compute-only', action='store_true', help='Headless compute/cache qualification; does not qualify presentation')
+    parser.add_argument('--descriptor-only', action='store_true', help='Run the real UAV-table compute readback control')
+    parser.add_argument('--d3d12-directory', type=Path, help='Stage owned candidate D3D12 DLLs per probe; never replace a live module')
     parser.add_argument('--compute-shards', action='store_true')
     parser.add_argument('--render-shards', action='store_true')
     parser.add_argument('--render-global-read-only', type=Path)
@@ -50,6 +52,12 @@ def main():
     parser.add_argument('--batch-argument-heaps', action='store_true')
     parser.add_argument('--argument-heap-threshold', type=int, default=16)
     args = parser.parse_args()
+    if args.compute_only and args.descriptor_only:
+        parser.error('Select either compute-only or descriptor-only')
+    d3d12_directory = args.d3d12_directory.resolve() if args.d3d12_directory else None
+    if d3d12_directory and (not any(d3d12_directory.is_relative_to(ROOT / p) for p in ('build', 'evidence'))
+            or not all((d3d12_directory / n).is_file() for n in ('d3d12.dll', 'd3d12core.dll'))):
+        parser.error('Owned staged D3D12 DLL directory required')
     private = args.private_directory.resolve()
     if not private.is_relative_to(ROOT / 'build') or not (private / 'libCandidate.dylib').is_file():
         parser.error('An existing private candidate directory in owned build is required')
@@ -146,18 +154,32 @@ def main():
         probes[-1:] = [('present-seed', 'd3d12_presentation_probe.exe', 'presentation.gpu_api_result=PASS'),
                        ('present-warm', 'd3d12_presentation_probe.exe', 'presentation.gpu_api_result=PASS')]
     if args.compute_only: probes = [p for p in probes if p[0].startswith("compute-")]
+    if args.descriptor_only:
+        # Reuse the existing per-application native-DLL probe configuration.
+        # Tencent ignores process WINEDLLOVERRIDES for unconfigured filenames.
+        # This is our pixel fixture, never a game executable or a DRM wrapper.
+        probes = [('descriptor', 'd3d12_compute_probe.exe', 'compute.result=PASS')]
+    result['stagedD3D12Directory'] = str(d3d12_directory) if d3d12_directory else None
+    result['descriptorOnly'] = args.descriptor_only
+    result['descriptorFixture'] = 'src/d3d12_descriptor_validation_control.cpp' if args.descriptor_only else None
+    if args.descriptor_only:
+        result['qualificationScope'] = 'descriptor-UAV-compute-readback-only'
     for name, filename, marker in probes:
         d = out / name
         d.mkdir()
         (d / "msl").mkdir()
         executable = d / filename
-        shutil.copy2(Path("/private/tmp/yyb-probe-app") / filename, executable)
+        source = (ROOT / 'build/descriptor-validation-control.exe') if args.descriptor_only else Path('/private/tmp/yyb-probe-app') / filename
+        shutil.copy2(source, executable)
         for dll in ("d3d12.dll", "d3d12core.dll", "dxgi.dll"):
-            shutil.copy2(Path("/private/tmp/yyb-probe-app") / dll, d / dll)
+            dll_source = d3d12_directory / dll if d3d12_directory and dll != 'dxgi.dll' else Path('/private/tmp/yyb-probe-app') / dll
+            shutil.copy2(dll_source, d / dll)
         run_env = env | {"YYB_OPEN_GUARD_FORCE": "1",
                          "YYB_OPEN_GUARD_RECORD": str(d / "guard.trace"),
                          "MVK_CONFIG_SHADER_DUMP_DIR": str(d / "msl"),
                          "VKD3D_LOG_FILE": "Z:" + str(d / "vkd3d.log").replace("/Users/tonytan", "").replace("/", "\\")}
+        if d3d12_directory or args.descriptor_only:
+            run_env['WINEDLLOVERRIDES'] = 'd3d12,d3d12core,dxgi=n'
         if args.compute_shards and name == 'compute-load':
             run_env['MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT'] = '1'
         if args.render_shards and name == 'present-warm':
@@ -189,6 +211,10 @@ def main():
                  "sharedGameCandidateMapped": str(shared) in stderr,
                  "nativeCacheBytes": (out / "compute.metalar").stat().st_size
                     if (out / "compute.metalar").exists() else 0}
+        log_text = (d / 'vkd3d.log').read_text(errors='replace') if (d / 'vkd3d.log').exists() else ''
+        entry['missingDescriptorHeapWarnings'] = log_text.count('tables in root signature, but no heap is bound?')
+        entry['d3d12DLLSHA256'] = {n: digest(d / n) for n in ('d3d12.dll', 'd3d12core.dll')}
+        entry['probeExecutableSHA256'] = digest(executable)
         if args.compute_shards:
             traces = [json.loads(f.read_text()) for f in (d / 'msl').glob('trace-compute-archive-*.json')]
             entry['computeArchiveRecords'] = traces

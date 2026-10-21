@@ -35,6 +35,9 @@ static bool compute_smoke(Com *device, Handle d3d12) {
     Com *rootBlob = nullptr, *errors = nullptr, *root = nullptr, *pso = nullptr;
     Com *queue = nullptr, *allocator = nullptr, *list = nullptr, *list7 = nullptr;
     Com *gpu = nullptr, *readback = nullptr, *fence = nullptr;
+#ifdef D3D12_DESCRIPTOR_TABLE_CONTROL
+    Com *descriptorHeap = nullptr;
+#endif
     bool pass = false;
     auto need = [](const char *name, HR value) { hr(name, value); return value >= 0; };
     {
@@ -44,6 +47,12 @@ static bool compute_smoke(Com *device, Handle d3d12) {
         RootParameter parameters[2] = {};
         parameters[0].ParameterType = 4; // D3D12_ROOT_PARAMETER_TYPE_UAV.
         parameters[0].Descriptor = {0, 0};
+#ifdef D3D12_DESCRIPTOR_TABLE_CONTROL
+        struct DescriptorRange { U32 Type, Count, Register, Space, Offset; };
+        DescriptorRange range = {1, 1, 0, 0, 0}; // One UAV at u0.
+        parameters[0].ParameterType = 0;
+        parameters[0].Table = {1, &range};
+#endif
         parameters[1].ParameterType = 1; // 32-bit root constants at b0.
         parameters[1].Constants = {0, 0, 2};
         RootSignatureDesc rootDesc = {2, parameters, 0, nullptr, 0};
@@ -72,6 +81,22 @@ static bool compute_smoke(Com *device, Handle d3d12) {
         if (!need("compute.CreateDefaultUAV", createBuffer(device, &gpuHeap, 0, &gpuDesc, 0, nullptr, &IID_Resource, &gpu))) goto cleanup;
         if (!need("compute.CreateReadback", createBuffer(device, &readHeap, 0, &readDesc, 0x400, nullptr, &IID_Resource, &readback))) goto cleanup;
         if (!need("compute.CreateFence", method<HR (__stdcall *)(Com *, U64, U32, const Guid *, Com **)>(device, 36)(device, 0, 0, &IID_Fence, &fence))) goto cleanup;
+#ifdef D3D12_DESCRIPTOR_TABLE_CONTROL
+        struct HeapDesc { U32 Type, Count, Flags, NodeMask; };
+        struct CPUHandle { Size Ptr; };
+        struct GPUHandle { U64 Ptr; };
+        struct UAVDesc { U32 Format, Dimension; U64 FirstElement; U32 Count, Stride; U64 CounterOffset; U32 Flags; };
+        static_assert(sizeof(UAVDesc) == 40, "D3D12 buffer UAV ABI");
+        const Guid heapIID = {0x8efb471d,0x616c,0x4f49,{0x90,0xf7,0x12,0x7b,0xb7,0x63,0xfa,0x51}};
+        HeapDesc heapDesc = {0, 1, 1, 0};
+        if (!need("descriptor.CreateHeap", method<HR (__stdcall *)(Com *, const HeapDesc *, const Guid *, Com **)>(device,14)(device,&heapDesc,&heapIID,&descriptorHeap))) goto cleanup;
+        CPUHandle cpuHandle = {}; GPUHandle gpuHandle = {};
+        method<CPUHandle *(__stdcall *)(Com *, CPUHandle *)>(descriptorHeap,9)(descriptorHeap,&cpuHandle);
+        method<GPUHandle *(__stdcall *)(Com *, GPUHandle *)>(descriptorHeap,10)(descriptorHeap,&gpuHandle);
+        UAVDesc uav = {39,1,0,1024,0,0,1}; // R32_TYPELESS raw buffer.
+        method<void (__stdcall *)(Com *,Com *,Com *,const UAVDesc *,CPUHandle)>(device,19)(device,gpu,nullptr,&uav,cpuHandle);
+        method<void (__stdcall *)(Com *,U32,Com *const *)>(list,28)(list,1,&descriptorHeap);
+#endif
         U64 gpuAddress = method<U64 (__stdcall *)(Com *)>(gpu, 11)(gpu);
         text("compute.root_uav_gpuva_nonzero="); number(gpuAddress != 0); text("\n");
         if (!gpuAddress) goto cleanup;
@@ -79,11 +104,24 @@ static bool compute_smoke(Com *device, Handle d3d12) {
         BarrierGroup prepareGroup = {2, 1, &prepare};
         method<void (__stdcall *)(Com *, U32, const BarrierGroup *)>(list7, 80)(list7, 1, &prepareGroup);
         method<void (__stdcall *)(Com *, Com *)>(list, 29)(list, root);
+#ifndef D3D12_DESCRIPTOR_TABLE_CONTROL
         method<void (__stdcall *)(Com *, U32, U64)>(list, 41)(list, 0, gpuAddress);
+#endif
         U32 constants[2] = {1024, 0x693c24a7u};
         method<void (__stdcall *)(Com *, U32, U32, const void *, U32)>(list, 35)(list, 1, 2, constants, 0);
         text("compute.Dispatch=16 groups x 64 threads; indirect root UAV address\n");
+#ifdef D3D12_DESCRIPTOR_TABLE_CONTROL
+        for (U32 repeat = 0; repeat < 16; ++repeat) {
+            method<void (__stdcall *)(Com *,U32,GPUHandle)>(list,31)(list,0,gpuHandle);
+            method<void (__stdcall *)(Com *, U32, U32, U32)>(list,14)(list,16,1,1);
+            BufferBarrier order = {0x80,0x80,0x10,0x10,gpu,0,4096};
+            BarrierGroup orderGroup = {2,1,&order};
+            method<void (__stdcall *)(Com *, U32, const BarrierGroup *)>(list7,80)(list7,1,&orderGroup);
+        }
+        text("descriptor.table_dispatches=16 actual_UAV_heap_bound=1\n");
+#else
         method<void (__stdcall *)(Com *, U32, U32, U32)>(list, 14)(list, 16, 1, 1);
+#endif
         BufferBarrier finish = {0x80, 0x200, 0x10, 0x800, gpu, 0, 4096};
         BarrierGroup finishGroup = {2, 1, &finish};
         method<void (__stdcall *)(Com *, U32, const BarrierGroup *)>(list7, 80)(list7, 1, &finishGroup);
@@ -121,6 +159,9 @@ cleanup:
     text("compute.scope=actual DXIL compute, root constants and indirect root UAV GPUVA, Enhanced Buffer Barriers, CPU readback; not game/conformance\n");
     release(list7); release(list); release(allocator); release(queue); release(fence);
     release(gpu); release(readback); release(pso); release(root); release(errors); release(rootBlob);
+#ifdef D3D12_DESCRIPTOR_TABLE_CONTROL
+    release(descriptorHeap);
+#endif
     return pass;
 }
 

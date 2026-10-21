@@ -7346,6 +7346,14 @@ static void d3d12_command_list_update_descriptor_table_offsets(struct d3d12_comm
         table_offsets[table->table_index] = bindings->descriptor_tables[root_parameter_index];
 
 #ifdef VKD3D_ENABLE_BREADCRUMBS
+        /* The union's buffers heap pointers are populated only by the
+         * descriptor-buffer path. Descriptor sets bind vk_sets instead, so
+         * inspecting buffers here reports valid sets as missing heaps (and
+         * floods synchronous diagnostics on every table update). Keep all
+         * buffer-path validation below, without reading the inactive member. */
+        if (!d3d12_device_uses_descriptor_buffers(list->device))
+            continue;
+
         if (root_signature->descriptor_table_mask_sampler & (1ull << root_parameter_index))
         {
             if (!list->descriptor_heap.buffers.sampler_heap)

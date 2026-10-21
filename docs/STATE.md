@@ -1,3 +1,22 @@
+> 最新（2026-10-20）：已拿到前台失败证据，仍未达到可玩。旧 EF 候选前台/可见 60/60 次采样，首尾场景图相同，期间无新原生呈现记录；计算和图形队列均发生真实超时。错误前最后一段有效呈现约 3 FPS，该更早窗口未独立验证前台。
+> Latest: not playable. The old EF candidate froze through all 60 foreground/visible samples, with identical scene captures and no new presentation records; native compute and graphics command buffers timed out. The last earlier valid presentation window was ~3 FPS, but that earlier window did not independently establish foreground visibility.
+
+已经复现一个明确的开源层缺陷：dispatch/fill/dispatch 中填充正确，但后续计算输出全部保持哨兵值；仅原样重绑描述符或使用独立资源绑定可消除错误。采用 [上游 PR2822](https://github.com/KhronosGroup/MoltenVK/pull/2822) 的通用修复，将描述符资源使用缓存与实际 Metal argument-buffer 绑定分开处理，保留现有资源缓存。
+
+A confirmed open-source-layer defect is repaired: helper commands overwrite Metal argument-buffer slots while the Vulkan descriptor set and resource-use cache remain unchanged. Rebinding the same descriptors fixes the old output. The adapted upstream fix restores actual bindings via the existing buffer/offset cache without clearing descriptor resource-use caching on every draw. It applies to compute and graphics, with no shader rewriting or feature-bit claims.
+
+- 旧库计算对照：两种 fill 间隔合计 16,384 个错误输出字；原样重绑与独立绑定对照均正确。
+- 修复计算：64 轮/组，327,680 个输出/填充字，0 差异。
+- 旧库 draw/clear/draw 图形对照触发真实 GPU 超时；修复版 20 轮、16 次 encoder 切换、20,480 像素，0 差异。
+- 越界/空描述符、几何输出与原应用宝 Wine 严格缓存/呈现回归均通过。
+- New native SHA-256: `5987d724da4329f86f3f2add1a204a4d084d0c1cd80f4b1fa59328504836dc36`.
+
+[Evidence](release-evidence/helper-binding-20261020/). The new library is deployed through the existing normal original-Steam launch path; game validation is in progress. **The isolated defect is proven; its contribution to the actual game's timeouts and sustained game performance still require real scene validation. FSR3 upscaling and frame generation remain required and unvalidated.** Historical OFF settings were not introduced as a fix. No new playable release is claimed.
+
+另修复长时间日志到上限后不再更新的问题：保留原历史日志，并持续原子更新有时间戳的有限 current 文件。2,200 次写入/23,054 次并发读取无残缺或倒序。新增默认关闭的低开销队列失败上下文，只保存前 8 次错误的依赖快照，不开启逐绘制工作日志；关闭工作日志时也不再构造其标签。仅为诊断，不改同步值、返回码或 watchdog。The performance-regressing small-heap counter remains an archived experiment; the active mainline keeps the original heap grouping.
+
+Separately, upstream mixed-compute-stage fence issue 2805 was investigated but **not applied**: it did not explain this observed one-encoder failing control, which passes after rebinding with unchanged barriers. Avoid combining unrelated hypotheses into the same trial.
+
 > 新对照（2026-10-20）：仍未验收可玩，原 Steam 的现有游戏和缓存未动。原生 heap 分组改用小表内联计数、大表哈希回退；稳定源码构建、20,480 像素图形回读、16 个 heap 的计算回读、越界/空资源回归及原应用宝 Wine 严格缓存命中/呈现均通过。但五次 CPU 对照中，1–8 个 heap 较快，部分大表回退变慢，因此新候选 **仅保留研究，未部署到游戏**。锁屏状态仍存在，实际前台场景帧率与 FSR3 超分/帧生成未验证。
 > New control: small heap groups avoid per-draw hash allocations, with a bounded hash fallback for larger groups. The stable-source build, real AMD GPU readbacks and original Tencent Wine cache/presentation checks pass. CPU controls improve small groups but regress some spill cases; candidate **192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003 is experimental and NOT deployed**. The active ef9241 game run and all caches remain intact. The console is still locked; sustained foreground FPS and both FSR3 features remain unvalidated. [Evidence](release-evidence/heap-inline-20261020/).
 

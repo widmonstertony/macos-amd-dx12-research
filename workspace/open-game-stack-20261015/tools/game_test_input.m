@@ -15,7 +15,7 @@ int main(int argc,const char**argv) {
   for(id w in (__bridge NSArray*)raw) {
    CFTypeRef title=NULL;
    if(AXUIElementCopyAttributeValue((__bridge AXUIElementRef)w,kAXTitleAttribute,&title)==kAXErrorSuccess) {
-    if(([(__bridge NSString*)title hasPrefix:@"StellarBlade"] || [(__bridge NSString*)title hasPrefix:@"SB-Win64-Shipp"])) {found=YES;AXUIElementPerformAction((__bridge AXUIElementRef)w,kAXRaiseAction);}
+    if(([(__bridge NSString*)title hasPrefix:@"StellarBlade"] || [(__bridge NSString*)title hasPrefix:@"SB-Win64-Shipp"])) {found=YES;AXUIElementSetAttributeValue((__bridge AXUIElementRef)w,kAXMinimizedAttribute,kCFBooleanFalse);AXUIElementPerformAction((__bridge AXUIElementRef)w,kAXRaiseAction);}
     CFRelease(title);
    }
   }

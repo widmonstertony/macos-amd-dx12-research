@@ -1,0 +1,67 @@
+{
+  "timeUTC": "2026-10-21T05:52:48.361194+00:00",
+  "gamePID": 59077,
+  "sampleCount": 60,
+  "secondsObserved": 59.46775197982788,
+  "foregroundSamples": 60,
+  "visibleSamples": 60,
+  "firstAndLastScenePNGIdentical": true,
+  "presentationProgressRecordsDuringObservation": 0,
+  "lastPresentationRecord": {
+    "nativeIntervalSeconds": 4.99141213,
+    "sceneAndVisibilityVerified": false,
+    "swapchain": "0x7f8e71ee0600",
+    "time": 814254433.931918,
+    "callbacksWithoutNativeTimestamp": 0,
+    "largestNativeGapMilliseconds": 699.980111,
+    "nativeTimestampCallbacks": 16,
+    "nativePresentationFPS": 3.0051615874083315,
+    "callbacks": 16
+  },
+  "lastEarlierValidPresentationWindow": {
+    "nativeIntervalSeconds": 4.99141213,
+    "sceneAndVisibilityVerified": false,
+    "swapchain": "0x7f8e71ee0600",
+    "time": 814254433.931918,
+    "callbacksWithoutNativeTimestamp": 0,
+    "largestNativeGapMilliseconds": 699.980111,
+    "nativeTimestampCallbacks": 16,
+    "nativePresentationFPS": 3.0051615874083315,
+    "callbacks": 16
+  },
+  "nativeQueueErrorWindows": [
+    {
+      "queueFamily": 2,
+      "queueIndex": 0,
+      "time": 814254439.962199,
+      "wallSeconds": 8.394057,
+      "completed": 10,
+      "validGPUTimestamps": 10,
+      "errors": 1,
+      "hostPrecommitTotalMS": 11.191,
+      "hostPrecommitMaxMS": 1.248,
+      "GPUExecutionTotalMS": 0.161,
+      "GPUExecutionMaxMS": 0.017,
+      "commitToGPUStartTotalMS": 5089.163
+    },
+    {
+      "queueFamily": 0,
+      "queueIndex": 0,
+      "time": 814254441.59536,
+      "wallSeconds": 8.261524,
+      "completed": 52,
+      "validGPUTimestamps": 52,
+      "errors": 1,
+      "hostPrecommitTotalMS": 1578.337,
+      "hostPrecommitMaxMS": 189.625,
+      "GPUExecutionTotalMS": 256.985,
+      "GPUExecutionMaxMS": 33.25,
+      "commitToGPUStartTotalMS": 6971.2
+    }
+  ],
+  "renderAndVkd3dQueuesWaitingEntireCPUSample": true,
+  "measuredOutcome": "Frozen attack pose throughout foreground minute after native command-buffer timeouts; no new native presentation records in the interval. This is failure, not a playable frame rate.",
+  "gamePlayable": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false
+}

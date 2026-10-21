@@ -21,7 +21,7 @@ struct Case {int32_t op,x,y,z;};
 struct GPU {
  VkInstance instance;VkPhysicalDevice physical;VkDevice device;VkQueue queue;uint32_t family;VkCommandPool pool;
  VkPhysicalDeviceMemoryProperties mem;
- GPU(){
+ GPU(bool advancedDescriptorFeatures=true){
   const char* ext=VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
   VkApplicationInfo ai{VK_STRUCTURE_TYPE_APPLICATION_INFO};ai.pApplicationName="isolated-r2-output-validation";ai.apiVersion=VK_API_VERSION_1_2;
   VkInstanceCreateInfo ci{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};ci.pApplicationInfo=&ai;ci.flags=VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;ci.enabledExtensionCount=1;ci.ppEnabledExtensionNames=&ext;
@@ -34,9 +34,9 @@ struct GPU {
   for(uint32_t i=0;i<qn;i++)if(qs[i].queueFlags&VK_QUEUE_COMPUTE_BIT){family=i;break;}
   if(family==~0u)throw std::runtime_error("No compute queue");float priority=1;
   VkDeviceQueueCreateInfo qi{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};qi.queueFamilyIndex=family;qi.queueCount=1;qi.pQueuePriorities=&priority;
-  VkPhysicalDeviceFeatures enabled{};enabled.shaderInt64=VK_TRUE;enabled.shaderStorageBufferArrayDynamicIndexing=VK_TRUE;
+  VkPhysicalDeviceFeatures enabled{};enabled.shaderInt64=advancedDescriptorFeatures;enabled.shaderStorageBufferArrayDynamicIndexing=advancedDescriptorFeatures;
   VkPhysicalDeviceDescriptorIndexingFeatures indexing{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES};indexing.shaderStorageBufferArrayNonUniformIndexing=VK_TRUE;indexing.runtimeDescriptorArray=VK_TRUE;indexing.descriptorBindingVariableDescriptorCount=VK_TRUE;indexing.descriptorBindingPartiallyBound=VK_TRUE;
-  const char* dext[]={"VK_KHR_portability_subset","VK_EXT_descriptor_indexing"};VkDeviceCreateInfo di{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};di.pNext=&indexing;di.queueCreateInfoCount=1;di.pQueueCreateInfos=&qi;di.pEnabledFeatures=&enabled;di.enabledExtensionCount=2;di.ppEnabledExtensionNames=dext;
+  const char* dext[]={"VK_KHR_portability_subset","VK_EXT_descriptor_indexing"};VkDeviceCreateInfo di{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};di.pNext=advancedDescriptorFeatures?&indexing:nullptr;di.queueCreateInfoCount=1;di.pQueueCreateInfos=&qi;di.pEnabledFeatures=&enabled;di.enabledExtensionCount=advancedDescriptorFeatures?2:1;di.ppEnabledExtensionNames=dext;
   CHECK(vkCreateDevice(physical,&di,nullptr,&device));vkGetDeviceQueue(device,family,0,&queue);vkGetPhysicalDeviceMemoryProperties(physical,&mem);
   VkCommandPoolCreateInfo pi{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};pi.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;pi.queueFamilyIndex=family;CHECK(vkCreateCommandPool(device,&pi,nullptr,&pool));
  }

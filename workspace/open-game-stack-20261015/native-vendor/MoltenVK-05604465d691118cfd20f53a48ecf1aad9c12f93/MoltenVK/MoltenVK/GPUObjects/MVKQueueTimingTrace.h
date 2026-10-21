@@ -3,6 +3,7 @@
 #pragma once
 #import <QuartzCore/QuartzCore.h>
 #include <map>
+#include "MVKTraceSnapshot.h"
 #include <mutex>
 #include <cstdio>
 
@@ -35,6 +36,7 @@ inline void mvkQueueTimingBegin(id<MTLCommandBuffer> cb, uint32_t family, uint32
     record->committed = 0;
     objc_setAssociatedObject(cb, mvkQueueTimingKey(), record, OBJC_ASSOCIATION_RETAIN);
     NSString* path = [NSString stringWithFormat:@"%s/queue-timing-%d.jsonl", directory, getpid()];
+    NSString* currentPath = [NSString stringWithFormat:@"%s/queue-timing-current-%d-%u-%u.json", directory, getpid(), family, index];
     [cb addCompletedHandler:^(id<MTLCommandBuffer> completed) {
         struct Window {
             double start = 0, host = 0, gpu = 0, wait = 0, maxHost = 0, maxGPU = 0;
@@ -60,14 +62,19 @@ inline void mvkQueueTimingBegin(id<MTLCommandBuffer> cb, uint32_t family, uint32
             w.maxGPU = std::max(w.maxGPU, end - begin);
             if (record->committed > 0 && begin > record->committed) w.wait += begin - record->committed;
         }
-        if ((now - w.start < 5.0 && w.published) || records >= 2048) return;
-        FILE* file = fopen(path.fileSystemRepresentation, "a");
-        if (file) {
-            fprintf(file, "{\"queueFamily\":%u,\"queueIndex\":%u,\"time\":%.6f,\"wallSeconds\":%.6f,\"completed\":%llu,\"validGPUTimestamps\":%llu,\"errors\":%llu,\"hostPrecommitTotalMS\":%.3f,\"hostPrecommitMaxMS\":%.3f,\"GPUExecutionTotalMS\":%.3f,\"GPUExecutionMaxMS\":%.3f,\"commitToGPUStartTotalMS\":%.3f}\n",
+        if (now - w.start < 5.0 && w.published) return;
+        char line[2048];
+        snprintf(line, sizeof(line), "{\"queueFamily\":%u,\"queueIndex\":%u,\"time\":%.6f,\"wallSeconds\":%.6f,\"completed\":%llu,\"validGPUTimestamps\":%llu,\"errors\":%llu,\"hostPrecommitTotalMS\":%.3f,\"hostPrecommitMaxMS\":%.3f,\"GPUExecutionTotalMS\":%.3f,\"GPUExecutionMaxMS\":%.3f,\"commitToGPUStartTotalMS\":%.3f}\n",
                     family,index,[NSDate timeIntervalSinceReferenceDate],now-w.start,(unsigned long long)w.count,(unsigned long long)w.valid,(unsigned long long)w.errors,
                     w.host*1000,w.maxHost*1000,w.gpu*1000,w.maxGPU*1000,w.wait*1000);
-            fclose(file); ++records;
+        // Preserve the original bounded history. Refresh one separate current
+        // file per queue after the history cap, so a long game run never
+        // silently substitutes hours-old measurements for current timings.
+        if (records < 2048) {
+            FILE* file = fopen(path.fileSystemRepresentation, "a");
+            if (file) { fputs(line, file); fclose(file); ++records; }
         }
+        mvkWriteTraceSnapshot(currentPath.fileSystemRepresentation, line);
         w = Window{}; w.start = now; w.published = true;
     }];
     [record release];

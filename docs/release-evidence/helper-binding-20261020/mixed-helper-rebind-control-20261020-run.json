@@ -1,0 +1,45 @@
+{
+  "librarySHA256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f",
+  "exitCode": 0,
+  "elapsedSeconds": 1.640649872002541,
+  "workTrace": false,
+  "failureContext": false,
+  "argumentBuffers": 1,
+  "rebindAfterHelper": true,
+  "gameStarted": false,
+  "passed": true,
+  "output": {
+    "passed": true,
+    "roundsPerArm": 8,
+    "milliseconds": 50.2645,
+    "arms": [
+      {
+        "kind": "dispatch-only",
+        "checkedWords": 8192,
+        "mismatches": 0,
+        "outputMismatches": 0,
+        "scratchMismatches": 0,
+        "firstActual": 0,
+        "firstExpected": 0
+      },
+      {
+        "kind": "compute-fill-gap",
+        "checkedWords": 16384,
+        "mismatches": 0,
+        "outputMismatches": 0,
+        "scratchMismatches": 0,
+        "firstActual": 0,
+        "firstExpected": 0
+      },
+      {
+        "kind": "byte-pattern-fill-gap",
+        "checkedWords": 16384,
+        "mismatches": 0,
+        "outputMismatches": 0,
+        "scratchMismatches": 0,
+        "firstActual": 0,
+        "firstExpected": 0
+      }
+    ]
+  }
+}

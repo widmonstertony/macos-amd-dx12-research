@@ -5,7 +5,7 @@ root=pathlib.Path(__file__).resolve().parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--run',action='store_true')
 parser.add_argument('--label',required=True)
-parser.add_argument('--suite',choices=['static','memory','vector','aggregate','graphics','heapgraphics','bda','descriptors','heapdescriptors','multiheapdescriptors','typed64','typedvec','typedgraphics','geometry','vertexarray'],default='static')
+parser.add_argument('--suite',choices=['static','memory','vector','aggregate','graphics','heapgraphics','helpercleargraphics','bda','descriptors','heapdescriptors','multiheapdescriptors','typed64','typedvec','typedgraphics','geometry','vertexarray'],default='static')
 parser.add_argument('--library',type=pathlib.Path)
 parser.add_argument('--runtime-trace',action='store_true')
 parser.add_argument('--gpu-timeout-trace',action='store_true')
@@ -67,7 +67,7 @@ if args.runtime_trace:env['MVK_AMD_RUNTIME_TRACE']='1'
 if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
 if args.queue_timing:env['MVK_AMD_QUEUE_TIMING']='1'
 if args.encoder_transitions != 1:
-    if args.suite != 'heapgraphics' or not 1 <= args.encoder_transitions <= 64:parser.error('1..64 encoder transitions require heapgraphics')
+    if args.suite not in ('heapgraphics','helpercleargraphics') or not 1 <= args.encoder_transitions <= 64:parser.error('1..64 encoder transitions require heapgraphics')
     env['GPU_ENCODER_TRANSITIONS']=str(args.encoder_transitions)
 if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
 if args.fresh_mesh_libraries:env['MVK_AMD_FRESH_MESH_LIBRARIES']='1'
@@ -177,6 +177,8 @@ elif args.suite=='heapdescriptors':
     cmd=[root/'build/probes/heap_descriptor_probe',root/'build/probes/variable-array.spv',dest/'output.json']
 elif args.suite=='multiheapdescriptors':
     cmd=[root/'build/probes/multiheap_descriptor_probe',root/'build/probes/variable-array.spv',dest/'output.json']
+elif args.suite=='helpercleargraphics':
+    cmd=[root/'build/probes/helper_clear_graphics_probe',root/'build/probes/heap-graphics.vert.spv',root/'build/probes/heap-graphics.frag.spv',dest/'output.json']
 elif args.suite=='heapgraphics':
     cmd=[root/'build/probes/heap_graphics_probe',root/'build/probes/heap-graphics.vert.spv',root/'build/probes/heap-graphics.frag.spv',dest/'output.json']
 else:cmd=[reference/'build/reference_robust_access',reference/'build/spv']

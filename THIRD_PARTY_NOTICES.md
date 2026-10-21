@@ -19,3 +19,6 @@ For the distributed Wine module, the release also supplies the complete fixed pu
 Historical baseline source archives for MoltenVK, SPIRV-Cross, vkd3d-proton and translators are included in the repository. Public release source is the release tag's full source archive, including build scripts. Native probes are newly authored fixtures and contain no extracted game shader code.
 
 No game assets, DRM components, Steam account state, or DXGI binary are included in the public test kit. Names of games, companies, and APIs identify compatibility targets and do not imply endorsement.
+
+
+Helper argument-buffer binding restoration is adapted from shih-liang's MoltenVK PR #2822: https://github.com/KhronosGroup/MoltenVK/pull/2822 . It modifies the existing Apache-2.0 MoltenVK source under its existing license. The added compute and draw/clear/draw controls are authored for this research snapshot; no game-derived shader code is included.

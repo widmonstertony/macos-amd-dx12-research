@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "updates": 2200,
+  "concurrentReads": 23054,
+  "partialOrReorderedReads": 0,
+  "finalSequence": 2200,
+  "boundedCurrentFiles": 1,
+  "candidateDeployedToGame": false
+}

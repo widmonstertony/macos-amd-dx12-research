@@ -7,9 +7,13 @@
 #include <atomic>
 #include <mutex>
 
-inline bool mvkDependencyTraceEnabled() {
-    static const bool enabled = [] { const char* v = getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v, "1"); }();
+inline bool mvkEncoderWorkTraceEnabled() {
+    static const bool enabled = [] { const char* v=getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v,"1"); }();
     return enabled;
+}
+inline bool mvkDependencyTraceEnabled() {
+    static const bool failure = [] { const char* v=getenv("MVK_AMD_QUEUE_FAILURE_CONTEXT"); return v && !strcmp(v,"1"); }();
+    return failure || mvkEncoderWorkTraceEnabled();
 }
 inline const void* mvkDependencyKey() { return sel_registerName("mvkQueueDependenciesV1"); }
 struct MVKPendingDependencyRecords {
@@ -49,12 +53,12 @@ inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, ui
 // The encoder retains only bounded CPU metadata, never a command buffer or a
 // Vulkan/GPU resource. This also covers helper pipelines without a Vulkan owner.
 inline void mvkAssociateEncoderTrace(id<MTLCommandBuffer> cb, id<MTLCommandEncoder> encoder) {
-    if (!encoder || !mvkDependencyTraceEnabled()) return;
+    if (!encoder || !mvkEncoderWorkTraceEnabled()) return;
     id record = objc_getAssociatedObject(cb, mvkDependencyKey());
     if (record) objc_setAssociatedObject(encoder, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
 }
-inline void mvkRecordEncoderWork(id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
-    if (!encoder || !mvkDependencyTraceEnabled()) return;
+inline void mvkRecordEncoderWorkImpl(id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
+    if (!encoder || !mvkEncoderWorkTraceEnabled()) return;
     NSMutableDictionary* record = objc_getAssociatedObject(encoder, mvkDependencyKey());
     if (!record) return;
     @synchronized (record) {
@@ -73,6 +77,9 @@ inline void mvkRecordEncoderWork(id<MTLCommandEncoder> encoder, NSString* kind, 
             @"time":@([NSDate timeIntervalSinceReferenceDate])}];
     }
 }
+// Lazy arguments matter: disabled diagnostics must not allocate NSString
+// labels for every fence, draw or dispatch before the helper can return.
+#define mvkRecordEncoderWork(...) do { if (mvkEncoderWorkTraceEnabled()) mvkRecordEncoderWorkImpl(__VA_ARGS__); } while (false)
 inline void mvkRecordDependencyPhase(id<MTLCommandBuffer> cb, NSString* phase) {
     if (!cb || !mvkDependencyTraceEnabled()) return;
     NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());

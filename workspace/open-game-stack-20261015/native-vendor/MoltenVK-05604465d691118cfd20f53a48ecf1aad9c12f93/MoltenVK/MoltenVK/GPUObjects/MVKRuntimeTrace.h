@@ -10,6 +10,10 @@ static inline bool mvkGPUTimeoutTraceEnabled() {
     static const bool enabled = [] { const char* v = getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v, "1"); }();
     return enabled;
 }
+static inline bool mvkGPUFailureTraceEnabled() {
+    static const bool enabled = [] { const char* v=getenv("MVK_AMD_QUEUE_FAILURE_CONTEXT"); return v && !strcmp(v,"1"); }();
+    return enabled;
+}
 static inline bool mvkRuntimeTraceEnabled(const MVKConfiguration& config) {
     const char* value = getenv("MVK_AMD_RUNTIME_TRACE");
     return value && !strcmp(value, "1") && config.shaderDumpDir[0];
@@ -49,6 +53,7 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
         !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
         !([kind isEqualToString:@"compute-archive"] && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
         !([kind isEqualToString:@"present-progress"] && getenv("MVK_AMD_QUEUE_TIMING") && !strcmp(getenv("MVK_AMD_QUEUE_TIMING"), "1")) &&
+        !(mvkGPUFailureTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"queue-config"])) &&
         !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"present-progress"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"] ||
           ([kind isEqualToString:@"queue-dependencies"] && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))))) return;
     static std::atomic<uint64_t> sequence{0};

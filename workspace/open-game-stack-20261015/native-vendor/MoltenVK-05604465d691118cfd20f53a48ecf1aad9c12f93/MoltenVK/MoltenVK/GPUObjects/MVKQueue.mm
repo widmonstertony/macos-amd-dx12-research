@@ -188,7 +188,7 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
 
 	MTLCommandBufferDescriptor* mtlCmdBuffDesc = [MTLCommandBufferDescriptor new];	// temp retain
 	mtlCmdBuffDesc.retainedReferences = retainRefs;
-	if (getMVKConfig().debugMode || mvkGPUTimeoutTraceEnabled()) {
+	if (getMVKConfig().debugMode || mvkGPUTimeoutTraceEnabled() || mvkGPUFailureTraceEnabled()) {
 		mtlCmdBuffDesc.errorOptions |= MTLCommandBufferErrorOptionEncoderExecutionStatus;
 	}
 	mtlCmdBuff = [_mtlQueue commandBufferWithDescriptor: mtlCmdBuffDesc];
@@ -277,7 +277,11 @@ void MVKQueue::handleMTLCommandBufferError(id<MTLCommandBuffer> mtlCmdBuff) {
 			vkErr = VK_ERROR_OUT_OF_DEVICE_MEMORY;
 			break;
 	}
-    if (mvkGPUTimeoutTraceEnabled()) {
+    static std::atomic<uint32_t> failureSnapshots{0};
+    bool captureFailure = mvkGPUTimeoutTraceEnabled() ||
+        (mvkGPUFailureTraceEnabled() && failureSnapshots.fetch_add(1, std::memory_order_relaxed) < 8);
+    // Bound expensive failure snapshots, not native error reporting/results.
+    if (captureFailure) {
         NSMutableArray* encoders = [NSMutableArray array];
         NSArray<id<MTLCommandBufferEncoderInfo>>* infos = mtlCmdBuff.error.userInfo[MTLCommandBufferEncoderInfoErrorKey];
         for (id<MTLCommandBufferEncoderInfo> encoder in infos) {
@@ -286,7 +290,7 @@ void MVKQueue::handleMTLCommandBufferError(id<MTLCommandBuffer> mtlCmdBuff) {
                 @"signposts":encoder.debugSignposts ?: @[]}];
         }
         mvkWriteRuntimeTrace(getMVKConfig(), @"gpu-timeout", @{
-            @"snapshotBeforeDeviceLossMark":@YES, @"time":@([NSDate timeIntervalSinceReferenceDate]), @"queueFamily":@(_queueFamily->getIndex()),
+            @"snapshotBeforeDeviceLossMark":@YES, @"perEncoderWorkTraceEnabled":@(mvkEncoderWorkTraceEnabled()), @"time":@([NSDate timeIntervalSinceReferenceDate]), @"queueFamily":@(_queueFamily->getIndex()),
             @"queueIndex":@(_index), @"label":mtlCmdBuff.label ?: @"", @"errorCode":@(mtlCmdBuff.error.code),
             @"error":mtlCmdBuff.error.localizedDescription ?: @"", @"status":@(mtlCmdBuff.status),
             @"GPUStartTime":@(mtlCmdBuff.GPUStartTime), @"GPUEndTime":@(mtlCmdBuff.GPUEndTime),

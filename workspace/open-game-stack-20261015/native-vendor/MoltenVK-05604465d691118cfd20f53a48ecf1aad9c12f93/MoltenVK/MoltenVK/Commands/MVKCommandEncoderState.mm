@@ -17,7 +17,7 @@
  */
 
 #include "MVKCommandEncoderState.h"
-#include "MVKHeapUseCounter.h"
+#include "MVKTraceSnapshot.h"
 #include "MVKCommandEncodingPool.h"
 #include "MVKCommandBuffer.h"
 #include "MVKImage.h"
@@ -769,13 +769,19 @@ static void bindMetalResources(id<MTLCommandEncoder> encoder,
                                MVKStageResourceBits& exists,
                                MVKStageResourceBindings& bindings,
                                const MVKResourceBinder& RESTRICT binder) {
-	// Clear descriptor set resource use bitarray for new sets and bind them
+	// Upstream KhronosGroup/MoltenVK PR #2822 (shih-liang): resource-use
+	// caching and actual Metal buffer bindings have independent invalidation.
 	MVKStaticBitSet<kMVKMaxDescriptorSetCount> setsNeeded = resources.resources.descriptorSetData.clearingAllIn(exists.descriptorSetData);
 	exists.descriptorSetData |= resources.resources.descriptorSetData;
 	for (size_t idx : setsNeeded) {
-		MVKDescriptorSet* set = common._descriptorSets[idx];
 		const MVKDescriptorSetLayout* layout = common._layout->getDescriptorSetLayout(idx);
 		bindings.descriptorSetResourceUse[idx].resizeAndClear(layout->bindings().size());
+	}
+	// Fill/clear helper commands can overwrite the argument-buffer slot without
+	// disturbing the Vulkan descriptor set. The existing binding cache avoids
+	// redundant Metal calls, but must see every shader-used argument buffer.
+	for (size_t idx : resources.resources.descriptorSetData) {
+		MVKDescriptorSet* set = common._descriptorSets[idx];
 		bindBuffer(encoder, set->gpuBufferObject, set->gpuBufferOffset, idx, exists, bindings, binder);
 	}
 
@@ -1146,15 +1152,18 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     total.resets+=encoderReset; total.capClears+=encoderReset && used.size()>8192;
     total.maxUsed=std::max(total.maxUsed,uint64_t(used.size()));
     statsCalls=statsLookups=statsRetainedHits=statsAbsentHits=statsLiveFound=0;
-    if (now-total.start<5 || records>=1024) return;
+    if (now-total.start<5) return;
     const char* directory=getenv("MVK_CONFIG_SHADER_DUMP_DIR");
     if (directory) {
         char path[4096];snprintf(path,sizeof(path),"%s/resource-use-%d.jsonl",directory,getpid());
-        FILE* file=fopen(path,"a");
-        if(file) {
-            fprintf(file,"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed);
-            fclose(file);++records;
+        char line[2048];
+        snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed);
+        if (records < 1024) {
+            FILE* file=fopen(path,"a");
+            if(file) { fputs(line,file); fclose(file); ++records; }
         }
+        int length=snprintf(path,sizeof(path),"%s/resource-use-current-%d.json",directory,getpid());
+        if(length>0 && static_cast<size_t>(length)<sizeof(path)) mvkWriteTraceSnapshot(path,line);
     }
     total=Totals{};total.start=now;
 }
@@ -1346,23 +1355,21 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 			// indirect resources in one MTLHeap to be declared with one useHeap.
 			// Collapse only groups large enough to amortize the heap declaration;
 			// keep small and non-heap groups on the precise useResources path.
-			MVKHeapUseCounter<id<MTLHeap>> heapCounts;
+			std::unordered_map<id<MTLHeap>, uint32_t> heapCounts;
 			for (id<MTLResource> resource : entry.read) {
 				id<MTLHeap> heap = resource.heap;
-				if (heap) heapCounts.add(heap);
+				if (heap) ++heapCounts[heap];
 			}
 			for (id<MTLResource> resource : entry.readWrite) {
 				id<MTLHeap> heap = resource.heap;
-				if (heap) heapCounts.add(heap);
+				if (heap) ++heapCounts[heap];
 			}
 			uint32_t collapsedResources = 0;
-			heapCounts.each([&](id<MTLHeap> heap, uint32_t count) {
-                if (count >= heapBatchThreshold) { heaps.push_back(heap); collapsedResources += count; }
-            });
+			for (auto& pair : heapCounts) if (pair.second >= heapBatchThreshold) { heaps.push_back(pair.first); collapsedResources += pair.second; }
 			if (!heaps.empty()) {
 				auto keepPrecise = [&](id<MTLResource> resource) {
 					id<MTLHeap> heap = resource.heap;
-					return !heap || heapCounts.count(heap) < heapBatchThreshold;
+					return !heap || heapCounts[heap] < heapBatchThreshold;
 				};
 				entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
 				entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());
@@ -1385,23 +1392,21 @@ void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> enco
 	Entry& entry = entries[MVKResourceUsageStages::Compute];
 	MVKSmallVector<id<MTLHeap>> heaps;
 	if (batchArgumentHeaps) {
-		MVKHeapUseCounter<id<MTLHeap>> heapCounts;
+		std::unordered_map<id<MTLHeap>, uint32_t> heapCounts;
 		for (id<MTLResource> resource : entry.read) {
 			id<MTLHeap> heap = resource.heap;
-			if (heap) heapCounts.add(heap);
+			if (heap) ++heapCounts[heap];
 		}
 		for (id<MTLResource> resource : entry.readWrite) {
 			id<MTLHeap> heap = resource.heap;
-			if (heap) heapCounts.add(heap);
+			if (heap) ++heapCounts[heap];
 		}
 		uint32_t collapsedResources = 0;
-		heapCounts.each([&](id<MTLHeap> heap, uint32_t count) {
-                if (count >= heapBatchThreshold) { heaps.push_back(heap); collapsedResources += count; }
-            });
+		for (auto& pair : heapCounts) if (pair.second >= heapBatchThreshold) { heaps.push_back(pair.first); collapsedResources += pair.second; }
 		if (!heaps.empty()) {
 			auto keepPrecise = [&](id<MTLResource> resource) {
 				id<MTLHeap> heap = resource.heap;
-				return !heap || heapCounts.count(heap) < heapBatchThreshold;
+				return !heap || heapCounts[heap] < heapBatchThreshold;
 			};
 			entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
 			entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());

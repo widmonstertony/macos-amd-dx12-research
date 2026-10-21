@@ -1,3 +1,6 @@
+> 非对齐缓冲区拷贝的计算回退由单线程逐字节循环改为有边界检查的并行字节拷贝，地址相加前使用 64 位整数。附全字节哨兵、非对齐偏移、同缓冲区非重叠范围及 Vulkan 调用层的 GPU 对照源码。限时计数器可用有上限的标记刷新覆盖较晚故障。单个函数的提速不代表整体游戏提速，图形队列超时仍未修复；此更新不发布新的本机测试数据或下载运行库。
+> The unaligned-buffer compute fallback now copies bytes in parallel with bounds checks and widened offset arithmetic, replacing a serial single-thread loop. GPU controls cover full-byte sentinels, unaligned offsets, disjoint same-buffer ranges and the Vulkan call path. Bounded marker refresh can cover later faults. A faster helper does not prove game-wide speedup; the graphics-queue timeout remains unresolved. This update publishes no new local test data or downloadable runtimes.
+
 > 新增可选的限时 GPU 时间戳诊断：只在标记有效时采样，最多 64 个在途命令缓冲区、每个 128 个时间戳；不插入等待或围栏。仅有日志提示不能证明 Shader Validation 真正启用，独立测试现在核对实际管线状态。新增原始着色器受控输入与时间戳的 GPU 验证程序。本次为诊断源码更新，尚未定位游戏超时根因，不是可玩性修复；下载的历史运行库未更新，新本机诊断文件未公开。
 > Add optional timed GPU timestamp diagnostics, bounded to 64 in-flight command buffers and 128 samples each, without inserting waits or fences. A log message alone does not prove Shader Validation is active; the isolated control now queries actual pipeline state. Add captured-shader controlled-input and timestamp GPU fixtures. This is diagnostic source work, not a game timeout or playability fix. Historical downloadable runtimes are unchanged; new local diagnostics remain private.
 

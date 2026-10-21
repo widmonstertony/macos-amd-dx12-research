@@ -2002,8 +2002,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCmdTransfer.mm",
-      "bytes": 84469,
-      "sha256": "88459b34fe694e9755f67e0711a2cfdf1d289d136cd803e5b55d28df5f6282ca",
+      "bytes": 84727,
+      "sha256": "5f9d7bba3780b5952d1ab7736a87ab8c65b5077065ba2e7b93bf08497c150553",
       "executable": false
     },
     {
@@ -2050,8 +2050,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandPipelineStateFactoryShaderSource.h",
-      "bytes": 29316,
-      "sha256": "52580710d1005e663c608e7736303ba883bc91e7c995e65c8d5c791c803ec7b0",
+      "bytes": 29567,
+      "sha256": "6461c6c82a7056ac55372b7e6273fc71b56800739a34acf5643fc883db4a7913",
       "executable": false
     },
     {
@@ -34037,6 +34037,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/parallel_byte_copy_gpu.mm",
+      "bytes": 4670,
+      "sha256": "cbe0ab539bfcda0696b068eb2cdb5b72c7be3fa0d4e8edf027fba87f971a3943",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/pending_declaration_batches_gpu.mm",
       "bytes": 6635,
       "sha256": "b381b358f1dc43c453d645b16ec9d157b0dea207b969e752a9b295e972548857",
@@ -34208,6 +34214,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/vulkan_byte_copy_gpu.cpp",
+      "bytes": 6245,
+      "sha256": "efd4807b66ecf34a61bac62fb31fb74af82afd0e35b953febb9ce3a2adc9f7a5",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/winemac_ui32_probe.c",
       "bytes": 1131,
       "sha256": "aa13a3066dbb3141856795e2ef37d4a83b3b743005656866fab8fcdb91658603",
@@ -34240,6 +34252,12 @@
       "path": "open-game-stack-20261015/tools/arm_game_work_capture.py",
       "sha256": "fcb349be4c42adc29172ef093aaebdfa3dc529ad2640325d0bd28351e158b6d9",
       "bytes": 2201
+    },
+    {
+      "path": "open-game-stack-20261015/tools/arm_gpu_counters.py",
+      "bytes": 2759,
+      "sha256": "2a910035b8a104824ee90a7443e05151fae3193b1b49077aee4af7095d2c36ac",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/audit_winemac_abi.py",
@@ -70120,5 +70138,5 @@
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
-  "latestSourceUpdateUTC": "2026-10-21T23:28:33.525225+00:00"
+  "latestSourceUpdateUTC": "2026-10-21T23:41:34.462604+00:00"
 }

@@ -102,10 +102,14 @@ typedef struct {
 
 kernel void cmdCopyBufferBytes(device uint8_t* src [[ buffer(0) ]],
                                device uint8_t* dst [[ buffer(1) ]],
-                               constant CopyInfo& info [[ buffer(2) ]]) {
-	for (size_t i = 0; i < info.size; i++) {
-		dst[i + info.dstOffset] = src[i + info.srcOffset];
-	}
+                               constant CopyInfo& info [[ buffer(2) ]],
+                               uint index [[thread_position_in_grid]]) {
+    if (index < info.size) {
+        // Vulkan forbids overlapping source/destination copy ranges. Widen
+        // before adding offsets so the last byte cannot wrap a uint32_t.
+        size_t i = size_t(index);
+        dst[i + info.dstOffset] = src[i + info.srcOffset];
+    }
 }
 
 kernel void cmdFillBuffer(device uint32_t* dst [[ buffer(0) ]],

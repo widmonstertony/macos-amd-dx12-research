@@ -2032,8 +2032,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 126729,
-      "sha256": "fa7d95d5155e5b662e82a0c688e3898bae960001b41508f8cd66943765a841a3",
+      "bytes": 126838,
+      "sha256": "6df35624ee2acef195b4c73a1e6a371aa75721ba37ed85b993e891bd8d5fa20c",
       "executable": false
     },
     {
@@ -2082,6 +2082,12 @@
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandTypePools.def",
       "bytes": 6944,
       "sha256": "1fc017a22e473f0d6567bca8c8694126484b03d007097941e9c67068d89215ad",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKHeapUseCounter.h",
+      "bytes": 1510,
+      "sha256": "13935df0801b60d78155d4319615d575332590dc88063a18504650f733cc2041",
       "executable": false
     },
     {
@@ -33810,6 +33816,12 @@
       "path": "open-game-stack-20261015/src/graphics-bda/variable-array.comp",
       "bytes": 827,
       "sha256": "0ae8ee6949d5684f570115f2e818ac1c19c76f23f1d6386cf99cec9a6d524573",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/heap_use_counter_control.cpp",
+      "bytes": 2952,
+      "sha256": "ffa3ed59254e5454ab7277d1dd209c93008934e037f0e673fe4b140d82d66e62",
       "executable": false
     },
     {
@@ -69529,9 +69541,50 @@
           "sha256": "5a4494e5737ec0686a3255743adf8a424751354f67e48c7ee25e954ba7124b5a"
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-heap-inline-control-20261020.tar.gz",
+      "sha256": "b69099a5d6a41c20787b6673326f5774061899a62624814c89d6351e4d440aab",
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/heap-inline-live-20261020-probe/libCandidate.dylib",
+          "bytes": 5940272,
+          "sha256": "192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003"
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-inline-live-20261020-probe/libProbeGuard.dylib",
+          "bytes": 32256,
+          "sha256": "f8ed4a68dc0e409e0a29fcf49082050c09bd65f48433a4389a55a51e307eb4b7"
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-inline-live-20261020-probe/build.json",
+          "bytes": 709,
+          "sha256": "8bb87d1b3c4659801ad8a03ad5d3c4a05bc35cf966ca45adc1141341dfaab31f"
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-inline-live-20261020-game/libCandidate.dylib",
+          "bytes": 5940272,
+          "sha256": "192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003"
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-inline-live-20261020-game/libProbeGuard.dylib",
+          "bytes": 36480,
+          "sha256": "68fef9ca3edf175d2b884c83e912e981ffb722e6d00392f41eef1e1fe3d4019a"
+        },
+        {
+          "path": "open-game-stack-20261015/build/heap-inline-live-20261020-game/build.json",
+          "bytes": 845,
+          "sha256": "832b9bc9e60b09a4f3d16007599c0c98374219ef7ece18ad20d850d7eaf7cded"
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/heap-inline-live-20261020/game-trial-config.h",
+          "bytes": 3039,
+          "sha256": "90c3c731d01d42159640293d1a095357a1791c7a16ca61abccff53e1318df694"
+        }
+      ]
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Live support-cache candidate retained; compilation audit matches all 50 intermediate mesh failures to real successful recovery. Prospective qualified compiler provenance/presentation-filter diagnostics are saved but NOT deployed. Initial mesh-link root cause and sustained playability unresolved.",
-  "lastSourceUpdateUTC": "2026-10-21T01:20:32.187397+00:00"
+  "currentSourceState": "Playability unvalidated. Active original-Steam game keeps qualified ef9241 cross-snapshot candidate and caches. Experimental 192d73 heap counter passes GPU/Wine output checks but has CPU spill regressions and is NOT deployed. macOS remains locked; foreground scene FPS and both FSR3 features require local unlock and actual verification.",
+  "lastSourceUpdateUTC": "2026-10-21T02:00:57.105525+00:00"
 }

@@ -1,3 +1,6 @@
+> 新对照（2026-10-20）：仍未验收可玩，原 Steam 的现有游戏和缓存未动。原生 heap 分组改用小表内联计数、大表哈希回退；稳定源码构建、20,480 像素图形回读、16 个 heap 的计算回读、越界/空资源回归及原应用宝 Wine 严格缓存命中/呈现均通过。但五次 CPU 对照中，1–8 个 heap 较快，部分大表回退变慢，因此新候选 **仅保留研究，未部署到游戏**。锁屏状态仍存在，实际前台场景帧率与 FSR3 超分/帧生成未验证。
+> New control: small heap groups avoid per-draw hash allocations, with a bounded hash fallback for larger groups. The stable-source build, real AMD GPU readbacks and original Tencent Wine cache/presentation checks pass. CPU controls improve small groups but regress some spill cases; candidate **192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003 is experimental and NOT deployed**. The active ef9241 game run and all caches remain intact. The console is still locked; sustained foreground FPS and both FSR3 features remain unvalidated. [Evidence](release-evidence/heap-inline-20261020/).
+
 > 验证阻碍（2026-10-20）：系统明确报告 `IOConsoleLocked=true`、`CGSSessionScreenIsLocked=true`。已停止窗口操作，保留原 Steam 启动的现有游戏和缓存，等待用户在本机解锁。锁屏期间的黑色截图、窗口缩略图与后台呈现回调不可作为游戏黑屏或实际前台 FPS 的证据。最新候选仍未验收可玩，FSR3 超分及帧生成仍未验证。
 > Validation blocked: macOS reports a locked console session. Window operations stopped; the existing original-Steam game and all caches remain intact pending a local unlock. Locked/background captures and callbacks cannot establish scene rendering or foreground FPS. Playability and both FSR3 features remain unvalidated.
 

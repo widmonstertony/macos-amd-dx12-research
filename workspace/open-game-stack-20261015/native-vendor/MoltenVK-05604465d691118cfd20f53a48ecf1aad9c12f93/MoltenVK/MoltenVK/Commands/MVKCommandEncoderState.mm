@@ -17,6 +17,7 @@
  */
 
 #include "MVKCommandEncoderState.h"
+#include "MVKHeapUseCounter.h"
 #include "MVKCommandEncodingPool.h"
 #include "MVKCommandBuffer.h"
 #include "MVKImage.h"
@@ -1345,21 +1346,23 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 			// indirect resources in one MTLHeap to be declared with one useHeap.
 			// Collapse only groups large enough to amortize the heap declaration;
 			// keep small and non-heap groups on the precise useResources path.
-			std::unordered_map<id<MTLHeap>, uint32_t> heapCounts;
+			MVKHeapUseCounter<id<MTLHeap>> heapCounts;
 			for (id<MTLResource> resource : entry.read) {
 				id<MTLHeap> heap = resource.heap;
-				if (heap) ++heapCounts[heap];
+				if (heap) heapCounts.add(heap);
 			}
 			for (id<MTLResource> resource : entry.readWrite) {
 				id<MTLHeap> heap = resource.heap;
-				if (heap) ++heapCounts[heap];
+				if (heap) heapCounts.add(heap);
 			}
 			uint32_t collapsedResources = 0;
-			for (auto& pair : heapCounts) if (pair.second >= heapBatchThreshold) { heaps.push_back(pair.first); collapsedResources += pair.second; }
+			heapCounts.each([&](id<MTLHeap> heap, uint32_t count) {
+                if (count >= heapBatchThreshold) { heaps.push_back(heap); collapsedResources += count; }
+            });
 			if (!heaps.empty()) {
 				auto keepPrecise = [&](id<MTLResource> resource) {
 					id<MTLHeap> heap = resource.heap;
-					return !heap || heapCounts[heap] < heapBatchThreshold;
+					return !heap || heapCounts.count(heap) < heapBatchThreshold;
 				};
 				entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
 				entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());
@@ -1382,21 +1385,23 @@ void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> enco
 	Entry& entry = entries[MVKResourceUsageStages::Compute];
 	MVKSmallVector<id<MTLHeap>> heaps;
 	if (batchArgumentHeaps) {
-		std::unordered_map<id<MTLHeap>, uint32_t> heapCounts;
+		MVKHeapUseCounter<id<MTLHeap>> heapCounts;
 		for (id<MTLResource> resource : entry.read) {
 			id<MTLHeap> heap = resource.heap;
-			if (heap) ++heapCounts[heap];
+			if (heap) heapCounts.add(heap);
 		}
 		for (id<MTLResource> resource : entry.readWrite) {
 			id<MTLHeap> heap = resource.heap;
-			if (heap) ++heapCounts[heap];
+			if (heap) heapCounts.add(heap);
 		}
 		uint32_t collapsedResources = 0;
-		for (auto& pair : heapCounts) if (pair.second >= heapBatchThreshold) { heaps.push_back(pair.first); collapsedResources += pair.second; }
+		heapCounts.each([&](id<MTLHeap> heap, uint32_t count) {
+                if (count >= heapBatchThreshold) { heaps.push_back(heap); collapsedResources += count; }
+            });
 		if (!heaps.empty()) {
 			auto keepPrecise = [&](id<MTLResource> resource) {
 				id<MTLHeap> heap = resource.heap;
-				return !heap || heapCounts[heap] < heapBatchThreshold;
+				return !heap || heapCounts.count(heap) < heapBatchThreshold;
 			};
 			entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
 			entry.readWrite.erase(std::remove_if(entry.readWrite.begin(), entry.readWrite.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.readWrite.end());

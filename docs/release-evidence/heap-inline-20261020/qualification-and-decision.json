@@ -1,0 +1,172 @@
+{
+  "timeUTC": "2026-10-21T02:00:19.497707+00:00",
+  "candidateSHA256": "192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003",
+  "buildSourceStable": true,
+  "GPU": {
+    "heap_inline_graphics_gpu_20261020": {
+      "passed": true,
+      "nativeSHA256": "192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003",
+      "metalValidationEnabled": true,
+      "results": {
+        "passed": true,
+        "sharedAllocationResources": 64,
+        "rounds": 20,
+        "passesPerSubmission": 16,
+        "checkedPixels": 20480,
+        "mismatches": 0,
+        "milliseconds": 155.012
+      }
+    },
+    "heap_inline_multiheap_gpu_20261020": {
+      "passed": true,
+      "nativeSHA256": "192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003",
+      "metalValidationEnabled": true,
+      "results": {
+        "passed": true,
+        "resources": 64,
+        "allocationCount": 16,
+        "resourcesPerAllocation": 4,
+        "rounds": 20,
+        "checkedWords": 1280,
+        "mismatches": 0,
+        "milliseconds": 36.8032
+      }
+    },
+    "heap_inline_memory_gpu_20261020": {
+      "passed": true,
+      "nativeSHA256": "192d7376faa4c1d61817b49d41f4a83a34c9e3bc4e2ab4a08a7a05705333c003",
+      "metalValidationEnabled": true,
+      "results": {
+        "device": "AMD Radeon Pro 5600M",
+        "nativeRobustness2FeaturesChanged": false,
+        "scenarios": 12,
+        "gpuResultWordsChecked": 9648,
+        "witnessWordsChecked": 192528,
+        "mismatches": 0,
+        "passed": true,
+        "scope": "Source-built MoltenVK internal compiler and descriptors; experimental private opt-in, not full conformance"
+      }
+    }
+  },
+  "originalTencentWinePassed": true,
+  "originalTencentWineEvidence": "evidence/private-cache-wine-20261021T015900Z/run.json",
+  "CPUControls": {
+    "passed": true,
+    "runs": 5,
+    "gameFPSClaim": false,
+    "cases": [
+      {
+        "heaps": 1,
+        "shuffled": false,
+        "originalMedianMS": 26.535,
+        "candidateMedianMS": 15.23,
+        "ratio": 0.5739589221782552
+      },
+      {
+        "heaps": 1,
+        "shuffled": true,
+        "originalMedianMS": 31.2,
+        "candidateMedianMS": 15.356,
+        "ratio": 0.4921794871794872
+      },
+      {
+        "heaps": 2,
+        "shuffled": false,
+        "originalMedianMS": 29.336,
+        "candidateMedianMS": 17.475,
+        "ratio": 0.5956844832287974
+      },
+      {
+        "heaps": 2,
+        "shuffled": true,
+        "originalMedianMS": 42.934,
+        "candidateMedianMS": 19.782,
+        "ratio": 0.4607537150044254
+      },
+      {
+        "heaps": 4,
+        "shuffled": false,
+        "originalMedianMS": 33.973,
+        "candidateMedianMS": 17.896,
+        "ratio": 0.5267712595296266
+      },
+      {
+        "heaps": 4,
+        "shuffled": true,
+        "originalMedianMS": 34.77,
+        "candidateMedianMS": 21.224,
+        "ratio": 0.6104112740868565
+      },
+      {
+        "heaps": 8,
+        "shuffled": false,
+        "originalMedianMS": 40.428,
+        "candidateMedianMS": 22.724,
+        "ratio": 0.5620856831898684
+      },
+      {
+        "heaps": 8,
+        "shuffled": true,
+        "originalMedianMS": 38.892,
+        "candidateMedianMS": 28.052,
+        "ratio": 0.7212794405019026
+      },
+      {
+        "heaps": 9,
+        "shuffled": false,
+        "originalMedianMS": 50.49,
+        "candidateMedianMS": 65.875,
+        "ratio": 1.3047138047138047
+      },
+      {
+        "heaps": 9,
+        "shuffled": true,
+        "originalMedianMS": 46.08,
+        "candidateMedianMS": 70.005,
+        "ratio": 1.5192057291666665
+      },
+      {
+        "heaps": 64,
+        "shuffled": false,
+        "originalMedianMS": 128.826,
+        "candidateMedianMS": 84.506,
+        "ratio": 0.6559700681539441
+      },
+      {
+        "heaps": 64,
+        "shuffled": true,
+        "originalMedianMS": 94.09,
+        "candidateMedianMS": 140.604,
+        "ratio": 1.4943564672122436
+      },
+      {
+        "heaps": 512,
+        "shuffled": false,
+        "originalMedianMS": 587.427,
+        "candidateMedianMS": 478.235,
+        "ratio": 0.8141181797908505
+      },
+      {
+        "heaps": 512,
+        "shuffled": true,
+        "originalMedianMS": 745.86,
+        "candidateMedianMS": 546.405,
+        "ratio": 0.7325838629233368
+      }
+    ]
+  },
+  "nativeGPUOutputCorrectInTestedCases": true,
+  "universalCPUImprovement": false,
+  "CPURegressionsRetained": true,
+  "deployedToGame": false,
+  "activeGamePID": 43610,
+  "activeGameNativeSHA256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f",
+  "activeGameRestarted": false,
+  "gameCachesDeleted": false,
+  "consoleStillLocked": true,
+  "foregroundFPSVerified": false,
+  "gamePlayable": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "decision": "Keep as an experimental control, not a promoted game optimization: small heap groups improve CPU fixture but some spill cases regress. Preserve active game and caches pending local unlock for the already GPU-qualified cross-snapshot candidate foreground scene baseline."
+}

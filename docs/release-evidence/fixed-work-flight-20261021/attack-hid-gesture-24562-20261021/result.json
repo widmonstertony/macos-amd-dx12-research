@@ -1,0 +1,25 @@
+{
+  "startUTC": "2026-10-21T17:36:20.672310+00:00",
+  "gamePID": 24562,
+  "preexistingFailures": 0,
+  "frames": [
+    {
+      "elapsed": 3.835145115008345,
+      "exitCode": 0
+    },
+    {
+      "elapsed": 4.9696708179981215,
+      "exitCode": 0
+    },
+    {
+      "elapsed": 6.122884659998817,
+      "exitCode": 0
+    }
+  ],
+  "inputExitCode": 0,
+  "inputStdout": "{\"pid\":24562,\"button\":\"left\",\"holdMS\":1000,\"HIDHitVerified\":true,\"sent\":true}\n",
+  "inputStderr": "gamePID=24562 active=1 frontmostAttributeResult=0\n",
+  "swordGestureVisuallyVerified": true,
+  "verifiedFrame": "frame-2.png",
+  "gamePlayable": false
+}

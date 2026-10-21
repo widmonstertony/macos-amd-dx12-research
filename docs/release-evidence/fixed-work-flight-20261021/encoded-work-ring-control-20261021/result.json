@@ -1,0 +1,1 @@
+{"passed":true,"retentionCases":8,"concurrentSnapshots":91,"concurrentWrites":100000,"eventCapacity":64,"ringBytes":36880,"ringMilliseconds":11.519,"previousAllocationMilliseconds":385.035,"gameFPSNotMeasured":true}

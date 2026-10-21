@@ -7,6 +7,7 @@
 #include <atomic>
 #include <mutex>
 #include "MVKTimedTraceArm.h"
+#include "MVKEncodedWorkRing.h"
 
 inline bool mvkEncoderWorkTraceEnabled() {
     static const bool enabled = [] { const char* v=getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v,"1"); }();
@@ -19,6 +20,7 @@ inline bool mvkDependencyTraceEnabled() {
     return failure || mvkEncoderWorkTraceEnabled();
 }
 inline const void* mvkDependencyKey() { return sel_registerName("mvkQueueDependenciesV1"); }
+inline const void* mvkEncodedWorkKey() { return sel_registerName("mvkEncodedWorkRingV1"); }
 struct MVKPendingDependencyRecords {
     std::mutex lock;
     NSMutableDictionary* records = [NSMutableDictionary new];
@@ -57,28 +59,18 @@ inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, ui
 // Vulkan/GPU resource. This also covers helper pipelines without a Vulkan owner.
 inline void mvkAssociateEncoderTrace(id<MTLCommandBuffer> cb, id<MTLCommandEncoder> encoder) {
     if (!encoder || !mvkEncoderWorkTraceEnabled()) return;
-    id record = objc_getAssociatedObject(cb, mvkDependencyKey());
-    if (record) objc_setAssociatedObject(encoder, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
+    NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
+    if (!record) return;
+    @synchronized (record) {
+        NSMutableData* data = record[@"workBuffer"];
+        if (!data) { data = mvkNewEncodedWorkRing(); record[@"workBuffer"] = data; }
+        objc_setAssociatedObject(encoder, mvkEncodedWorkKey(), data, OBJC_ASSOCIATION_RETAIN);
+    }
 }
 inline void mvkRecordEncoderWorkImpl(id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
     if (!encoder || !mvkEncoderWorkTraceEnabled()) return;
-    NSMutableDictionary* record = objc_getAssociatedObject(encoder, mvkDependencyKey());
-    if (!record) return;
-    @synchronized (record) {
-        uint64_t number = [record[@"workCount"] unsignedLongLongValue];
-        record[@"workCount"] = @(number + 1);
-        NSMutableArray* work = record[@"workEvents"];
-        // Preserve first 16 and most recent 48 entries. Counts expose omitted work.
-        if (work.count >= 64) {
-            [work removeObjectAtIndex:16];
-            record[@"truncatedWorkEvents"] = @([record[@"truncatedWorkEvents"] unsignedLongLongValue] + 1);
-        }
-        NSString* text = label ?: @"";
-        if (text.length > 512) text = [text substringToIndex:512];
-        [work addObject:@{@"index":@(number), @"kind":kind, @"label":text,
-            @"encoder":[NSString stringWithFormat:@"%p",encoder],
-            @"time":@([NSDate timeIntervalSinceReferenceDate])}];
-    }
+    NSMutableData* data = objc_getAssociatedObject(encoder, mvkEncodedWorkKey());
+    if (data) mvkAppendEncodedWork(data, encoder, kind, label);
 }
 // Lazy arguments matter: disabled diagnostics must not allocate NSString
 // labels for every fence, draw or dispatch before the helper can return.
@@ -115,6 +107,7 @@ inline void mvkRecordEventDependency(id<MTLCommandBuffer> cb, id<MTLEvent> event
 inline NSDictionary* mvkSnapshotDependencyRecord(NSDictionary* record) {
     if (!record) return @{};
     @synchronized (record) {
+        NSDictionary* work = mvkSnapshotEncodedWork(record[@"workBuffer"]);
         NSMutableArray* events = [NSMutableArray array];
         for (NSDictionary* raw in record[@"events"]) {
             id<MTLEvent> event = raw[@"eventObject"];
@@ -128,8 +121,8 @@ inline NSDictionary* mvkSnapshotDependencyRecord(NSDictionary* record) {
             @"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
             @"queueIndex":record[@"queueIndex"], @"createdTime":record[@"createdTime"],
             @"events":events, @"truncatedEvents":record[@"truncatedEvents"],
-            @"workEvents":[NSArray arrayWithArray:record[@"workEvents"]],
-            @"workCount":record[@"workCount"], @"truncatedWorkEvents":record[@"truncatedWorkEvents"]};
+            @"workEvents":work[@"workEvents"],
+            @"workCount":work[@"workCount"], @"truncatedWorkEvents":work[@"truncatedWorkEvents"]};
     }
 }
 inline NSDictionary* mvkCommandBufferDependencies(id<MTLCommandBuffer> cb) {

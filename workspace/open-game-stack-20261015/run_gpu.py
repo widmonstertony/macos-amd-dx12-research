@@ -67,7 +67,8 @@ icd=dest/'icd.json';icd.write_text(json.dumps({'file_format_version':'1.0.0','IC
 env={k:v for k,v in os.environ.items() if not k.startswith(('DYLD_','VK_','MVK_','MTL_','GPU_ADAPTER_','R2_'))}
 env.update(PATH='/nonexistent',VK_ICD_FILENAMES=str(icd),MTL_DEBUG_LAYER='1',MVK_CONFIG_LOG_LEVEL='2',MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS='1',MVK_AMD_REFERENCE_RBA2='1',MVK_AMD_REFERENCE_RIA2='1',MVK_AMD_REFERENCE_NULL='1',MVK_AMD_BYTE_GUARDS='1',MVK_CONFIG_SHADER_DUMP_DIR=str(dest/'msl'))
 if args.runtime_trace:env['MVK_AMD_RUNTIME_TRACE']='1'
-if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
+if args.gpu_timeout_trace:
+    env.update(MVK_AMD_GPU_TIMEOUT_TRACE='1',MVK_AMD_QUEUE_FAILURE_CONTEXT='1',MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL='1',MVK_AMD_RUNTIME_TRACE='1')
 if args.armed_work_trace:
     marker=dest/'capture.arm';marker.write_text('Owned bounded GPU diagnostic\n')
     if args.work_trace_expired:os.utime(marker,(time.time()-60,time.time()-60))

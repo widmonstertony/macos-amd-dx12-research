@@ -1,3 +1,16 @@
+> 2026-10-21：挥剑动作已通过游戏截图确认，但随后仍发生 4 次 GPU 超时；两段一分钟采样未保持前台，因此没有可用的稳定 FPS 结果。**仍未修好。**
+> Sword input was visually verified in the actual game, but four later GPU timeouts still occurred. Both one-minute samples lost foreground, so neither provides a valid sustained FPS result. **Still unresolved.**
+
+新增诊断 `740c588c…` 用固定 64 条 CPU 记录替代逐条 Foundation 字典分配，保留前 16 条及后 48 条，每个命令缓冲区 36,880 字节。独立 CPU 对照 10 万次记录从 385.035ms 降到 11.519ms；这只是诊断开销对照，**不是游戏提速结论**。并发读取、真实 AMD 绘制/清屏/几何阶段及内存读写、应用宝原 Wine 计算/呈现/严格缓存命中均通过。
+
+Diagnostic `740c588c…` replaces per-event Foundation allocations with a fixed 64-event CPU history (first 16, latest 48; 36,880 bytes per command buffer). A 100,000-event CPU control improved from 385.035ms to 11.519ms; **this is diagnostic overhead, not game FPS**. Concurrent snapshots, real AMD graphics/clear/geometry/memory output and original Tencent Wine compute/presentation/strict cache-hit qualification passed.
+
+新游戏通过原 Steam 启动并确认映射该库，但在生成图形日志前退出，原因尚未确定，未将它算成 GPU 回归成功。此前短时详细记录未覆盖晚发生的超时，具体着色器/同步根因仍未知。游戏与缓存保留，FSR3 两项未验证；此下载为可恢复研究版本，不是保证可玩的发布版。
+
+A new original-Steam game mapped the qualified library but exited before graphics logs; cause unknown, not a game-validation success. Earlier timed work capture missed late timeouts, so the exact shader/synchronization root remains unproven. Game and caches remain intact; both FSR3 features are unvalidated. Downloads are recoverable research builds, not a guaranteed playable release.
+
+[Controls and actual failed-game evidence](release-evidence/fixed-work-flight-20261021/)
+
 > 2026-10-21 更新：已确认一次真实磁盘写满（最低约 139MB 空闲）。仅压缩校验过的旧研究文本日志，保留恢复元数据；游戏、存档和所有着色器缓存未删除。正常 Steam 测试现增加启动前 10GiB 空间检查及限时磁盘监测。
 > Update: actual ENOSPC occurred with about 139MB free. Only old owned text research logs were losslessly compressed with decompressed SHA verification and recovery metadata. Game, saves and all shader caches remain intact. Normal-Steam tests now require 10GiB free before launch and use a bounded disk monitor.
 

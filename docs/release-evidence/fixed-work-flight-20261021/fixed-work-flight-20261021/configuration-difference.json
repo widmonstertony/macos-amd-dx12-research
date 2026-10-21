@@ -1,0 +1,22 @@
+{
+  "MVK_AMD_GPU_WORK_TRACE_ARM_PATH": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/timed-work-names-20261021/gpu-work-trace.arm",
+    null
+  ],
+  "MVK_CONFIG_SHADER_DUMP_DIR": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/timed-work-names-20261021/msl",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/fixed-work-flight-20261021/msl"
+  ],
+  "MVK_AMD_GPU_TIMEOUT_TRACE": [
+    "0",
+    "1"
+  ],
+  "MVK_AMD_EFFECTIVE_CONFIG_PATH": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/timed-work-names-20261021/effective-config.json",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/fixed-work-flight-20261021/effective-config.json"
+  ],
+  "YYB_OPEN_GUARD_RECORD": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/timed-work-names-20261021/guard-proxy.trace",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/fixed-work-flight-20261021/guard-proxy.trace"
+  ]
+}

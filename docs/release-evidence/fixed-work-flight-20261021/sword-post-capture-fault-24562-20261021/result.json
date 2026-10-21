@@ -1,0 +1,11 @@
+{
+  "timeUTC": "2026-10-21T17:49:06.457254+00:00",
+  "gamePID": 24562,
+  "signalSent": false,
+  "GPUTimeoutFiles": 4,
+  "freeBytesAtFailure": 35444199424,
+  "exactShaderNotProven": true,
+  "markerDisabledAtFailure": true,
+  "gamePlayable": false,
+  "cacheDeleted": false
+}

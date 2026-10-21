@@ -1,0 +1,20 @@
+{
+  "fixed_ring_active_gpu_20261021": {
+    "records": 20,
+    "maxWorkCount": 59,
+    "retainedAtMost64": true,
+    "sequenceCorrect": true
+  },
+  "fixed_ring_expired_gpu_20261021": {
+    "records": 20,
+    "maxWorkCount": 0,
+    "retainedAtMost64": true,
+    "sequenceCorrect": true
+  },
+  "fixed_ring_continuous16_gpu_20261021": {
+    "records": 20,
+    "maxWorkCount": 115,
+    "retainedAtMost64": true,
+    "sequenceCorrect": true
+  }
+}

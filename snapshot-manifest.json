@@ -2186,6 +2186,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKEncodedWorkRing.h",
+      "sha256": "af6046d95ece9a5662a7438d06872fc857fb018b50844f5b4af6ada29b9016bf",
+      "bytes": 3376
+    },
+    {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKFramebuffer.h",
       "bytes": 2236,
       "sha256": "1e65a647143453df204d20073f92232e9d8586dc2e6588ff59ca1994560cd44b",
@@ -2300,8 +2305,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueDependencyTrace.h",
-      "sha256": "1f39aefdd45dae87740130b2e82bdc40d4f733e5053e423e3a14943aff23667f",
-      "bytes": 8536
+      "sha256": "ca43dfd7a654464ccf04503f1f113f682e26e3d26d67d69beb11d0b08ca1a572",
+      "bytes": 8146
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueTimingTrace.h",
@@ -33652,8 +33657,8 @@
     },
     {
       "path": "open-game-stack-20261015/run_gpu.py",
-      "sha256": "7efc022858cd27f0036c02fe68efbf78a42094566a4c4a58f9fd5ffd3d0b3dc5",
-      "bytes": 17853
+      "sha256": "02f36aef6a62814ad7d3c51023e397efe90b4492eee89ab7a435397aa92942a5",
+      "bytes": 17961
     },
     {
       "path": "open-game-stack-20261015/run_tencent_trial.py",
@@ -33732,6 +33737,11 @@
       "bytes": 14376,
       "sha256": "b1b1e21544f23d4090cd4953a1b92a9c9823d6298a7a4f826a63343212602883",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/encoded_work_ring_control.mm",
+      "sha256": "b8e805c2fd3eae84663f3e7016a8f7d6c442b284fed1b3ef77353044456315ef",
+      "bytes": 2292
     },
     {
       "path": "open-game-stack-20261015/src/fresh-mesh-specialization.frag",
@@ -34142,9 +34152,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/activate_game_titlebar.m",
-      "bytes": 2036,
-      "sha256": "5ce87b1ba23709c2aed276abc9c1cd09184f7f23255049bd9b20f83a9278add5",
-      "executable": false
+      "sha256": "05fd59de3e51184e9630a3f25533048f17e2c7e8b72a34b91675165523af0e66",
+      "bytes": 2143
     },
     {
       "path": "open-game-stack-20261015/tools/apply-stellar-postprocess-bypass.py",
@@ -34176,8 +34185,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "sha256": "a9f91b818130b80fec899baab783adbcf6436dc8da739bbcd28602261ccca0c5",
-      "bytes": 3862
+      "sha256": "f2053631a102ad1e848c8ee5a5077d6a0e73faa79093d3ab82bcf454c62c1329",
+      "bytes": 4358
     },
     {
       "path": "open-game-stack-20261015/tools/build_queue_burst_probe.py",
@@ -34239,8 +34248,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/game_test_input.m",
-      "sha256": "2b2c38bc5e341a5a2978f5cb98086245bb4779d64a6906d16f16b867e1d6e841",
-      "bytes": 4439
+      "sha256": "032c71a02f3aabe46466fb542da969bd064d6e108fedb899bc3981f8f3c3ce0e",
+      "bytes": 5171
     },
     {
       "path": "open-game-stack-20261015/tools/game_window_state.m",
@@ -34404,9 +34413,19 @@
       "bytes": 1918
     },
     {
+      "path": "open-game-stack-20261015/tools/summarize_game_gpu_fault.py",
+      "sha256": "54fbe4c33f39cbc6b073adaf1b74b0ccb4b35d4fae500f04b093ca628cd76062",
+      "bytes": 2122
+    },
+    {
       "path": "open-game-stack-20261015/tools/thermal_pause_game.py",
       "sha256": "d6ff53c67321aa46b04cdbce9eeff906f9a6c5fbfca42df964951f1e66fdd0c7",
       "bytes": 1818
+    },
+    {
+      "path": "open-game-stack-20261015/tools/watch_first_game_fault.py",
+      "sha256": "b64811a23a89503f9d5c3e7ced19ccd4ccf3fb73b804c9436acca30a6d4812b6",
+      "bytes": 2553
     },
     {
       "path": "open-game-stack-20261015/tools/watch_game_disk_budget.py",
@@ -69929,9 +69948,56 @@
           "bytes": 19272
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-fixed-work-flight-20261021.tar.gz",
+      "sha256": "b47a2e3a081d48eb6c75fa898205d4c58f6aa7b1df75e3061cd9c8104e5199b8",
+      "bytes": 3705941,
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/fixed-work-flight-20261021-probe/libCandidate.dylib",
+          "sha256": "740c588c6dd51a9bf46a8fdafb9744058dbbe59bc6a07af2485ecb8031c19729",
+          "bytes": 5951248
+        },
+        {
+          "path": "open-game-stack-20261015/build/fixed-work-flight-20261021-probe/libProbeGuard.dylib",
+          "sha256": "dc1120b0f64c4d744b6ffffb5fb4fed3a30774c634f9ac7d1be440f0d40bcda7",
+          "bytes": 32256
+        },
+        {
+          "path": "open-game-stack-20261015/build/fixed-work-flight-20261021-probe/build.json",
+          "sha256": "9ccdd819c105c31a591153426bfde92530b3f13b282516dc6b055a0d7c437b0e",
+          "bytes": 873
+        },
+        {
+          "path": "open-game-stack-20261015/build/fixed-work-flight-20261021-game/libCandidate.dylib",
+          "sha256": "740c588c6dd51a9bf46a8fdafb9744058dbbe59bc6a07af2485ecb8031c19729",
+          "bytes": 5951248
+        },
+        {
+          "path": "open-game-stack-20261015/build/fixed-work-flight-20261021-game/libProbeGuard.dylib",
+          "sha256": "9e5f2f927adc01cd0be936dd2c364afca4499c428c53fecda73544df49f0752a",
+          "bytes": 36480
+        },
+        {
+          "path": "open-game-stack-20261015/build/fixed-work-flight-20261021-game/build.json",
+          "sha256": "5f78e5e556c497948d1ad2f63a91574275a625ed614dee65139eae945642300a",
+          "bytes": 1010
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/fixed-work-flight-20261021/game-trial-config.h",
+          "sha256": "635e5a028b3175bf357381dddc421fc87b8c55cbe8ea79c5f545c8e8735feeb0",
+          "bytes": 3200
+        },
+        {
+          "path": "open-game-stack-20261015/build/fixed-work-flight-20261021-tools/game-test-input",
+          "sha256": "5c6d6fc0ef7bb4671f28057408af4c1e2712d159f91e18b016456f1019ccc797",
+          "bytes": 19520
+        }
+      ]
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Attack GPU timeout still unresolved. Actual ENOSPC observed at139MBfree; only old owned text research logs gzip-compressed with decompressed hash verification. Game/save/shader caches untouched. New normal-Steam launch preflight10GiBfree and900sec identity-guarded disk monitor preserving3GiBreserve. Game14991 reproduced3GPUtimeouts with about19GiBfree,soENOSPCnotsolecause. Detailed marker expired beforefault;no exactshaderidentified. Current24562 repeat unchanged6e7d diagnostic with600sec bounded capture after cache completion. No GPU synchronization semantics changed. Notplayable;bothFSR3unvalidated.",
-  "lastSourceUpdateUTC": "2026-10-21T17:19:26.752061+00:00"
+  "currentSourceState": "Diagnostic740c588usesfixed64eventCPUring36880bytesperCB;100000events11.519msvs385.035msoldFoundationallocationfixture,notgameFPS. CPUconcurrent/sequencecontrols,realAMDgraphics/memory/geometry,originalTencentWinecompute/present/strictcachepassed. Actualpreviousgame24562visuallyverifiedHIDsword,butlater4GPUtimeoutsafterdetailedcapturedisabled;noexactshaderrootproven. Both60secFPSsamplesinvalidforeground,neverreportFPSfromthem. NewnormalSteamgame33374mappedqualifieddiagnosticbutexitedbeforegraphicslogs;causeunknown,askeduser. NoGPUsemanticschanged,cachesintact,notplayable,bothFSR3unvalidated.",
+  "lastSourceUpdateUTC": "2026-10-21T18:14:31.601414+00:00"
 }

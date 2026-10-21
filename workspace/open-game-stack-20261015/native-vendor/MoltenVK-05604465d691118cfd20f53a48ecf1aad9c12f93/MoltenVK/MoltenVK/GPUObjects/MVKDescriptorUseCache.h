@@ -15,7 +15,13 @@
 
 class MVKDescriptorUseCache {
 public:
-    using Resources = std::vector<id<MTLResource>>;
+    struct Resources : std::vector<id<MTLResource>> {
+        using std::vector<id<MTLResource>>::vector;
+        // Raw identities only. Weak ancestry cannot retain an unbounded chain
+        // of old descriptor tables, and never owns any Metal resource.
+        std::weak_ptr<const Resources> previous;
+        std::vector<id<MTLResource>> added, removed;
+    };
     using Snapshot = std::shared_ptr<const Resources>;
     std::unique_lock<std::mutex> beginWrite(const char* first = nullptr, size_t bytes = 0) {
         std::unique_lock<std::mutex> lock(_lock);
@@ -78,6 +84,10 @@ public:
             return entry.snapshot;
         }
         bool changed = !entry.snapshot;
+        size_t dirtySlots = 0;
+        for (auto range : entry.dirty) dirtySlots += range.second-range.first;
+        bool trackDelta = entry.snapshot && dirtySlots <= 4096;
+        std::unordered_set<id<MTLResource>> added, removed;
         for (auto range : entry.dirty) {
             for (uint32_t i = range.first; i < range.second; ++i) {
                 id<MTLResource> resource = *reinterpret_cast<const id<MTLResource>*>(src + i * stride);
@@ -85,19 +95,31 @@ public:
                 if (old == resource) continue;
                 if (old) {
                     auto it = entry.counts.find(old);
-                    if (--it->second == 0) entry.counts.erase(it);
+                    if (--it->second == 0) {
+                        entry.counts.erase(it);
+                        if (trackDelta && !added.erase(old)) removed.insert(old);
+                    }
                 }
-                if (resource) ++entry.counts[resource];
+                if (resource && ++entry.counts[resource] == 1 && trackDelta && !removed.erase(resource))
+                    added.insert(resource);
                 entry.slots[i] = resource;
                 changed = true;
             }
             _scanned += range.second-range.first;
         }
         entry.dirty.clear();
+        // The snapshot describes a set, not slot order or multiplicity. A
+        // shuffle or duplicate-count change must preserve its cache identity.
+        if (trackDelta && added.empty() && removed.empty()) changed = false;
         if (changed) {
             auto result = std::make_shared<Resources>();
             result->reserve(entry.counts.size());
             for (auto item : entry.counts) result->push_back(item.first);
+            if (trackDelta) {
+                result->previous = entry.snapshot;
+                result->added.assign(added.begin(), added.end());
+                result->removed.assign(removed.begin(), removed.end());
+            }
             entry.snapshot = result;
             _emitted += result->size(); ++_rebuilds;
         } else ++_hits;

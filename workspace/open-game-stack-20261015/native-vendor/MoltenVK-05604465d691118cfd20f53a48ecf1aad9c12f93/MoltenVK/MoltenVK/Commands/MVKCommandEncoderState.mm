@@ -1091,9 +1091,13 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
     // a cached absence too. Validated objects remain owned by this helper.
     uint64_t additions = list.additionGeneration();
     DeclaredSnapshot* prior = nullptr;
+    DeclaredSnapshot* deltaPrior = nullptr;
+    auto previous = crossEncoderSnapshotReuse ? snapshot->previous.lock() : nullptr;
     if (descriptorSnapshotReuse) {
         for (auto& entry : declaredSnapshots) {
-            if (entry.snapshot != snapshot || entry.list != &list || entry.stage != stage || entry.write != write) continue;
+            if (entry.list != &list || entry.stage != stage || entry.write != write) continue;
+            if (previous && entry.snapshot == previous && entry.liveSnapshot) deltaPrior = &entry;
+            if (entry.snapshot != snapshot) continue;
             prior = &entry;
             if (entry.additions != additions) {
                 if (resourceUseStats) ++statsRegistrationQueries;
@@ -1122,14 +1126,53 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         }
     }
     auto live = crossEncoderSnapshotReuse ? std::make_shared<MVKDescriptorUseCache::Resources>() : nullptr;
-    for (id<MTLResource> resource : *snapshot) {
-        bool valid = addImmediateLive(resource,list,encoder,func,stage,write);
-        if (valid && live) live->push_back(resource);
+    // An immutable successor can reuse a parent's filtered, owned identities.
+    // A registration affecting the successor invalidates this shortcut too:
+    // an old absent identity may now be live without a descriptor-slot edit.
+    if (!prior && deltaPrior && deltaPrior->additions != additions) {
+        uint64_t observed = additions;
+        if (resourceUseStats) ++statsRegistrationQueries;
+        bool validate = list.registrationRequiresValidation(deltaPrior->additions, [&](id resource) {
+            return std::find(snapshot->begin(),snapshot->end(),resource) != snapshot->end();
+        }, observed);
+        if (validate) deltaPrior = nullptr;
+        else {
+            additions = observed;
+            if (resourceUseStats) ++statsRegistrationUnrelated;
+        }
+    }
+    if (!prior && deltaPrior) {
+        const auto& removed = snapshot->removed;
+        std::unordered_set<id<MTLResource>> manyRemoved;
+        if (removed.size() > 8) manyRemoved.insert(removed.begin(),removed.end());
+        live->reserve(deltaPrior->liveSnapshot->size()+snapshot->added.size());
+        for (id<MTLResource> resource : *deltaPrior->liveSnapshot) {
+            bool erased = removed.size() > 8 ? manyRemoved.count(resource) != 0
+                : std::find(removed.begin(),removed.end(),resource) != removed.end();
+            if (erased) continue;
+            // Retention prevents address reuse; the normal helper still emits
+            // every encoder's stage/access declaration and any write upgrade.
+            if (addImmediateLive(resource,list,encoder,func,stage,write)) live->push_back(resource);
+        }
+        for (id<MTLResource> resource : snapshot->added)
+            if (addImmediateLive(resource,list,encoder,func,stage,write)) live->push_back(resource);
+        if (resourceUseStats) {
+            ++statsSnapshotDeltaHits;
+            statsSnapshotDeltaReused += snapshot->size()-snapshot->added.size();
+        }
+        prior = deltaPrior;
+    } else {
+        if (resourceUseStats) statsSnapshotColdWords += snapshot->size();
+        for (id<MTLResource> resource : *snapshot) {
+            bool valid = addImmediateLive(resource,list,encoder,func,stage,write);
+            if (valid && live) live->push_back(resource);
+        }
     }
     if (descriptorSnapshotReuse) {
         size_t previous = prior && prior->liveSnapshot ? prior->liveSnapshot->size() : 0;
         size_t incoming = live ? live->size() : 0;
         if ((!prior && declaredSnapshots.size() >= 64) || snapshotLiveIdentities-previous+incoming > 32768) {
+            if (resourceUseStats) ++statsSnapshotCacheClears;
             declaredSnapshots.clear(); snapshotLiveIdentities=0; prior=nullptr;previous=0;
         }
         // Admission/eviction affects only CPU metadata. The owned resource
@@ -1146,6 +1189,7 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     if (!resourceUseStats) return;
     struct Totals {
         uint64_t registrationQueries=0, registrationUnrelated=0, calls=0, lookups=0, retainedHits=0, absentHits=0, liveFound=0, snapshotCalls=0, snapshotSkips=0, snapshotWordsSkipped=0, snapshotFilterHits=0, resets=0, capClears=0, maxUsed=0;
+        uint64_t snapshotDeltaHits=0, snapshotDeltaReused=0, snapshotColdWords=0, snapshotCacheClears=0;
         double start=0;
     };
     static std::mutex lock;
@@ -1159,6 +1203,8 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     statsRegistrationQueries=statsRegistrationUnrelated=0;
     total.snapshotCalls+=statsSnapshotCalls;total.snapshotSkips+=statsSnapshotSkips;total.snapshotWordsSkipped+=statsSnapshotWordsSkipped;total.snapshotFilterHits+=statsSnapshotFilterHits;
     statsSnapshotCalls=statsSnapshotSkips=statsSnapshotWordsSkipped=statsSnapshotFilterHits=0;
+    total.snapshotDeltaHits+=statsSnapshotDeltaHits;total.snapshotDeltaReused+=statsSnapshotDeltaReused;total.snapshotColdWords+=statsSnapshotColdWords;total.snapshotCacheClears+=statsSnapshotCacheClears;
+    statsSnapshotDeltaHits=statsSnapshotDeltaReused=statsSnapshotColdWords=statsSnapshotCacheClears=0;
     total.retainedHits+=statsRetainedHits; total.absentHits+=statsAbsentHits; total.liveFound+=statsLiveFound;
     total.resets+=encoderReset; total.capClears+=encoderReset && used.size()>8192;
     total.maxUsed=std::max(total.maxUsed,uint64_t(used.size()));
@@ -1168,7 +1214,7 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     if (directory) {
         char path[4096];snprintf(path,sizeof(path),"%s/resource-use-%d.jsonl",directory,getpid());
         char line[2048];
-        snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"registrationQueries\":%llu,\"registrationUnrelated\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.registrationQueries,(unsigned long long)total.registrationUnrelated,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed);
+        snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"registrationQueries\":%llu,\"registrationUnrelated\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"snapshotDeltaHits\":%llu,\"snapshotDeltaReused\":%llu,\"snapshotColdWords\":%llu,\"snapshotCacheClears\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.registrationQueries,(unsigned long long)total.registrationUnrelated,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.snapshotDeltaHits,(unsigned long long)total.snapshotDeltaReused,(unsigned long long)total.snapshotColdWords,(unsigned long long)total.snapshotCacheClears,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed);
         if (records < 1024) {
             FILE* file=fopen(path,"a");
             if(file) { fputs(line,file); fclose(file); ++records; }

@@ -1,3 +1,6 @@
+> 新增实验性描述符增量规则：资源身份集合不变时保留快照；小范围改动记录新增/移除身份；原生编码路径只复用已持有引用的旧资源，并保留每个编码器的阶段与写权限声明。注册状态影响表中资源时回退完整校验，弱引用避免快照历史无限保留。包含独立集合对照和真实 GPU 测试源码。游戏性能收益仍待验证，FSR3 两项仍未完成。本次只发布源码，不公开新的本机日志或运行环境证据。
+> Experimental descriptor membership deltas preserve immutable snapshot identity for set-equivalent edits and record additions/removals for small updates. Native encoding reuses only retained parent resources while preserving per-encoder stage/write declarations. Registrations affecting table resources trigger full validation; weak ancestry bounds retained history. Independent set-oracle and real GPU fixture source is included. Game performance benefit remains unverified; both FSR3 features remain incomplete. This update publishes source only, without new local logs or machine evidence.
+
 > 诊断工具补充：命中测试使用系统实际输入接收进程核对可穿透覆盖层；窗口大小请求同时记录实际大小；Wine 正常线程挂起信号原样传递。新的本机测试数据仍只保存在本机，游戏可玩性仍未通过。
 > Diagnostic tooling follow-up: verify the actual accessibility input recipient when a click-through overlay exists; report actual window size alongside resize requests; pass Wine thread-suspension signals unchanged. New local test data remain local. Playability is still unverified.
 

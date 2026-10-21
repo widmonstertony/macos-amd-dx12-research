@@ -2026,13 +2026,13 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "sha256": "26304c1f69ec02d6b294d4a2e49715a852879a6c3e2e1df6355182caa0accf1f",
-      "bytes": 35515
+      "sha256": "0c63e2ebfa3048f78fb39acb4533af0b9323646c1fd3ab3c07d8298b4f90bce4",
+      "bytes": 35636
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "sha256": "644a2e22ca8f9f1052e35bf97c8165aadbbede8ae7f4317bfbfa7ac79cb862db",
-      "bytes": 127983
+      "sha256": "f3c44be0aa42e3d739a0049d848050bfbec76f05077b55fc37b4b5f21a59f273",
+      "bytes": 131088
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncodingPool.h",
@@ -2153,9 +2153,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDescriptorUseCache.h",
-      "bytes": 5537,
-      "sha256": "9f6a7932dbbddbd07c03f8bb772de102eb686cf0d7f127543053171e9a5c4216",
-      "executable": false
+      "sha256": "3072df7ea639adf82b5b8e640092630076bbfb262a8577f1d5e39ca91340159f",
+      "bytes": 6772
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h",
@@ -33733,6 +33732,16 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/descriptor_membership_delta_control.mm",
+      "sha256": "5ffd236577a5b1ceb23913ac9b48a58ca35ad323315f7f356567da14e759c425",
+      "bytes": 3422
+    },
+    {
+      "path": "open-game-stack-20261015/src/descriptor_membership_delta_gpu.mm",
+      "sha256": "144bf0e8e1cd74770de4f73bda82ceacf5da3f825a075e8ef00d566f05fb965e",
+      "bytes": 6156
+    },
+    {
       "path": "open-game-stack-20261015/src/dxgi_format_control.cpp",
       "bytes": 14376,
       "sha256": "b1b1e21544f23d4090cd4953a1b92a9c9823d6298a7a4f826a63343212602883",
@@ -34196,8 +34205,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_resource_lookup_fixture.py",
-      "sha256": "e7354918952e1032eed11066217eab30e71f27ceb1e0721ead17ef46cc58c189",
-      "bytes": 1309
+      "sha256": "3da9b887c3bbad3f435e6359c6179f1889141cfd3677380e07aa5bf7a9ec337a",
+      "bytes": 1423
     },
     {
       "path": "open-game-stack-20261015/tools/build_stable_moltenvk.py",
@@ -70007,6 +70016,6 @@
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Open-source diagnostic tooling update only. Original native launcher preserves complete backend selection. Bounded Wine handler capture detaches after a matching fault, unexpected debugger event or timeout. Logging requests are not proof of active logging; mapped libraries are not proof of device initialization. No new machine logs or runtime environment evidence published with this update. Playability and both FSR3 features remain unverified.",
+  "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
   "lastSourceUpdateUTC": "2026-10-21T18:14:31.601414+00:00"
 }

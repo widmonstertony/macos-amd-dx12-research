@@ -4040,7 +4040,10 @@ static id<MTLBinaryArchive> mvkPrepareRenderBinaryArchive(id<MTLDevice> mtlDev,
 #pragma mark MVKRenderPipelineCompiler
 
 id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLRenderPipelineDescriptor* mtlRPLDesc) {
-    if (mvkWorkTraceConfigured()) mtlRPLDesc.label = [NSString stringWithFormat:@"vs=%@;fs=%@", mtlRPLDesc.vertexFunction.name ?: @"", mtlRPLDesc.fragmentFunction.name ?: @""];
+    // Function entry names (often "main0") do not identify shader content.
+    // Keep the existing source identity in the opt-in failure label instead.
+    // Labels are diagnostic only and are not included in archive recipes.
+    if (mvkWorkTraceConfigured()) mtlRPLDesc.label = [NSString stringWithFormat:@"vs=%@;fs=%@", mtlRPLDesc.vertexFunction.label ?: mtlRPLDesc.vertexFunction.name ?: @"", mtlRPLDesc.fragmentFunction.label ?: mtlRPLDesc.fragmentFunction.name ?: @""];
 
 	unique_lock<mutex> lock(_completionLock);
 	const char* root = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");

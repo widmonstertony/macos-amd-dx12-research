@@ -2253,8 +2253,9 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm",
-      "sha256": "ee1b98966815652ff48b2556f621ed7c1f78940fcd4a55fcd1848e685cc3c7c2",
-      "bytes": 222357
+      "bytes": 222658,
+      "sha256": "6f58e11e62d9bcbb04b0d237a72448b7342b2f23a5681dff93ca085ac483a924",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipelineLinkGate.h",
@@ -34021,6 +34022,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/queued_resource_declarations_gpu.mm",
+      "bytes": 8557,
+      "sha256": "b9597c5fdc68c3b61409274b73d673364e7f8d51616eb2ff83c780526a250244",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/registration_log_control.cpp",
       "sha256": "49cab6cbbb5e34e320b408d484f9f0e18065ef57ac9a3c00df2eca012666652f",
       "bytes": 1914
@@ -34231,8 +34238,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_resource_lookup_fixture.py",
-      "bytes": 2069,
-      "sha256": "d99b5d578d54a6ef7da893aac027df2b613bb85548882c4db83360ec2be755e5",
+      "bytes": 2192,
+      "sha256": "bcd8acfb9bb5bb34637cb8a54f2206f8adadfe84e645aedc9090d3ed32d4c92c",
       "executable": false
     },
     {
@@ -70059,5 +70066,5 @@
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
-  "lastSourceUpdateUTC": "2026-10-21T18:14:31.601414+00:00"
+  "lastSourceUpdateUTC": "2026-10-21T22:01:23.898056+00:00"
 }

@@ -1,3 +1,6 @@
+> 增加三独立队列、间接原子写入和像素回读的通用 GPU 对照源码。图形管线的诊断标签改为使用已有着色器源码身份，避免不同程序都显示为 main0。此修改只改善故障归因，未修复或验收游戏超时；稳定可玩和 FSR3 超分/帧生成仍未验证。新的本机故障日志保持私有。
+> Add a generic three-queue indirect atomic-write and pixel-readback control. Graphics failure labels now carry existing shader source identities instead of ambiguous main0 entry names. This improves attribution only; game timeouts and stable playability remain unresolved, and both FSR3 features are unvalidated. New local fault logs remain private.
+
 > 合并同一批中被更完整阶段/写权限覆盖的待发资源声明；已经送入 Metal 的声明保留，用独立批次编号防止旧索引影响下一批。补充真实 GPU 多次绘制、资源身份核对与编号回绕对照，并完善受窗口限制的攻击输入记录。实际游戏仍未达到稳定可玩结论，FSR3 两项尚未验证。仅发布源码与通用说明，新的本机诊断数据未公开。
 > Coalesce pending resource declarations superseded by broader stage/write coverage within the same batch. Preserve already emitted Metal declarations; a separate batch serial prevents stale indices affecting later batches. Add real GPU multiple-draw, identity-contract and serial-wrap controls, plus scoped attack input records. Stable game playability remains unproven and both FSR3 features are unvalidated. Source and generic documentation only; new local diagnostics remain private.
 

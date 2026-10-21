@@ -10,6 +10,10 @@ static inline bool mvkGPUTimeoutTraceEnabled() {
     static const bool enabled = [] { const char* v = getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v, "1"); }();
     return enabled;
 }
+static inline bool mvkWorkTraceConfigured() {
+    static const bool armed = [] { const char* v=getenv("MVK_AMD_GPU_WORK_TRACE_ARM_PATH"); return v && v[0]; }();
+    return mvkGPUTimeoutTraceEnabled() || armed;
+}
 static inline bool mvkGPUFailureTraceEnabled() {
     static const bool enabled = [] { const char* v=getenv("MVK_AMD_QUEUE_FAILURE_CONTEXT"); return v && !strcmp(v,"1"); }();
     return enabled;

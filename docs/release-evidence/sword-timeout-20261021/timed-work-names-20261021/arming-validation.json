@@ -1,0 +1,16 @@
+{
+  "named_arm_active_gpu_20261021": {
+    "GPUOutputPassed": true,
+    "workRecords": 20,
+    "maximumWorkCount": 115,
+    "pipelineLabels": [
+      "vs=main0;fs=main0"
+    ]
+  },
+  "named_arm_expired_gpu_20261021": {
+    "GPUOutputPassed": true,
+    "workRecords": 20,
+    "maximumWorkCount": 0,
+    "pipelineLabels": []
+  }
+}

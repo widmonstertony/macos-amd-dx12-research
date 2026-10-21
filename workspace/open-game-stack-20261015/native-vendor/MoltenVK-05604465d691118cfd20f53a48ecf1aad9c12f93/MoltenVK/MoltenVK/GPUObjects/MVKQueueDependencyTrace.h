@@ -6,10 +6,13 @@
 #include <objc/runtime.h>
 #include <atomic>
 #include <mutex>
+#include "MVKTimedTraceArm.h"
 
 inline bool mvkEncoderWorkTraceEnabled() {
     static const bool enabled = [] { const char* v=getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v,"1"); }();
-    return enabled;
+    if (enabled) return true;
+    static const MVKTimedTraceArm arm(getenv("MVK_AMD_GPU_WORK_TRACE_ARM_PATH"));
+    return arm.enabled();
 }
 inline bool mvkDependencyTraceEnabled() {
     static const bool failure = [] { const char* v=getenv("MVK_AMD_QUEUE_FAILURE_CONTEXT"); return v && !strcmp(v,"1"); }();

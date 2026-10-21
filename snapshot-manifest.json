@@ -2247,9 +2247,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm",
-      "bytes": 222368,
-      "sha256": "79a5c552452b6b64702b214efb00db88ad361393fb4c16e7942d2722ec37e114",
-      "executable": false
+      "sha256": "ee1b98966815652ff48b2556f621ed7c1f78940fcd4a55fcd1848e685cc3c7c2",
+      "bytes": 222357
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipelineLinkGate.h",
@@ -2301,9 +2300,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueDependencyTrace.h",
-      "bytes": 8388,
-      "sha256": "cecf4df7460c0e002924e6175174053c0a174cc61892dc547b772dfe2f7f24d7",
-      "executable": false
+      "sha256": "1f39aefdd45dae87740130b2e82bdc40d4f733e5053e423e3a14943aff23667f",
+      "bytes": 8536
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueTimingTrace.h",
@@ -2348,9 +2346,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRuntimeTrace.h",
-      "bytes": 7443,
-      "sha256": "abc864a6fc1b058885c6f1196e754aac5fe5063e67ee9cd32187c0727b553842",
-      "executable": false
+      "sha256": "037437f3419d51ef8bc95c7cae61e27840c56e2dca0a32a13267439b969a0546",
+      "bytes": 7655
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.h",
@@ -2405,6 +2402,11 @@
       "bytes": 21287,
       "sha256": "6f162e163d121b15fe2b64b9230c5039349a2ad27ad9883860bc8ca6f41c7d1d",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKTimedTraceArm.h",
+      "sha256": "f0252d536938428b1da1007b47c0bb17043c86cfc14dfd1b25457d480efefad9",
+      "bytes": 1216
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKTraceSnapshot.h",
@@ -33650,8 +33652,8 @@
     },
     {
       "path": "open-game-stack-20261015/run_gpu.py",
-      "sha256": "1a83dd5445377cbc9343d4e26d2ab39651ab81675e7743ef4901f5b627a27bf5",
-      "bytes": 17277
+      "sha256": "7efc022858cd27f0036c02fe68efbf78a42094566a4c4a58f9fd5ffd3d0b3dc5",
+      "bytes": 17853
     },
     {
       "path": "open-game-stack-20261015/run_tencent_trial.py",
@@ -34086,6 +34088,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/timed_trace_arm_control.cpp",
+      "sha256": "926534734bc344d0f37b301c66318833b0ebceea171f686acd3d3c9f3dabb274",
+      "bytes": 1458
+    },
+    {
       "path": "open-game-stack-20261015/src/trace_snapshot_control.cpp",
       "bytes": 1955,
       "sha256": "6ccec18ad7a2066515c836398633210cc834f7a2360b95ada7faac270123ef2f",
@@ -34164,8 +34171,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "sha256": "2b0e1deb57852d1b09916e06f81a83fc3bf5427e9820f2fd268b3cb9842b5e5a",
-      "bytes": 3502
+      "sha256": "a9f91b818130b80fec899baab783adbcf6436dc8da739bbcd28602261ccca0c5",
+      "bytes": 3862
     },
     {
       "path": "open-game-stack-20261015/tools/build_queue_burst_probe.py",
@@ -34222,9 +34229,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/game_test_input.m",
-      "bytes": 2347,
-      "sha256": "6857a7d006ce2c4458f6b605f1781c0de62df9375f7befcea84a539a2a56947a",
-      "executable": false
+      "sha256": "2b2c38bc5e341a5a2978f5cb98086245bb4779d64a6906d16f16b867e1d6e841",
+      "bytes": 4439
     },
     {
       "path": "open-game-stack-20261015/tools/game_window_state.m",
@@ -34356,6 +34362,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/run_queue_wait_order.py",
+      "sha256": "9653f74861fbeba79720975e5daf2b84a3d504aeed001e1ed245e01705a85619",
+      "bytes": 3422
+    },
+    {
       "path": "open-game-stack-20261015/tools/run_resource_helper_controls.py",
       "sha256": "433be5e2f79d62eb96e11b952604e483801a5ffeab31e095fd3f11d0c83b483f",
       "bytes": 2616
@@ -34377,6 +34388,11 @@
       "bytes": 3640,
       "sha256": "5ed77be6e28f4ac393e2e3993c86372c7019fd9a709fe41572169de8809c512c",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/summarize_foreground_scene.py",
+      "sha256": "d473b6db601addf292ad4abb971c74586b5a17bd684ca6478e5ef6768ea487a6",
+      "bytes": 1918
     },
     {
       "path": "open-game-stack-20261015/tools/thermal_pause_game.py",
@@ -69852,9 +69868,56 @@
           "bytes": 3154
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-timed-work-names-20261021.tar.gz",
+      "sha256": "360d4b924a064d2a10fddbe2ee6f1265d49ae0ec6faded4e4bb6246c5beea7b6",
+      "bytes": 3704167,
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/timed-work-names-20261021-probe/libCandidate.dylib",
+          "sha256": "6e7d6b8100643d5e0d735fb45eda99cee061085911820fed16fc1d212597be72",
+          "bytes": 5951000
+        },
+        {
+          "path": "open-game-stack-20261015/build/timed-work-names-20261021-probe/libProbeGuard.dylib",
+          "sha256": "32d41cbfa54143f3ac799eb5202f051fc214c0919d85c2f106603ab0da90dcec",
+          "bytes": 32256
+        },
+        {
+          "path": "open-game-stack-20261015/build/timed-work-names-20261021-probe/build.json",
+          "sha256": "863da66752790e6328dc48a50d89b85e476e3de4caa9d4dbea8cac66e6416f15",
+          "bytes": 830
+        },
+        {
+          "path": "open-game-stack-20261015/build/timed-work-names-20261021-game/libCandidate.dylib",
+          "sha256": "6e7d6b8100643d5e0d735fb45eda99cee061085911820fed16fc1d212597be72",
+          "bytes": 5951000
+        },
+        {
+          "path": "open-game-stack-20261015/build/timed-work-names-20261021-game/libProbeGuard.dylib",
+          "sha256": "e6536b0aadb4a4efce232d9ce579ab3b2f78aaf2bb6e218092deca3282dce75e",
+          "bytes": 36480
+        },
+        {
+          "path": "open-game-stack-20261015/build/timed-work-names-20261021-game/build.json",
+          "sha256": "bc59f8a152056fdd82cc7d60ee16e6830bbdaa2c92d598841b12ad7fbb9d480f",
+          "bytes": 966
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/timed-work-names-20261021/game-trial-config.h",
+          "sha256": "ceab8bd44e781bfe13b02c6f72077a1deaa04dad819354dec72ab0230782bf72",
+          "bytes": 3341
+        },
+        {
+          "path": "open-game-stack-20261015/build/timed-work-names-20261021-tools/game-test-input",
+          "sha256": "88e2dbae562fb813c3c471d843c2b9f8bdb1e0c2c50a38028eaad921ed341b9f",
+          "bytes": 19272
+        }
+      ]
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Same-scene0da8acf loaded5.72FPS, external-load-isolated12.69FPS and cooled13.33FPS. Simulator pause auto-restored after600sec. Newb48f473registrationdelta+explicitheapwrites nativeCPU/GPUqualified,notgame-tested; currentlocalsessionlocked and unlockrequested. Newfixture131072->4096lookups,6+128GPUwords correct;4additionalGPU suitespassed. Gamecachepreserved,gamecurrentlystopped; originalWinecomputeandstrictcachepassed;presentationandactualgameFPSstillpending,FSR3bothunvalidated,notplayable.",
-  "lastSourceUpdateUTC": "2026-10-21T08:07:52.358900+00:00"
+  "currentSourceState": "b48f473actualgamefull3072x1920campvisibleand13,779computearchivesloaded/rehydratedwithoutcreationerrors. Userattacktriggered3GPUtimeoutsandgameexit;foreground60seccontainsfailure,presented8.76FPSisnotstableplayability. Q2waitgraphics166151timesout5sec;producerQ0alsofailslater. Independent3queue/separateeventforward+reverse8,388,608GPUwords0mismatch,didnotreproducegamefailure. Diagnostic6e7d6bsource/runtimeandbounded30secarmedworkcapturevalidated,activework115,expired0;originalWinecompute/present/cachepassed;newgame12446viaoriginalSteamwarmloading,captureunarmed,cachesintact. No synchronizationsemanticschanged,notplayable,bothFSR3featuresunvalidated.",
+  "lastSourceUpdateUTC": "2026-10-21T16:46:59.372862+00:00"
 }

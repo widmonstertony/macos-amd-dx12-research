@@ -1,0 +1,45 @@
+{
+  "timeUTC": "2026-10-21T16:34:29.629359+00:00",
+  "candidateSHA256": "b48f473503ad06eb117b366343ccff661416ca480c30dcabdee021009f48fdd5",
+  "originalWineEvidence": "open-game-stack-20261015/evidence/private-cache-wine-20261021T161619Z/run.json",
+  "originalWineComputePresentationAndStrictCachePassed": true,
+  "launch": "open-game-stack-20261015/evidence/tencent-normal-game-deferred-20261021T161802Z/launch.json",
+  "normalSteamLaunchVerified": true,
+  "gamePID": 10213,
+  "originalWriteDenied": true,
+  "windowModuleMapped": true,
+  "currentStage": "exited-after-sword-GPU-timeout",
+  "registrationDeltaActualCountersObserved": {
+    "queries": 101,
+    "unrelatedSkips": 100
+  },
+  "cacheDeleted": false,
+  "gamePlayable": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "awakeAssertion": {
+    "timeUTC": "2026-10-21T16:17:07.386671+00:00",
+    "pid": 10092,
+    "flags": [
+      "-d",
+      "-i"
+    ],
+    "seconds": 1800,
+    "lockSettingsChanged": false,
+    "unlockBypass": false
+  },
+  "next": "Gamealreadyexitedbeforeterminationattempt,nostopsent. Preservecacheandfailure. Earliestqueue2waitgraphics166151timesout5sec;queue0producer1360584scheduled,waittransfer365observedfulfilled,butsignal166151notreachedbeforetimeout. Downstreamgraphicswaitcompute23461alsofails. Noexactshader/cycleproven. Narrowindependent3queue/separate-eventwaitordercontrolandarmableboundedworkcapturebeforeanysemanticpatch. Bothperformanceandstabilityremainunresolved.",
+  "gameStillRunning": false,
+  "userSwordAttackTriggeredHang": true,
+  "GPUTimeoutFiles": 3,
+  "swordStallEvidence": "open-game-stack-20261015/evidence/sword-stall-registration-delta-20261021",
+  "actualSceneEvidence": "open-game-stack-20261015/evidence/foreground-scene-registration-delta-20261021/result.json",
+  "outputPixels": [
+    3072,
+    1920
+  ],
+  "measuredPresentationFPS": 8.7636920049322,
+  "all60SamplesForeground": true,
+  "measurementContainsGPUFailure": true,
+  "notAStablePerformanceResult": true
+}

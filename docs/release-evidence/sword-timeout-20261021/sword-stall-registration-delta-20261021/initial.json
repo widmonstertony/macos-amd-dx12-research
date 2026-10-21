@@ -1,0 +1,2006 @@
+{
+  "timeUTC": "2026-10-21T16:31:02.513725+00:00",
+  "gamePID": 10213,
+  "userReports": "Sword attack hangs game",
+  "files": {
+    "trace-gpu-timeout-10213-2.json": {
+      "label": "vkQueueSubmit MTLCommandBuffer on Queue 0-0",
+      "perEncoderWorkTraceEnabled": false,
+      "snapshotBeforeDeviceLossMark": true,
+      "time": 814292992.327384,
+      "queueFamily": 0,
+      "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+      "GPUEndTime": 71547.966639569,
+      "errorCode": 2,
+      "encoders": [],
+      "dependencies": {
+        "logicalQueue": "0x7f7f70e0aa30",
+        "createdTime": 814292985.113405,
+        "submission": 1360596,
+        "workCount": 0,
+        "logicalDevice": "0x7f7fa8040000",
+        "workEvents": [],
+        "phases": [
+          {
+            "phase": "enqueueRequested",
+            "nativeStatus": 0,
+            "order": 1360597,
+            "time": 814292985.113441
+          },
+          {
+            "phase": "commitRequested",
+            "nativeStatus": 1,
+            "order": 1360599,
+            "time": 814292985.138249
+          },
+          {
+            "phase": "scheduled",
+            "nativeStatus": 5,
+            "order": 1360626,
+            "time": 814292990.139182
+          },
+          {
+            "phase": "completed",
+            "nativeStatus": 5,
+            "order": 1360632,
+            "time": 814292992.327379
+          }
+        ],
+        "queueFamily": 0,
+        "truncatedEvents": 0,
+        "truncatedWorkEvents": 0,
+        "nativeQueue": "0x7f7f70e0ad00",
+        "queueIndex": 0,
+        "events": [
+          {
+            "operation": "wait",
+            "event": "0x7f8007f27600",
+            "encodeTime": 814292985.113446,
+            "requestedValue": 23461,
+            "kind": "timeline",
+            "valueAtEncode": 23460,
+            "valueAtObservation": 23460
+          },
+          {
+            "operation": "signal",
+            "event": "0x7f7f70e0bfc0",
+            "encodeTime": 814292985.138237,
+            "requestedValue": 166153,
+            "kind": "timeline",
+            "valueAtEncode": 166150,
+            "valueAtObservation": 166157
+          }
+        ]
+      },
+      "GPUStartTime": 71547.96663952,
+      "queueIndex": 0,
+      "status": 5,
+      "pendingQueueDependencies": [
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149396,
+          "submission": 1360615,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360616,
+              "time": 814292985.14941
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360617,
+              "time": 814292985.149418
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70b8ed50",
+              "encodeTime": 814292985.149413,
+              "requestedValue": 23798,
+              "kind": "timeline",
+              "valueAtEncode": 23797,
+              "valueAtObservation": 23798
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.148908,
+          "submission": 1360606,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360629,
+              "time": 814292990.141561
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.148928,
+              "requestedValue": 1488,
+              "kind": "binary-deferred",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1488
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.138919,
+          "submission": 1360603,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360604,
+              "time": 814292985.138935
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360605,
+              "time": 814292985.148755
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360628,
+              "time": 814292990.141549
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.148742,
+              "requestedValue": 166155,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166157
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.138497,
+          "submission": 1360600,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360601,
+              "time": 814292985.138517
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360602,
+              "time": 814292985.138846
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360627,
+              "time": 814292990.139408
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.138838,
+              "requestedValue": 166154,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166157
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149321,
+          "submission": 1360613,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 0,
+              "order": 1360614,
+              "time": 814292985.149347
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7ff7f48310",
+              "encodeTime": 814292985.149336,
+              "requestedValue": 7733,
+              "kind": "binary",
+              "valueAtEncode": 7732,
+              "valueAtObservation": 7733
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.149344,
+              "requestedValue": 1488,
+              "kind": "binary-deferred",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1488
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149904,
+          "submission": 1360621,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360622,
+              "time": 814292985.149919
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360623,
+              "time": 814292985.174178
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.174161,
+              "requestedValue": 166158,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166157
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149204,
+          "submission": 1360610,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360611,
+              "time": 814292985.14922
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360612,
+              "time": 814292985.149231
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7ff006a800",
+              "encodeTime": 814292985.149224,
+              "requestedValue": 23798,
+              "kind": "timeline",
+              "valueAtEncode": 23797,
+              "valueAtObservation": 23798
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.149228,
+              "requestedValue": 166156,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166157
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149502,
+          "submission": 1360618,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360619,
+              "time": 814292985.149517
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360620,
+              "time": 814292985.149829
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.149821,
+              "requestedValue": 166157,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166157
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.14901,
+          "submission": 1360607,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360608,
+              "time": 814292985.149027
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360609,
+              "time": 814292985.149163
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.149031,
+              "requestedValue": 1488,
+              "kind": "binary",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1488
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f48310",
+              "encodeTime": 814292985.149156,
+              "requestedValue": 7733,
+              "kind": "binary",
+              "valueAtEncode": 7732,
+              "valueAtObservation": 7733
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.113405,
+          "submission": 1360596,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360597,
+              "time": 814292985.113441
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360599,
+              "time": 814292985.138249
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 5,
+              "order": 1360626,
+              "time": 814292990.139182
+            },
+            {
+              "phase": "completed",
+              "nativeStatus": 5,
+              "order": 1360632,
+              "time": 814292992.327379
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f8007f27600",
+              "encodeTime": 814292985.113446,
+              "requestedValue": 23461,
+              "kind": "timeline",
+              "valueAtEncode": 23460,
+              "valueAtObservation": 23460
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.138237,
+              "requestedValue": 166153,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166157
+            }
+          ]
+        }
+      ]
+    },
+    "trace-gpu-timeout-10213-1.json": {
+      "label": "vkQueueSubmit MTLCommandBuffer on Queue 0-0",
+      "perEncoderWorkTraceEnabled": false,
+      "snapshotBeforeDeviceLossMark": true,
+      "time": 814292992.324748,
+      "queueFamily": 0,
+      "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+      "GPUEndTime": 71547.96659222101,
+      "errorCode": 2,
+      "encoders": [
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdDispatch ComputeEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": []
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "state": 1,
+          "stateName": "completed",
+          "signposts": [
+            "Encoding waits"
+          ]
+        }
+      ],
+      "dependencies": {
+        "logicalQueue": "0x7f7f70e0aa30",
+        "createdTime": 814292985.042408,
+        "submission": 1360584,
+        "workCount": 0,
+        "logicalDevice": "0x7f7fa8040000",
+        "workEvents": [],
+        "phases": [
+          {
+            "phase": "enqueueRequested",
+            "nativeStatus": 0,
+            "order": 1360585,
+            "time": 814292985.042423
+          },
+          {
+            "phase": "commitRequested",
+            "nativeStatus": 1,
+            "order": 1360588,
+            "time": 814292985.085299
+          },
+          {
+            "phase": "scheduled",
+            "nativeStatus": 3,
+            "order": 1360594,
+            "time": 814292985.091465
+          },
+          {
+            "phase": "completed",
+            "nativeStatus": 5,
+            "order": 1360630,
+            "time": 814292992.324706
+          }
+        ],
+        "queueFamily": 0,
+        "truncatedEvents": 0,
+        "truncatedWorkEvents": 0,
+        "nativeQueue": "0x7f7f70e0ad00",
+        "queueIndex": 0,
+        "events": [
+          {
+            "operation": "wait",
+            "event": "0x7f7f70e12230",
+            "encodeTime": 814292985.042429,
+            "requestedValue": 365,
+            "kind": "timeline",
+            "valueAtEncode": 364,
+            "valueAtObservation": 365
+          },
+          {
+            "operation": "signal",
+            "event": "0x7f7f70e0bfc0",
+            "encodeTime": 814292985.085286,
+            "requestedValue": 166151,
+            "kind": "timeline",
+            "valueAtEncode": 166150,
+            "valueAtObservation": 166154
+          }
+        ]
+      },
+      "GPUStartTime": 71540.731337384,
+      "queueIndex": 0,
+      "status": 5,
+      "pendingQueueDependencies": [
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149396,
+          "submission": 1360615,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360616,
+              "time": 814292985.14941
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360617,
+              "time": 814292985.149418
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70b8ed50",
+              "encodeTime": 814292985.149413,
+              "requestedValue": 23798,
+              "kind": "timeline",
+              "valueAtEncode": 23797,
+              "valueAtObservation": 23797
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.148908,
+          "submission": 1360606,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360629,
+              "time": 814292990.141561
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.148928,
+              "requestedValue": 1488,
+              "kind": "binary-deferred",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1487
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.042408,
+          "submission": 1360584,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360585,
+              "time": 814292985.042423
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360588,
+              "time": 814292985.085299
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360594,
+              "time": 814292985.091465
+            },
+            {
+              "phase": "completed",
+              "nativeStatus": 5,
+              "order": 1360630,
+              "time": 814292992.324706
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7f70e12230",
+              "encodeTime": 814292985.042429,
+              "requestedValue": 365,
+              "kind": "timeline",
+              "valueAtEncode": 364,
+              "valueAtObservation": 365
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.085286,
+              "requestedValue": 166151,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.138919,
+          "submission": 1360603,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360604,
+              "time": 814292985.138935
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360605,
+              "time": 814292985.148755
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360628,
+              "time": 814292990.141549
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.148742,
+              "requestedValue": 166155,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.138497,
+          "submission": 1360600,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360601,
+              "time": 814292985.138517
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360602,
+              "time": 814292985.138846
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360627,
+              "time": 814292990.139408
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.138838,
+              "requestedValue": 166154,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.085697,
+          "submission": 1360589,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360591,
+              "time": 814292985.08573
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360595,
+              "time": 814292985.1132
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360598,
+              "time": 814292985.116273
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.113187,
+              "requestedValue": 166152,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149321,
+          "submission": 1360613,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 0,
+              "order": 1360614,
+              "time": 814292985.149347
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7ff7f48310",
+              "encodeTime": 814292985.149336,
+              "requestedValue": 7733,
+              "kind": "binary",
+              "valueAtEncode": 7732,
+              "valueAtObservation": 7732
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.149344,
+              "requestedValue": 1488,
+              "kind": "binary-deferred",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1487
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149904,
+          "submission": 1360621,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360622,
+              "time": 814292985.149919
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360623,
+              "time": 814292985.174178
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.174161,
+              "requestedValue": 166158,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149204,
+          "submission": 1360610,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360611,
+              "time": 814292985.14922
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360612,
+              "time": 814292985.149231
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7ff006a800",
+              "encodeTime": 814292985.149224,
+              "requestedValue": 23798,
+              "kind": "timeline",
+              "valueAtEncode": 23797,
+              "valueAtObservation": 23797
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.149228,
+              "requestedValue": 166156,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149502,
+          "submission": 1360618,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360619,
+              "time": 814292985.149517
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360620,
+              "time": 814292985.149829
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.149821,
+              "requestedValue": 166157,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.14901,
+          "submission": 1360607,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360608,
+              "time": 814292985.149027
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360609,
+              "time": 814292985.149163
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.149031,
+              "requestedValue": 1488,
+              "kind": "binary",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1487
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f48310",
+              "encodeTime": 814292985.149156,
+              "requestedValue": 7733,
+              "kind": "binary",
+              "valueAtEncode": 7732,
+              "valueAtObservation": 7732
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.113405,
+          "submission": 1360596,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360597,
+              "time": 814292985.113441
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360599,
+              "time": 814292985.138249
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 5,
+              "order": 1360626,
+              "time": 814292990.139182
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f8007f27600",
+              "encodeTime": 814292985.113446,
+              "requestedValue": 23461,
+              "kind": "timeline",
+              "valueAtEncode": 23460,
+              "valueAtObservation": 23460
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.138237,
+              "requestedValue": 166153,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166154
+            }
+          ]
+        }
+      ]
+    },
+    "trace-gpu-timeout-10213-0.json": {
+      "label": "vkQueueSubmit MTLCommandBuffer on Queue 2-0",
+      "perEncoderWorkTraceEnabled": false,
+      "snapshotBeforeDeviceLossMark": true,
+      "time": 814292990.093621,
+      "queueFamily": 2,
+      "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+      "GPUEndTime": 71545.73590208,
+      "errorCode": 2,
+      "encoders": [],
+      "dependencies": {
+        "logicalQueue": "0x7f7f70e0b3d0",
+        "createdTime": 814292985.085715,
+        "submission": 1360590,
+        "workCount": 0,
+        "logicalDevice": "0x7f7fa8040000",
+        "workEvents": [],
+        "phases": [
+          {
+            "phase": "enqueueRequested",
+            "nativeStatus": 0,
+            "order": 1360592,
+            "time": 814292985.085742
+          },
+          {
+            "phase": "commitRequested",
+            "nativeStatus": 1,
+            "order": 1360593,
+            "time": 814292985.086658
+          },
+          {
+            "phase": "scheduled",
+            "nativeStatus": 5,
+            "order": 1360624,
+            "time": 814292990.092638
+          },
+          {
+            "phase": "completed",
+            "nativeStatus": 5,
+            "order": 1360625,
+            "time": 814292990.093607
+          }
+        ],
+        "queueFamily": 2,
+        "truncatedEvents": 0,
+        "truncatedWorkEvents": 0,
+        "nativeQueue": "0x7f7f70e0b510",
+        "queueIndex": 0,
+        "events": [
+          {
+            "operation": "wait",
+            "event": "0x7f7f70e0bfc0",
+            "encodeTime": 814292985.085753,
+            "requestedValue": 166151,
+            "kind": "timeline",
+            "valueAtEncode": 166150,
+            "valueAtObservation": 166150
+          },
+          {
+            "operation": "signal",
+            "event": "0x7f8007f27600",
+            "encodeTime": 814292985.086646,
+            "requestedValue": 23461,
+            "kind": "timeline",
+            "valueAtEncode": 23460,
+            "valueAtObservation": 23460
+          }
+        ]
+      },
+      "GPUStartTime": 71545.73589230301,
+      "queueIndex": 0,
+      "status": 5,
+      "pendingQueueDependencies": [
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149396,
+          "submission": 1360615,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360616,
+              "time": 814292985.14941
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360617,
+              "time": 814292985.149418
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70b8ed50",
+              "encodeTime": 814292985.149413,
+              "requestedValue": 23798,
+              "kind": "timeline",
+              "valueAtEncode": 23797,
+              "valueAtObservation": 23797
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0b3d0",
+          "createdTime": 814292985.085715,
+          "submission": 1360590,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360592,
+              "time": 814292985.085742
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360593,
+              "time": 814292985.086658
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 5,
+              "order": 1360624,
+              "time": 814292990.092638
+            },
+            {
+              "phase": "completed",
+              "nativeStatus": 5,
+              "order": 1360625,
+              "time": 814292990.093607
+            }
+          ],
+          "queueFamily": 2,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0b510",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.085753,
+              "requestedValue": 166151,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f8007f27600",
+              "encodeTime": 814292985.086646,
+              "requestedValue": 23461,
+              "kind": "timeline",
+              "valueAtEncode": 23460,
+              "valueAtObservation": 23460
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.148908,
+          "submission": 1360606,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.148928,
+              "requestedValue": 1488,
+              "kind": "binary-deferred",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1487
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.042408,
+          "submission": 1360584,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360585,
+              "time": 814292985.042423
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360588,
+              "time": 814292985.085299
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360594,
+              "time": 814292985.091465
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7f70e12230",
+              "encodeTime": 814292985.042429,
+              "requestedValue": 365,
+              "kind": "timeline",
+              "valueAtEncode": 364,
+              "valueAtObservation": 365
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.085286,
+              "requestedValue": 166151,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.138919,
+          "submission": 1360603,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360604,
+              "time": 814292985.138935
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360605,
+              "time": 814292985.148755
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.148742,
+              "requestedValue": 166155,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.138497,
+          "submission": 1360600,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360601,
+              "time": 814292985.138517
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360602,
+              "time": 814292985.138846
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.138838,
+              "requestedValue": 166154,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.085697,
+          "submission": 1360589,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360591,
+              "time": 814292985.08573
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360595,
+              "time": 814292985.1132
+            },
+            {
+              "phase": "scheduled",
+              "nativeStatus": 3,
+              "order": 1360598,
+              "time": 814292985.116273
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.113187,
+              "requestedValue": 166152,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149321,
+          "submission": 1360613,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 0,
+              "order": 1360614,
+              "time": 814292985.149347
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7ff7f48310",
+              "encodeTime": 814292985.149336,
+              "requestedValue": 7733,
+              "kind": "binary",
+              "valueAtEncode": 7732,
+              "valueAtObservation": 7732
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.149344,
+              "requestedValue": 1488,
+              "kind": "binary-deferred",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1487
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149904,
+          "submission": 1360621,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360622,
+              "time": 814292985.149919
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360623,
+              "time": 814292985.174178
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.174161,
+              "requestedValue": 166158,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149204,
+          "submission": 1360610,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360611,
+              "time": 814292985.14922
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360612,
+              "time": 814292985.149231
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7ff006a800",
+              "encodeTime": 814292985.149224,
+              "requestedValue": 23798,
+              "kind": "timeline",
+              "valueAtEncode": 23797,
+              "valueAtObservation": 23797
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.149228,
+              "requestedValue": 166156,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.149502,
+          "submission": 1360618,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360619,
+              "time": 814292985.149517
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360620,
+              "time": 814292985.149829
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.149821,
+              "requestedValue": 166157,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.14901,
+          "submission": 1360607,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360608,
+              "time": 814292985.149027
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360609,
+              "time": 814292985.149163
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f7ff7f305c0",
+              "encodeTime": 814292985.149031,
+              "requestedValue": 1488,
+              "kind": "binary",
+              "valueAtEncode": 1487,
+              "valueAtObservation": 1487
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7ff7f48310",
+              "encodeTime": 814292985.149156,
+              "requestedValue": 7733,
+              "kind": "binary",
+              "valueAtEncode": 7732,
+              "valueAtObservation": 7732
+            }
+          ]
+        },
+        {
+          "logicalQueue": "0x7f7f70e0aa30",
+          "createdTime": 814292985.113405,
+          "submission": 1360596,
+          "workCount": 0,
+          "logicalDevice": "0x7f7fa8040000",
+          "workEvents": [],
+          "phases": [
+            {
+              "phase": "enqueueRequested",
+              "nativeStatus": 0,
+              "order": 1360597,
+              "time": 814292985.113441
+            },
+            {
+              "phase": "commitRequested",
+              "nativeStatus": 1,
+              "order": 1360599,
+              "time": 814292985.138249
+            }
+          ],
+          "queueFamily": 0,
+          "truncatedEvents": 0,
+          "truncatedWorkEvents": 0,
+          "nativeQueue": "0x7f7f70e0ad00",
+          "queueIndex": 0,
+          "events": [
+            {
+              "operation": "wait",
+              "event": "0x7f8007f27600",
+              "encodeTime": 814292985.113446,
+              "requestedValue": 23461,
+              "kind": "timeline",
+              "valueAtEncode": 23460,
+              "valueAtObservation": 23460
+            },
+            {
+              "operation": "signal",
+              "event": "0x7f7f70e0bfc0",
+              "encodeTime": 814292985.138237,
+              "requestedValue": 166153,
+              "kind": "timeline",
+              "valueAtEncode": 166150,
+              "valueAtObservation": 166150
+            }
+          ]
+        }
+      ]
+    },
+    "resource-use-current-10213.json": {
+      "time": 814292984.425186,
+      "wallSeconds": 5.002235,
+      "calls": 9215385,
+      "liveLookups": 3674988,
+      "liveFound": 1726674,
+      "retainedHits": 5537041,
+      "absentHits": 3356,
+      "registrationQueries": 66,
+      "registrationUnrelated": 57,
+      "snapshotCalls": 23237,
+      "snapshotSkips": 12846,
+      "snapshotWordsSkipped": 15848817,
+      "snapshotFilterHits": 4609,
+      "encoderResets": 5540,
+      "capacityClears": 0,
+      "maxUsed": 2329
+    },
+    "queue-timing-current-10213-0-0.json": {
+      "queueFamily": 0,
+      "queueIndex": 0,
+      "time": 814292992.323474,
+      "wallSeconds": 7.28082,
+      "completed": 1,
+      "validGPUTimestamps": 1,
+      "errors": 1,
+      "hostPrecommitTotalMS": 42.907,
+      "hostPrecommitMaxMS": 42.907,
+      "GPUExecutionTotalMS": 7235.255,
+      "GPUExecutionMaxMS": 7235.255,
+      "commitToGPUStartTotalMS": 2.555
+    },
+    "queue-timing-current-10213-2-0.json": {
+      "queueFamily": 2,
+      "queueIndex": 0,
+      "time": 814292990.09267,
+      "wallSeconds": 5.701061,
+      "completed": 1,
+      "validGPUTimestamps": 1,
+      "errors": 1,
+      "hostPrecommitTotalMS": 0.994,
+      "hostPrecommitMaxMS": 0.994,
+      "GPUExecutionTotalMS": 0.01,
+      "GPUExecutionMaxMS": 0.01,
+      "commitToGPUStartTotalMS": 5005.752
+    },
+    "queue-timing-current-10213-3-0.json": {
+      "queueFamily": 3,
+      "queueIndex": 0,
+      "time": 814292980.406913,
+      "wallSeconds": 5.139801,
+      "completed": 48,
+      "validGPUTimestamps": 48,
+      "errors": 0,
+      "hostPrecommitTotalMS": 11.811,
+      "hostPrecommitMaxMS": 0.478,
+      "GPUExecutionTotalMS": 2.14,
+      "GPUExecutionMaxMS": 0.273,
+      "commitToGPUStartTotalMS": 56.285
+    }
+  },
+  "process": "10213 Ss    22.2 7168880 12:53 Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\SteamClient\\steamapps\\common\\StellarBlade\\SB\\Binaries\\Win64\\SB-Win64-Shipping.exe\n"
+}

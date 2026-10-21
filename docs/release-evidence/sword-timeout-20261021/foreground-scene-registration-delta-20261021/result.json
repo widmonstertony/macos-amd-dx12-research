@@ -1,0 +1,27 @@
+{
+  "gamePID": 10213,
+  "activitySamples": 60,
+  "referenceRange": [
+    814292948.519488,
+    814293007.769299
+  ],
+  "allForeground": true,
+  "nativePresentationRecords": 6,
+  "nativePresentationFPS": 8.7636920049322,
+  "timestampIntervals": 260,
+  "nativeIntervalSeconds": 29.667861428000002,
+  "largestNativeGapMilliseconds": 210.118305,
+  "observedWindowPointSizes": [
+    [
+      1536,
+      960
+    ]
+  ],
+  "FPSIsNotGamePlayabilityProof": true,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "GPUTimeoutFiles": 3,
+  "measurementContainsGPUFailure": true,
+  "gamePlayable": false,
+  "sceneVisible": true
+}

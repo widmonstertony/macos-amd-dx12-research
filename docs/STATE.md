@@ -1,3 +1,18 @@
+> 最新实际游戏结果（2026-10-21）：营地能正常显示，13,779 条计算管线全部从缓存加载/重建成功，0 创建错误；但用户挥剑后发生 **3 次原生 GPU 超时并退出**，仍不可玩。本轮为 3072×1920 输出，一分钟前台观测包含故障，期间呈现统计 8.76 FPS **不能当成稳定帧率或成功结果**。
+> Latest actual game: the camp rendered correctly and all 13,779 compute archives loaded/rehydrated with zero creation errors, but a sword attack triggered **three native GPU timeouts and game exit**. **Not playable.** Output was 3072×1920; the one-minute foreground observation includes that failure. Its 8.76 FPS presentation statistic is not a sustained-performance or success claim.
+
+第一条超时发生在计算队列等待图形队列信号；图形生产者随后也超时。现有记录不足以指认具体着色器或证明循环依赖。三个独立队列、三个独立时间线事件的正序与逆序对照共检查 8,388,608 words，0 差异，未复现实际游戏故障。
+
+The first timeout is a compute-queue wait on the graphics producer, which also times out later. Existing evidence does not identify the exact shader or prove a dependency cycle. Independent forward/reverse three-queue, three-event controls checked 8,388,608 GPU words with zero mismatches and did not reproduce the game failure.
+
+诊断候选 `6e7d6b81…` 只增加可短时开启的详细工作记录及管线函数名，不改变同步语义。有效标记记录到 115 个工作事件，过期标记为 0，图形 GPU 输出均正确；原应用宝 Wine 计算、呈现与严格缓存命中通过。已由原 Steam 启动新一轮准备捕获挥剑现场，标记尚未开启。缓存保留，FSR3 超分和帧生成仍未验证，**不是已修复的可玩版本**。
+
+Diagnostic candidate `6e7d6b81…` adds bounded, armable work capture and pipeline function names, without changing synchronization semantics. Fresh/expired marker controls produced 115/0 work events with correct GPU output; original Tencent Wine compute, presentation and strict cache-hit tests passed. A new original-Steam run is warming caches for targeted attack capture; recording is currently unarmed. Caches remain intact. Both FSR3 features are unvalidated; **this is not a fixed playable release**.
+
+[Sword-timeout, queue-control and diagnostic evidence](release-evidence/sword-timeout-20261021/)
+
+以下为历史记录。 / Earlier measurements follow.
+
 > 最新状态（2026-10-21）：同一轮、同一场景、726×526 输出，外部模拟器高负载下 **5.72 FPS**；有时限的减载对照测得 **12.69 FPS**，冷却后 **13.33 FPS**，均未记录 GPU 错误，**仍不可玩**。模拟器原进程已在十分钟时限内恢复，没有关闭模拟器或删除数据。
 > Latest: the same game, scene and output delivered **5.72 FPS** under external simulator CPU load, **12.69 FPS** with bounded load isolation and **13.33 FPS** after cooling. No GPU failures were recorded in those controls. **Still unplayable.** The isolated simulator process was resumed at the ten-minute deadline; no simulator shutdown or data removal occurred.
 

@@ -4040,7 +4040,7 @@ static id<MTLBinaryArchive> mvkPrepareRenderBinaryArchive(id<MTLDevice> mtlDev,
 #pragma mark MVKRenderPipelineCompiler
 
 id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLRenderPipelineDescriptor* mtlRPLDesc) {
-    if (mvkGPUTimeoutTraceEnabled()) mtlRPLDesc.label = [NSString stringWithFormat:@"vs=%@;fs=%@", mtlRPLDesc.vertexFunction.label ?: @"", mtlRPLDesc.fragmentFunction.label ?: @""];
+    if (mvkWorkTraceConfigured()) mtlRPLDesc.label = [NSString stringWithFormat:@"vs=%@;fs=%@", mtlRPLDesc.vertexFunction.name ?: @"", mtlRPLDesc.fragmentFunction.name ?: @""];
 
 	unique_lock<mutex> lock(_completionLock);
 	const char* root = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");
@@ -4157,7 +4157,7 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 
 #if MVK_XCODE_14
 id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLMeshRenderPipelineDescriptor* mtlRPLDesc) {
-    if (mvkGPUTimeoutTraceEnabled()) mtlRPLDesc.label = [NSString stringWithFormat:@"obj=%@;mesh=%@;fs=%@", mtlRPLDesc.objectFunction.label ?: @"", mtlRPLDesc.meshFunction.label ?: @"", mtlRPLDesc.fragmentFunction.label ?: @""];
+    if (mvkWorkTraceConfigured()) mtlRPLDesc.label = [NSString stringWithFormat:@"obj=%@;mesh=%@;fs=%@", mtlRPLDesc.objectFunction.name ?: @"", mtlRPLDesc.meshFunction.name ?: @"", mtlRPLDesc.fragmentFunction.name ?: @""];
 	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_PIPELINES");
 	bool synchronousMesh = getPhysicalDevice()->isAMDHardware() && syncOption && !strcmp(syncOption, "1");
 

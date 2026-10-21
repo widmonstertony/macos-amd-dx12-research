@@ -9,6 +9,8 @@ parser.add_argument('--suite',choices=['static','memory','vector','aggregate','g
 parser.add_argument('--library',type=pathlib.Path)
 parser.add_argument('--runtime-trace',action='store_true')
 parser.add_argument('--gpu-timeout-trace',action='store_true')
+parser.add_argument('--armed-work-trace',action='store_true')
+parser.add_argument('--work-trace-expired',action='store_true')
 parser.add_argument('--queue-timing',action='store_true')
 parser.add_argument('--encoder-transitions',type=int,default=1)
 parser.add_argument('--specialized-queues',action='store_true')
@@ -66,6 +68,10 @@ env={k:v for k,v in os.environ.items() if not k.startswith(('DYLD_','VK_','MVK_'
 env.update(PATH='/nonexistent',VK_ICD_FILENAMES=str(icd),MTL_DEBUG_LAYER='1',MVK_CONFIG_LOG_LEVEL='2',MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS='1',MVK_AMD_REFERENCE_RBA2='1',MVK_AMD_REFERENCE_RIA2='1',MVK_AMD_REFERENCE_NULL='1',MVK_AMD_BYTE_GUARDS='1',MVK_CONFIG_SHADER_DUMP_DIR=str(dest/'msl'))
 if args.runtime_trace:env['MVK_AMD_RUNTIME_TRACE']='1'
 if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
+if args.armed_work_trace:
+    marker=dest/'capture.arm';marker.write_text('Owned bounded GPU diagnostic\n')
+    if args.work_trace_expired:os.utime(marker,(time.time()-60,time.time()-60))
+    env.update(MVK_AMD_GPU_WORK_TRACE_ARM_PATH=str(marker),MVK_AMD_QUEUE_FAILURE_CONTEXT='1',MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL='1',MVK_AMD_RUNTIME_TRACE='1')
 if args.queue_timing:env['MVK_AMD_QUEUE_TIMING']='1'
 if args.encoder_transitions != 1:
     if args.suite not in ('heapgraphics','helpercleargraphics') or not 1 <= args.encoder_transitions <= 64:parser.error('1..64 encoder transitions require heapgraphics')
@@ -194,6 +200,8 @@ record['syncMeshPipelines']=args.sync_mesh_pipelines
 record['meshLinkDifferential']=args.mesh_link_differential
 record['failedMeshReplayEnabled']=args.replay_failed_mesh
 record['gpuTimeoutTrace']=args.gpu_timeout_trace
+record['armedWorkTrace']=args.armed_work_trace
+record['workTraceMarkerExpired']=args.work_trace_expired
 record['queueTiming']=args.queue_timing
 record['encoderTransitions']=args.encoder_transitions
 record['liveLookupFastCache']=args.live_lookup_fast_cache

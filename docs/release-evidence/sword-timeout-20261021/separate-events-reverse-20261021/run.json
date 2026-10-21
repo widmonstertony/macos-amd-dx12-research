@@ -1,0 +1,25 @@
+{
+  "nativeSHA256": "b48f473503ad06eb117b366343ccff661416ca480c30dcabdee021009f48fdd5",
+  "reverseSubmissionOrder": true,
+  "independentTimelineEvents": 3,
+  "allSignalsActuallySubmitted": true,
+  "metalValidation": true,
+  "exitCode": 0,
+  "elapsedSeconds": 1.4269644390005851,
+  "output": {
+    "passed": true,
+    "selectedFamilies": [
+      3,
+      2,
+      0
+    ],
+    "rounds": 1024,
+    "checkedWords": 4194304,
+    "mismatches": 0,
+    "totalMilliseconds": 776.298,
+    "slowestRoundMilliseconds": 38.2156
+  },
+  "passed": true,
+  "gameFailureReproduced": false,
+  "gameStarted": false
+}

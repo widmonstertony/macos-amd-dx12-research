@@ -1,0 +1,269 @@
+[
+  {
+    "file": "trace-gpu-timeout-10213-0.json",
+    "time": 814292990.093621,
+    "queue": 2,
+    "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+    "submission": 1360590,
+    "createdTime": 814292985.085715,
+    "phases": [
+      {
+        "phase": "enqueueRequested",
+        "nativeStatus": 0,
+        "order": 1360592,
+        "time": 814292985.085742
+      },
+      {
+        "phase": "commitRequested",
+        "nativeStatus": 1,
+        "order": 1360593,
+        "time": 814292985.086658
+      },
+      {
+        "phase": "scheduled",
+        "nativeStatus": 5,
+        "order": 1360624,
+        "time": 814292990.092638
+      },
+      {
+        "phase": "completed",
+        "nativeStatus": 5,
+        "order": 1360625,
+        "time": 814292990.093607
+      }
+    ],
+    "encoders": [],
+    "unresolvedWaits": [
+      {
+        "operation": "wait",
+        "event": "0x7f7f70e0bfc0",
+        "requestedValue": 166151,
+        "valueAtEncode": 166150,
+        "valueAtObservation": 166150,
+        "kind": "timeline"
+      }
+    ],
+    "pendingQueues": [
+      0,
+      2
+    ]
+  },
+  {
+    "file": "trace-gpu-timeout-10213-1.json",
+    "time": 814292992.324748,
+    "queue": 0,
+    "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+    "submission": 1360584,
+    "createdTime": 814292985.042408,
+    "phases": [
+      {
+        "phase": "enqueueRequested",
+        "nativeStatus": 0,
+        "order": 1360585,
+        "time": 814292985.042423
+      },
+      {
+        "phase": "commitRequested",
+        "nativeStatus": 1,
+        "order": 1360588,
+        "time": 814292985.085299
+      },
+      {
+        "phase": "scheduled",
+        "nativeStatus": 3,
+        "order": 1360594,
+        "time": 814292985.091465
+      },
+      {
+        "phase": "completed",
+        "nativeStatus": 5,
+        "order": 1360630,
+        "time": 814292992.324706
+      }
+    ],
+    "encoders": [
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdDispatch ComputeEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      },
+      {
+        "label": "vkCmdBeginRendering RenderEncoder",
+        "state": 1,
+        "stateName": "completed"
+      }
+    ],
+    "unresolvedWaits": [],
+    "pendingQueues": [
+      0
+    ]
+  },
+  {
+    "file": "trace-gpu-timeout-10213-2.json",
+    "time": 814292992.327384,
+    "queue": 0,
+    "error": "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+    "submission": 1360596,
+    "createdTime": 814292985.113405,
+    "phases": [
+      {
+        "phase": "enqueueRequested",
+        "nativeStatus": 0,
+        "order": 1360597,
+        "time": 814292985.113441
+      },
+      {
+        "phase": "commitRequested",
+        "nativeStatus": 1,
+        "order": 1360599,
+        "time": 814292985.138249
+      },
+      {
+        "phase": "scheduled",
+        "nativeStatus": 5,
+        "order": 1360626,
+        "time": 814292990.139182
+      },
+      {
+        "phase": "completed",
+        "nativeStatus": 5,
+        "order": 1360632,
+        "time": 814292992.327379
+      }
+    ],
+    "encoders": [],
+    "unresolvedWaits": [
+      {
+        "operation": "wait",
+        "event": "0x7f8007f27600",
+        "requestedValue": 23461,
+        "valueAtEncode": 23460,
+        "valueAtObservation": 23460,
+        "kind": "timeline"
+      }
+    ],
+    "pendingQueues": [
+      0
+    ]
+  }
+]

@@ -1,0 +1,36 @@
+{
+  "timeUTC": "2026-10-21T16:45:30.632166+00:00",
+  "candidateSHA256": "6e7d6b8100643d5e0d735fb45eda99cee061085911820fed16fc1d212597be72",
+  "diagnosticOnlyNoSynchronizationSemanticsChange": true,
+  "gamePID": 12446,
+  "normalSteamLaunchVerified": true,
+  "launch": "open-game-stack-20261015/evidence/tencent-normal-game-deferred-20261021T164417Z/launch.json",
+  "originalWineEvidence": "open-game-stack-20261015/evidence/private-cache-wine-20261021T164258Z/run.json",
+  "armingGPUControls": "open-game-stack-20261015/evidence/timed-work-names-20261021/arming-validation.json",
+  "expiredCaptureWorkCount": 0,
+  "activeCaptureWorkCount": 115,
+  "maxCaptureSeconds": 30,
+  "captureCurrentlyArmed": false,
+  "allGameCachesPreserved": true,
+  "lastGameExitedAfterSwordTimeout": true,
+  "separateQueueControls": {
+    "families": [
+      3,
+      2,
+      0
+    ],
+    "independentEvents": 3,
+    "orders": [
+      "producer-first",
+      "consumer-first"
+    ],
+    "roundsPerOrder": 1024,
+    "checkedWordsTotal": 8388608,
+    "mismatches": 0,
+    "gameFailureNotReproduced": true
+  },
+  "gamePlayable": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "next": "Preserve12446warmcache startup, nootherGPUprobe. InspectmenuContinueandcamp, thenwriteownedarmmarker,wait350ms,scopedleftclickattack,readfailurework/fences/functionnames. GuardinputonunlockedforegroundknownCG+AXwindow. Do notclaimrootspecificshaderfromonlydownstreamtimelinefailures. No synchronizationfeaturebitschanged."
+}

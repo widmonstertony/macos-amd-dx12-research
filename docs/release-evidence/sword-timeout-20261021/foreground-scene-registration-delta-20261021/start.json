@@ -1,0 +1,19 @@
+{
+  "timeUTC": "2026-10-21T16:29:08.106573+00:00",
+  "gamePID": 10213,
+  "nativeSHA256": "b48f473503ad06eb117b366343ccff661416ca480c30dcabdee021009f48fdd5",
+  "outputPixels": [
+    3072,
+    1920
+  ],
+  "cacheDeleted": false,
+  "externalSimulatorPaused": false,
+  "movementInputSent": {
+    "key": "W",
+    "milliseconds": 700
+  },
+  "backgroundCPU": [
+    "  PID STAT  %CPU COMM"
+  ],
+  "thermalLimits": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\n2026-10-21 09:29:08 -0700 CPU Power notify\n\tCPU_Scheduler_Limit \t= 100\n\tCPU_Available_CPUs \t= 16\n\tCPU_Speed_Limit \t= 42\n"
+}

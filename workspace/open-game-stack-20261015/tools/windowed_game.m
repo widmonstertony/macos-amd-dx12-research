@@ -1,0 +1,11 @@
+// Read or exit native macOS full screen for the named, owned game window.
+#import <AppKit/AppKit.h>
+#import <ApplicationServices/ApplicationServices.h>
+int main(int argc,const char**argv){@autoreleasepool{
+ if(argc!=2&&argc!=3)return 2;BOOL apply=argc==3&&!strcmp(argv[2],"--apply");if(argc==3&&!apply)return 2;pid_t pid=atoi(argv[1]);if(pid<2||!AXIsProcessTrusted())return 3;
+ NSRunningApplication*app=[NSRunningApplication runningApplicationWithProcessIdentifier:pid];if(!app)return 4;[app activateWithOptions:NSApplicationActivateAllWindows|NSApplicationActivateIgnoringOtherApps];AXUIElementRef ax=AXUIElementCreateApplication(pid);AXUIElementSetMessagingTimeout(ax,2);AXUIElementSetAttributeValue(ax,kAXFrontmostAttribute,kCFBooleanTrue);[[NSRunLoop currentRunLoop]runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1]];
+ CFTypeRef windows=NULL;if(AXUIElementCopyAttributeValue(ax,kAXWindowsAttribute,&windows)!=kAXErrorSuccess){CFRelease(ax);return 5;}BOOL found=NO;
+ for(id item in (__bridge NSArray*)windows){AXUIElementRef w=(__bridge AXUIElementRef)item;CFTypeRef title=NULL;if(AXUIElementCopyAttributeValue(w,kAXTitleAttribute,&title)!=kAXErrorSuccess)continue;BOOL named=[(__bridge NSString*)title hasPrefix:@"StellarBlade"];CFRelease(title);if(!named)continue;found=YES;CFTypeRef full=NULL;AXError read=AXUIElementCopyAttributeValue(w,CFSTR("AXFullScreen"),&full);BOOL before=read==kAXErrorSuccess&&full&&CFGetTypeID(full)==CFBooleanGetTypeID()&&CFBooleanGetValue((CFBooleanRef)full);if(full)CFRelease(full);AXError set=kAXErrorSuccess;if(apply&&before){set=AXUIElementSetAttributeValue(w,CFSTR("AXFullScreen"),kCFBooleanFalse);[[NSRunLoop currentRunLoop]runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2]];}CFTypeRef after=NULL;AXError afterRead=AXUIElementCopyAttributeValue(w,CFSTR("AXFullScreen"),&after);BOOL still=afterRead==kAXErrorSuccess&&after&&CFGetTypeID(after)==CFBooleanGetTypeID()&&CFBooleanGetValue((CFBooleanRef)after);if(after)CFRelease(after);
+ printf("{\"pid\":%d,\"readError\":%d,\"nativeFullscreenBefore\":%s,\"changeRequested\":%s,\"setError\":%d,\"readAfterError\":%d,\"nativeFullscreenAfter\":%s}\n",pid,read,before?"true":"false",apply&&before?"true":"false",set,afterRead,still?"true":"false");break;}
+ CFRelease(windows);CFRelease(ax);return found?0:6;
+}}

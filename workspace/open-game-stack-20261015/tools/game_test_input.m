@@ -4,9 +4,17 @@
 #include <unistd.h>
 int main(int argc,const char**argv) {
  @autoreleasepool {
-  if(argc!=4 || !AXIsProcessTrusted()) return 2;
+  if((argc!=4 && argc!=6) || !AXIsProcessTrusted()) return 2;
   pid_t pid=atoi(argv[1]); int key=atoi(argv[2]), millis=atoi(argv[3]);
   if(pid<2 || key < -5 || key>126 || millis<1 || millis>3000) return 3;
+  double relativeX=.5, relativeY=.5;
+  if(argc==6) {
+   if(key!=-4 && key!=-5)return 3;
+   char *endX=NULL,*endY=NULL;
+   relativeX=strtod(argv[4],&endX);relativeY=strtod(argv[5],&endY);
+   if(!endX || *endX || !endY || *endY || !isfinite(relativeX) || !isfinite(relativeY) ||
+      relativeX<.02 || relativeX>.98 || relativeY<.15 || relativeY>.98)return 3;
+  }
   if(key == -2) {printf("{\"pid\":%d,\"active\":%s}\n",pid,[NSRunningApplication runningApplicationWithProcessIdentifier:pid].active?"true":"false");return 0;}
   // Full-screen windows in another Space can temporarily disappear from AX.
   // Activate only after independently verifying a named CG window owned by PID.
@@ -49,7 +57,7 @@ int main(int argc,const char**argv) {
     NSString* title=row[(id)kCGWindowName]?:@"";
     if([row[(id)kCGWindowOwnerPID] intValue]!=pid || ![title hasPrefix:@"StellarBlade"])continue;
     CGRect bounds=CGRectZero;CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)row[(id)kCGWindowBounds],&bounds);
-    if(bounds.size.width>300 && bounds.size.height>200) {point=CGPointMake(CGRectGetMidX(bounds),CGRectGetMidY(bounds));targetWindow=row[(id)kCGWindowNumber];targetFound=YES;break;}
+    if(bounds.size.width>300 && bounds.size.height>200) {point=CGPointMake(bounds.origin.x+bounds.size.width*relativeX,bounds.origin.y+bounds.size.height*relativeY);targetWindow=row[(id)kCGWindowNumber];targetFound=YES;break;}
    }
    if(!targetFound)return 8;
    if(hid) {
@@ -73,6 +81,11 @@ int main(int argc,const char**argv) {
      fprintf(stderr,"accessibilityHitPID=%d hitError=%d\n",recipientPID,hitError);
      if(hitError!=kAXErrorSuccess||recipientPID!=pid)return 9;
     }
+   }
+   if(argc==6 && hid) {
+    CGEventRef move=CGEventCreateMouseEvent(NULL,kCGEventMouseMoved,point,kCGMouseButtonLeft);
+    CGEventPost(kCGHIDEventTap,move);CFRelease(move);usleep(50000);
+    if([NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier!=pid)return 6;
    }
    CGEventRef down=CGEventCreateMouseEvent(NULL,right?kCGEventRightMouseDown:kCGEventLeftMouseDown,point,right?kCGMouseButtonRight:kCGMouseButtonLeft);
    CGEventRef up=CGEventCreateMouseEvent(NULL,right?kCGEventRightMouseUp:kCGEventLeftMouseUp,point,right?kCGMouseButtonRight:kCGMouseButtonLeft);

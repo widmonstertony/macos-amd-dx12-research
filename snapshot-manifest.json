@@ -34268,8 +34268,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/game_test_input.m",
-      "sha256": "5a24f48e57811ec45f97bda37e427715d87a32796113a8299f80ab5ab532e4c0",
-      "bytes": 6187
+      "sha256": "67f304317dc90dd7ef175c7c90fa2fb74278a671640bc210b794f59974af95bf",
+      "bytes": 6890
     },
     {
       "path": "open-game-stack-20261015/tools/game_window_state.m",

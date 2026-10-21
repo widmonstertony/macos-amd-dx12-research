@@ -6,6 +6,8 @@ Open-source D3D12 → Vulkan → Metal compatibility research for Intel Macs wit
 
 > **Experimental; not yet playable.** Earlier builds reached controllable scenes, with very low frame rates, blue rectangular corruption, and GPU timeouts. The latest complete game replay failed. Downloads are developer test kits, **not a finished solution that lets every Mac run Stellar Blade**. Probe success does not establish game compatibility, FSR3 support, or support for other games/GPUs.
 
+See the [current research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
+
 ## Download and test
 
 [Experimental downloads](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.1.0-experimental) · [Testing](docs/TESTING.en.md) · [Known issues](docs/KNOWN_ISSUES.en.md) · [Contributing](CONTRIBUTING.md)

@@ -6,6 +6,8 @@
 
 > **实验项目，尚未可玩。** 曾进入可操作场景，但仍有严重低帧率、蓝色矩形遮挡和 GPU 超时；最近的完整游戏回放失败。下载包是开发者测试包，**不是能让所有 Mac 直接玩《剑星》的成品**。探针通过不代表游戏兼容、FSR3 或其他 DX12 游戏可用。
 
+最新源码、精确候选哈希与实测限制见 [当前研究状态](docs/STATE.md)。公开下载包仍是实验基线，尚不承诺《剑星》可玩。
+
 ## 下载与测试
 
 [实验版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.1.0-experimental) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)

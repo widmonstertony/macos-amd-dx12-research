@@ -1,3 +1,13 @@
+> 验证阻碍（2026-10-20）：系统明确报告 `IOConsoleLocked=true`、`CGSSessionScreenIsLocked=true`。已停止窗口操作，保留原 Steam 启动的现有游戏和缓存，等待用户在本机解锁。锁屏期间的黑色截图、窗口缩略图与后台呈现回调不可作为游戏黑屏或实际前台 FPS 的证据。最新候选仍未验收可玩，FSR3 超分及帧生成仍未验证。
+> Validation blocked: macOS reports a locked console session. Window operations stopped; the existing original-Steam game and all caches remain intact pending a local unlock. Locked/background captures and callbacks cannot establish scene rendering or foreground FPS. Playability and both FSR3 features remain unvalidated.
+
+> 最新进展（2026-10-20 18:19 PDT）：仍未验收可玩。新候选把已验证的资源集合保留到同一命令编码结束，跨 encoder 复用过滤结果，每个 encoder 仍收到各自的 Metal 资源声明，注册变化会失效缓存。GPU 注册失效/访问升级回归、图形切换、几何、描述符、内存及原应用宝 Wine 回归均通过，游戏已经原 Steam 启动；持续帧率、实际场景及 FSR3 超分/帧生成仍未通过。
+> Latest: not validated as playable. A qualified candidate reuses filtered, owned resource sets across encoders within one command encoding, preserving every encoder's Metal resource declarations and invalidating absences after registration changes. Real GPU and original Tencent Wine regressions passed; the original Steam game run is in progress. Sustained scene frame rate and FSR3 upscaling/frame generation remain unvalidated.
+
+Candidate SHA-256: `ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f`. [Evidence](release-evidence/cross-snapshot-20261020/). The final profile disables only the internal per-address absence hash cache after CPU controls measured it slower, while retaining snapshot reuse and all robustness/null-descriptor correctness logic. The CPU-only stale-table fixture measured ~158 ms baseline versus ~0.35 ms for cross-encoder snapshot reuse; this is **not game FPS**. Stable-source build verification is now recorded to reject source edits during compilation.
+
+The previous run had no recorded native completion errors, but its post-load scene was not visually verified: legacy captures turned black, window-specific ScreenCaptureKit capture failed, and Win32/native activity disagreed. This is an unresolved observation gap, not proof of correct scene output or of a rendering failure.
+
 > 最新进展（2026-10-20 17:23 PDT）：仍未达到可玩。实际营地的一分钟对照为约 1.4–2 FPS；3,337 万次注册表查询约 89% 返回不存在，资源缓存容量淘汰为 0。随后出现两次原生队列错误，超时首因尚未定位。新候选缓存注册版本限定的空结果，并复用同一 encoder 内已声明的不可变描述符快照；已通过 GPU 和原应用宝 Wine 回归，正在原 Steam 中验证游戏效果。
 > Latest: not playable. The measured camp baseline delivered about 1.4–2 FPS, with 89% of 33.37 million registry lookups returning absent over one minute, and no capacity evictions. Two later native queue errors remain unresolved. A qualified candidate caches versioned absences and reuses already-declared immutable descriptor snapshots within each encoder. Normal original-Steam game validation is in progress.
 

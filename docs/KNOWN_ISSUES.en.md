@@ -1,3 +1,5 @@
+Current game validation awaits a local unlock, confirmed by console lock flags. Locked captures do not prove a rendering failure, and background callbacks do not establish foreground FPS.
+
 Latest (2026-10-20): the game remains unplayable. Observed locn2 failures were eliminated by stable unique mesh entry names; archive-hit rehydration resolved the measured mapping leak. A later correctly rendered scene still delivered about 1–2 FPS and then GPU timeouts. Effective configuration and low-overhead CPU/GPU/queue timing are under validation. FSR3 upscaling and frame generation remain unvalidated, with historical force-off settings still present during the base-FPS measurement. The table below preserves older observations, not current process state.
 
 # Known issues and evidence gaps

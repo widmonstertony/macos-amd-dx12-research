@@ -1,0 +1,10 @@
+{
+  "device":"AMD Radeon Pro 5600M",
+  "nativeRobustness2FeaturesChanged":false,
+  "scenarios":12,
+  "gpuResultWordsChecked":9648,
+  "witnessWordsChecked":192528,
+  "mismatches":0,
+  "passed":true,
+  "scope":"Source-built MoltenVK internal compiler and descriptors; experimental private opt-in, not full conformance"
+}

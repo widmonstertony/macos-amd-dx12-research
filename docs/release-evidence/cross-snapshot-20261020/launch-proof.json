@@ -1,0 +1,34 @@
+{
+  "nativeRegressionPassed": true,
+  "nativeRegressionEvidence": [
+    "evidence/cross_snapshot_live_graphics_gpu_20261020/run.json",
+    "evidence/cross_snapshot_descriptors_gpu_20261020/run.json",
+    "evidence/cross_snapshot_memory_gpu_20261020/run.json",
+    "evidence/cross_snapshot_geometry_gpu_20261020/run.json",
+    "evidence/cross_snapshot_vertexarray_gpu_20261020/run.json"
+  ],
+  "originalTencentPresentationPassed": true,
+  "originalTencentPresentationEvidence": "evidence/private-cache-wine-20261021T011435Z/run.json",
+  "deferredGameGuardPassed": true,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/cross-snapshot-live-20261020-game/libCandidate.dylib",
+    "candidateSHA256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/cross-snapshot-live-20261020-game/libProbeGuard.dylib",
+    "proxySHA256": "89b3df0d3541851bab338942bba3a048b558953a191049a4b2cf845824ea1dd1",
+    "presentationPassed": true,
+    "crossEncoderLiveCache": true,
+    "argumentHeapThreshold": 2,
+    "actualConfigEvidenceRequired": true,
+    "cachePathsPreserved": true,
+    "descriptorSnapshotReuse": true,
+    "negativeLiveCache": false,
+    "crossEncoderSnapshotReuse": true,
+    "negativeCacheDecision": "CPU differential showed no gain from per-address negative hash cache; filtered snapshot cache handles absences at list scope."
+  },
+  "diagnosticOnly": false,
+  "resourceUseStatistics": true,
+  "gameFixProven": false,
+  "guardSourceUnchanged": true,
+  "actualHelperEpochEvidence": "evidence/cross-snapshot-live-20261020/epoch-gpu-output.json",
+  "sourceStableBuildProof": "evidence/cross-snapshot-stable-build-20261020/build-proof.json"
+}

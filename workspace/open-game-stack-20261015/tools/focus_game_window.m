@@ -26,7 +26,7 @@ int main(int argc, const char *argv[]) {
         for (id item in windows) {
             AXUIElementRef window = (__bridge AXUIElementRef)item;
             NSString *title = [copyAttribute(window, kAXTitleAttribute) description];
-            if (![title hasPrefix:@"StellarBlade"]) continue;
+            if (![title hasPrefix:@"StellarBlade"] && ![title hasPrefix:@"SB-Win64-Shipp"]) continue;
             found = YES;
             AXUIElementSetAttributeValue(window, kAXMinimizedAttribute, kCFBooleanFalse);
             CGPoint position = CGPointMake(80, 80);

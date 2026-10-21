@@ -1,0 +1,41 @@
+{
+  "timeUTC": "2026-10-21T01:40:07.077685+00:00",
+  "pid": 43610,
+  "screenLocked": true,
+  "IOConsoleLocked": true,
+  "CGSSessionScreenIsLocked": true,
+  "gamePlayable": false,
+  "FSR3UpscalingValidated": false,
+  "FSR3FrameGenerationValidated": false,
+  "requiresLocalUnlock": true,
+  "doNotRequestCredentials": true,
+  "windowOperationsStopped": true,
+  "currentGameAndCachesPreserved": true,
+  "nativeCompletionErrors": 0,
+  "effectiveConfig": {
+    "pid": 43610,
+    "encoderLiveCache": 1,
+    "crossEncoderLiveCache": 1,
+    "recentCacheSlots": 256,
+    "batchLiveResources": 1,
+    "batchArgumentHeaps": 1,
+    "heapThreshold": 2,
+    "descriptorSnapshotReuse": 1,
+    "negativeLiveCache": 0,
+    "crossEncoderSnapshotReuse": 1
+  },
+  "pipelineRecords": {
+    "render": {
+      "records": 10651,
+      "created": 10651,
+      "creationFailures": 0,
+      "rehydrated": 10651
+    },
+    "compute": {
+      "records": 13779,
+      "created": 13779,
+      "creationFailures": 0,
+      "rehydrated": 13779
+    }
+  }
+}

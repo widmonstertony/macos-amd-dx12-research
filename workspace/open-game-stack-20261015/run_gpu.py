@@ -26,6 +26,7 @@ parser.add_argument('--cross-encoder-live-cache',action='store_true')
 parser.add_argument('--live-lookup-fast-cache',action='store_true')
 parser.add_argument('--descriptor-use-cache',action='store_true')
 parser.add_argument('--descriptor-snapshot-reuse',action='store_true')
+parser.add_argument('--cross-encoder-snapshot-reuse',action='store_true')
 parser.add_argument('--negative-live-cache',action='store_true')
 parser.add_argument('--resource-use-stats',action='store_true')
 parser.add_argument('--batch-live-use-resource',action='store_true')
@@ -91,6 +92,7 @@ if args.cross_encoder_live_cache:
 if args.descriptor_use_cache:env['MVK_AMD_DESCRIPTOR_USE_CACHE']='1'
 if args.descriptor_snapshot_reuse:env['MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE']='1'
 if args.negative_live_cache:env['MVK_AMD_NEGATIVE_LIVE_CACHE']='1'
+if args.cross_encoder_snapshot_reuse:env['MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE']='1'
 if args.resource_use_stats:env['MVK_AMD_RESOURCE_USE_STATS']='1'
 if args.batch_live_use_resource:env['MVK_AMD_BATCH_LIVE_USE_RESOURCE']='1'
 if args.batch_argument_heaps:
@@ -192,6 +194,10 @@ record['queueTiming']=args.queue_timing
 record['encoderTransitions']=args.encoder_transitions
 record['liveLookupFastCache']=args.live_lookup_fast_cache
 record['descriptorUseCache']=args.descriptor_use_cache
+record['descriptorSnapshotReuse']=args.descriptor_snapshot_reuse
+record['crossEncoderSnapshotReuse']=args.cross_encoder_snapshot_reuse
+record['negativeLiveCache']=args.negative_live_cache
+record['resourceUseStatistics']=args.resource_use_stats
 record['batchLiveUseResource']=args.batch_live_use_resource
 record['batchArgumentHeaps']=args.batch_argument_heaps
 record['argumentHeapThreshold']=args.argument_heap_threshold

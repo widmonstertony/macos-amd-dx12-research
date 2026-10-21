@@ -36,11 +36,11 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
  [args setArgumentBuffer:table offset:0];[args setBuffer:input offset:0 atIndex:0];
  id<MTLCommandQueue> queue=[device newCommandQueue];
  MVKLiveList list;
- uint64_t initialLookups=0, duplicateLookups=0, skips=0;
+ uint64_t initialLookups=0, duplicateLookups=0, skips=0;bool crossObserved=false,negativeObserved=false;
  struct Bench {double ms;uint64_t lookups=0,hits=0;};Bench benches[4];
  for(unsigned mode=0;mode<4;++mode) {
   fprintf(stderr,"stage=bench-%u\n",mode);
-  MVKUseResourceHelper h;h.descriptorSnapshotReuse=(mode&1);h.negativeLiveCache=(mode&2);
+  MVKUseResourceHelper h;h.descriptorSnapshotReuse=(mode&1);h.negativeLiveCache=(mode&2);h.crossEncoderSnapshotReuse=h.crossEncoderSnapshotReuse&&h.descriptorSnapshotReuse;
   auto stale=std::make_shared<MVKDescriptorUseCache::Resources>();
   for(uintptr_t i=1;i<=4096;++i)stale->push_back((id<MTLResource>)(0x100000+i*64));
   MVKLiveList empty;
@@ -55,7 +55,7 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
 
  {
   fprintf(stderr,"stage=gpu-helper\n");
-  MVKUseResourceHelper helper;
+  MVKUseResourceHelper helper;crossObserved=helper.crossEncoderSnapshotReuse;negativeObserved=helper.negativeLiveCache;
   auto values=std::make_shared<MVKDescriptorUseCache::Resources>();
   for(uintptr_t i=1;i<=4096;++i)values->push_back((id<MTLResource>)(0x100000+i*64));
   values->push_back(input);values->push_back(next);
@@ -91,7 +91,7 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
  uint32_t expected[]={0x12345678,0x12345679,0xface0000,0xface0001};uint64_t mismatch=0;
  for(int i=0;i<4;++i)if(((uint32_t*)output.contents)[i]!=expected[i])++mismatch;
  if(*(uint32_t*)input.contents!=0x1234567a||*(uint32_t*)next.contents!=0xface0002)++mismatch;
- std::ofstream out(argv[1]);out<<"{\"passed\":"<<(mismatch?"false":"true")<<",\"GPUWordsChecked\":6,\"mismatches\":"<<mismatch<<",\"absentIdentities\":4096,\"initialLookups\":"<<initialLookups<<",\"lookupsAfterDuplicate\":"<<duplicateLookups<<",\"lastEncoderSnapshotSkips\":"<<skips<<",\"CPUControls\":[";
+ std::ofstream out(argv[1]);out<<"{\"passed\":"<<(mismatch?"false":"true")<<",\"GPUWordsChecked\":6,\"mismatches\":"<<mismatch<<",\"absentIdentities\":4096,\"initialLookups\":"<<initialLookups<<",\"lookupsAfterDuplicate\":"<<duplicateLookups<<",\"crossEncoderSnapshotReuse\":"<<(crossObserved?"true":"false")<<",\"negativeLiveCache\":"<<(negativeObserved?"true":"false")<<",\"lastEncoderSnapshotSkips\":"<<skips<<",\"CPUControls\":[";
  for(unsigned i=0;i<4;++i) {if(i)out<<",";out<<"{\"snapshotReuse\":"<<(i&1?"true":"false")<<",\"negativeCache\":"<<(i&2?"true":"false")<<",\"CPUms\":"<<benches[i].ms<<",\"liveLookups\":"<<benches[i].lookups<<",\"absenceHits\":"<<benches[i].hits<<"}";}
  out<<"]}\n";
  printf("RESOURCE_EPOCH_GPU mismatches=%llu initialLookups=%llu duplicateLookups=%llu\n",(unsigned long long)mismatch,(unsigned long long)initialLookups,(unsigned long long)duplicateLookups);

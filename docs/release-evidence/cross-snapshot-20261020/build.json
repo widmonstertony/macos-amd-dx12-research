@@ -1,0 +1,28 @@
+[
+  {
+    "timeUTC": "2026-10-21T01:13:25.936722+00:00",
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/cross-snapshot-live-20261020-probe/libCandidate.dylib",
+    "candidateSHA256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/cross-snapshot-live-20261020-probe/libProbeGuard.dylib",
+    "proxySHA256": "d1c95feeaf8f51e694862da81d23c657462d8e06546f505c8ad3b29d3d0fa2a5",
+    "profileHeader": null,
+    "resourceStatistics": true,
+    "snapshotReuse": true,
+    "negativeCache": false,
+    "crossEncoderSnapshotReuse": true,
+    "deployed": false
+  },
+  {
+    "timeUTC": "2026-10-21T01:13:26.380601+00:00",
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/cross-snapshot-live-20261020-game/libCandidate.dylib",
+    "candidateSHA256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/cross-snapshot-live-20261020-game/libProbeGuard.dylib",
+    "proxySHA256": "89b3df0d3541851bab338942bba3a048b558953a191049a4b2cf845824ea1dd1",
+    "profileHeader": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/cross-snapshot-live-20261020/game-trial-config.h",
+    "resourceStatistics": true,
+    "snapshotReuse": true,
+    "negativeCache": false,
+    "crossEncoderSnapshotReuse": true,
+    "deployed": false
+  }
+]

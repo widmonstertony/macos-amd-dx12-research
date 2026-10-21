@@ -63,8 +63,8 @@ inline void mvkQueueTimingBegin(id<MTLCommandBuffer> cb, uint32_t family, uint32
         if ((now - w.start < 5.0 && w.published) || records >= 2048) return;
         FILE* file = fopen(path.fileSystemRepresentation, "a");
         if (file) {
-            fprintf(file, "{\"queueFamily\":%u,\"queueIndex\":%u,\"wallSeconds\":%.6f,\"completed\":%llu,\"validGPUTimestamps\":%llu,\"errors\":%llu,\"hostPrecommitTotalMS\":%.3f,\"hostPrecommitMaxMS\":%.3f,\"GPUExecutionTotalMS\":%.3f,\"GPUExecutionMaxMS\":%.3f,\"commitToGPUStartTotalMS\":%.3f}\n",
-                    family,index,now-w.start,(unsigned long long)w.count,(unsigned long long)w.valid,(unsigned long long)w.errors,
+            fprintf(file, "{\"queueFamily\":%u,\"queueIndex\":%u,\"time\":%.6f,\"wallSeconds\":%.6f,\"completed\":%llu,\"validGPUTimestamps\":%llu,\"errors\":%llu,\"hostPrecommitTotalMS\":%.3f,\"hostPrecommitMaxMS\":%.3f,\"GPUExecutionTotalMS\":%.3f,\"GPUExecutionMaxMS\":%.3f,\"commitToGPUStartTotalMS\":%.3f}\n",
+                    family,index,[NSDate timeIntervalSinceReferenceDate],now-w.start,(unsigned long long)w.count,(unsigned long long)w.valid,(unsigned long long)w.errors,
                     w.host*1000,w.maxHost*1000,w.gpu*1000,w.maxGPU*1000,w.wait*1000);
             fclose(file); ++records;
         }

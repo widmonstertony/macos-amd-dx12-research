@@ -2026,14 +2026,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "bytes": 34984,
-      "sha256": "2daa78c00eb7b6660250f009fd1f7ffbdbb2cba557fff8fb283d01799a616e6c",
+      "bytes": 35347,
+      "sha256": "444bce20f5d8377b84aeb8121ea774b8ed136ab5b105d8338e046c5e4309e1b7",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 124972,
-      "sha256": "7ef4bbc84ca1080ea0a61bae6ad0254ab1e807203a03d6692f19a29abf2f892c",
+      "bytes": 126729,
+      "sha256": "fa7d95d5155e5b662e82a0c688e3898bae960001b41508f8cd66943765a841a3",
       "executable": false
     },
     {
@@ -2290,8 +2290,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKQueueTimingTrace.h",
-      "bytes": 3479,
-      "sha256": "9196793fc942b502721bc103d8bda21439b4be49db65f85880472564390d1db3",
+      "bytes": 3533,
+      "sha256": "4092d9e62e4fb6b369c30eed9e59cde6517d776514386c9ecccc166e35e4a5bb",
       "executable": false
     },
     {
@@ -33622,8 +33622,8 @@
     },
     {
       "path": "open-game-stack-20261015/run_gpu.py",
-      "bytes": 16411,
-      "sha256": "3aec21e95bceb69fa94067b4f5d2ebe63583933c6aa2eb7852199e78668667af",
+      "bytes": 16814,
+      "sha256": "fbfa188e009a30e8a8a491b3eae1c844dc0171305325b4cef95bbf77d1b407ba",
       "executable": false
     },
     {
@@ -33922,8 +33922,8 @@
     },
     {
       "path": "open-game-stack-20261015/src/resource_lookup_epoch_gpu.mm",
-      "bytes": 7004,
-      "sha256": "73e4b691a98195d7a7b57e76963a895563f6317df4554edd94d1c09d7e3a4dcb",
+      "bytes": 7353,
+      "sha256": "e06b80010bc286f0fa8cfec90bd38a58c90dbea766600919f346839eed304ae6",
       "executable": false
     },
     {
@@ -34053,6 +34053,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/activate_game_titlebar.m",
+      "bytes": 2036,
+      "sha256": "5ce87b1ba23709c2aed276abc9c1cd09184f7f23255049bd9b20f83a9278add5",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/tools/apply-stellar-postprocess-bypass.py",
       "bytes": 4375,
       "sha256": "1bee3581143b2b371bb74103fe846e774d8e40729363b5e5b15d639b30f4384b",
@@ -34072,8 +34078,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "bytes": 2709,
-      "sha256": "f81295e67a3775b1c9976950a5265c7ba8a447e1170c6579bb018f26545ffb5b",
+      "bytes": 2872,
+      "sha256": "4d10724b1a4ce0f0e094c804bdd11ce12bea047ee5a029e00042daa43c076bf3",
       "executable": false
     },
     {
@@ -34089,9 +34095,21 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/build_stable_moltenvk.py",
+      "bytes": 1801,
+      "sha256": "b601252752a00b6c369d6af645ef951cbff967f66c08fbfed038eb912a5d6036",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/tools/build_window_present_stress.py",
       "bytes": 5688,
       "sha256": "bb4b00e4d95e8dc1dc9c276052b67cac498f099d43adb81b15a31af4c09d3f6a",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/capture_game_window.m",
+      "bytes": 2233,
+      "sha256": "f4d2e19b640976ef3bb1ca07e6734697a6ae5c0ef4c9b744ca3d2cae037b8fee",
       "executable": false
     },
     {
@@ -34114,14 +34132,20 @@
     },
     {
       "path": "open-game-stack-20261015/tools/focus_game_window.m",
-      "bytes": 2345,
-      "sha256": "f9ddaace8e87b527c07c667cefc04159f95127c28aeadf58ce36d84e54b34147",
+      "bytes": 2385,
+      "sha256": "148124ec6146f36dd59c334847671a6ab57e1880cb4eb31dabc57b6afc889c56",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/game_test_input.m",
-      "bytes": 1645,
-      "sha256": "8f09ba1545f7a8fd0d2a868ff591b5185172e75d61d5c24eb0c64e7742b55490",
+      "bytes": 2252,
+      "sha256": "851c1d7e93010ac742dc4c652395d0a8d55163c33cf8c8beebbb58e820fd7c70",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/game_window_state.m",
+      "bytes": 1772,
+      "sha256": "44748b013853dd622170866dcc816f8ac1871ba55517a89d7a518f141dfc220c",
       "executable": false
     },
     {
@@ -34140,6 +34164,12 @@
       "path": "open-game-stack-20261015/tools/launch_stellar_deferred_proxy.py",
       "bytes": 8483,
       "sha256": "7bc89c84c6922fbf911679b589bb5c988d71ee6756f97b735d5db968ec2b1402",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/mac_session_state.py",
+      "bytes": 786,
+      "sha256": "81c50994002522589eb73defb24f4ba32547c51c86d63c0f6965eb9c5d3f8d54",
       "executable": false
     },
     {
@@ -34174,8 +34204,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "bytes": 12592,
-      "sha256": "7584e58a14562e59160f6251054097d93edd4ae8b7e94364d7ddcae82a2d7d7d",
+      "bytes": 12759,
+      "sha256": "6f70a469c22f0ab15d1c201995415142a85f0c73a0bf7044ed9ba528410b9390",
       "executable": false
     },
     {
@@ -69453,9 +69483,55 @@
           "sha256": "ec2152d91ea6c0f5742b79ea1aa68ee0908584d392d36f8f9566091eebfddbe3"
         }
       ]
+    },
+    {
+      "path": "artifacts/runtime-cross-snapshot-20261020.tar.gz",
+      "sha256": "dab6e5e47e4d62ba50bcebc280e9a2003f126d84fcb1a3872877056208c058f6",
+      "files": [
+        {
+          "path": "open-game-stack-20261015/build/cross-snapshot-live-20261020-probe/libCandidate.dylib",
+          "bytes": 5939536,
+          "sha256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f"
+        },
+        {
+          "path": "open-game-stack-20261015/build/cross-snapshot-live-20261020-probe/libProbeGuard.dylib",
+          "bytes": 32256,
+          "sha256": "d1c95feeaf8f51e694862da81d23c657462d8e06546f505c8ad3b29d3d0fa2a5"
+        },
+        {
+          "path": "open-game-stack-20261015/build/cross-snapshot-live-20261020-probe/build.json",
+          "bytes": 715,
+          "sha256": "f55a111330d5f5a23b39d590c9a5f6a91ea83e530ba3d057ba399571746be93e"
+        },
+        {
+          "path": "open-game-stack-20261015/build/cross-snapshot-live-20261020-game/libCandidate.dylib",
+          "bytes": 5939536,
+          "sha256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f"
+        },
+        {
+          "path": "open-game-stack-20261015/build/cross-snapshot-live-20261020-game/libProbeGuard.dylib",
+          "bytes": 36480,
+          "sha256": "89b3df0d3541851bab338942bba3a048b558953a191049a4b2cf845824ea1dd1"
+        },
+        {
+          "path": "open-game-stack-20261015/build/cross-snapshot-live-20261020-game/build.json",
+          "bytes": 854,
+          "sha256": "f2554297c01a5239695b7e9a8b6151061dd171333c54917e4b64a23458563e4d"
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/cross-snapshot-live-20261020/game-trial-config.h",
+          "bytes": 3048,
+          "sha256": "dd62cb457428dec2ce410afac6edad9091dd5945bfa6ef1e1734be8757b1dc63"
+        },
+        {
+          "path": "open-game-stack-20261015/evidence/cross-snapshot-stable-build-20261020/build-proof.json",
+          "bytes": 478,
+          "sha256": "5a4494e5737ec0686a3255743adf8a424751354f67e48c7ee25e954ba7124b5a"
+        }
+      ]
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Live support-cache candidate retained; compilation audit matches all 50 intermediate mesh failures to real successful recovery. Prospective qualified compiler provenance/presentation-filter diagnostics are saved but NOT deployed. Initial mesh-link root cause and sustained playability unresolved.",
-  "lastSourceUpdateUTC": "2026-10-21T00:23:40.706090+00:00"
+  "lastSourceUpdateUTC": "2026-10-21T01:20:32.187397+00:00"
 }

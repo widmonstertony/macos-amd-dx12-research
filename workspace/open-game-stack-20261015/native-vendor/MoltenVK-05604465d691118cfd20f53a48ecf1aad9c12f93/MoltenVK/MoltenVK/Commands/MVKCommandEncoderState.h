@@ -221,6 +221,8 @@ struct MVKUseResourceHelper {
 		negativeLiveCache = cacheLiveResources && value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE");
 		descriptorSnapshotReuse = cacheLiveResources && value && !strcmp(value, "1");
+		value = getenv("MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE");
+		crossEncoderSnapshotReuse = descriptorSnapshotReuse && crossEncoderLiveCache && value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_RESOURCE_USE_STATS");
 		resourceUseStats = value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_TRACE_LIVE_CACHE");
@@ -262,15 +264,19 @@ struct MVKUseResourceHelper {
     struct AbsentLiveResource { MVKLiveList* list; uint64_t additions; };
     std::unordered_map<id<MTLResource>, AbsentLiveResource> absentLiveResources;
     bool descriptorSnapshotReuse = false;
+    bool crossEncoderSnapshotReuse = false;
     struct DeclaredSnapshot {
         MVKDescriptorUseCache::Snapshot snapshot;
         MVKLiveList* list;
         MVKResourceUsageStages stage;
         bool write;
         uint64_t additions;
+        uint64_t generation;
+        MVKDescriptorUseCache::Snapshot liveSnapshot;
     };
+    size_t snapshotLiveIdentities = 0;
     std::vector<DeclaredSnapshot> declaredSnapshots;
-    uint64_t statsSnapshotCalls=0, statsSnapshotSkips=0, statsSnapshotWordsSkipped=0;
+    uint64_t statsSnapshotCalls=0, statsSnapshotSkips=0, statsSnapshotWordsSkipped=0, statsSnapshotFilterHits=0;
     void addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                          id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
                          MVKResourceUsageStages stage, bool write);
@@ -287,7 +293,7 @@ struct MVKUseResourceHelper {
 	/** Begin a new Metal encoder while retaining reusable hash-table nodes. */
 	void resetForEncoder();
 	/** Reuse a validated object only while this helper owns a retained reference. */
-	void addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write);
+	bool addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write);
 	/** Add a resource to the list of resources to use. */
 	void add(id<MTLResource> resource, MVKResourceUsageStages stage, bool write);
 	/**

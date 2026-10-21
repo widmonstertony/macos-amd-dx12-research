@@ -1,0 +1,12 @@
+{
+  "timeUTC": "2026-10-21T01:07:08.219551+00:00",
+  "exitCode": 0,
+  "sourceStable": true,
+  "changedDuringBuild": [],
+  "sourceFiles": 155,
+  "elapsedSeconds": 126.00090217700017,
+  "library": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/moltenvk-bounded-archive/MoltenVK/libMoltenVK.1.4.2.dylib",
+  "librarySHA256": "ef9241229adbeebe95461386a2d88dd61ca8c31af5197460d02beb3987f6c67f",
+  "passed": true,
+  "gameStarted": false
+}

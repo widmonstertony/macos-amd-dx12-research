@@ -1,0 +1,22 @@
+[
+  {
+    "timeUTC": "2026-10-21T00:18:46.996464+00:00",
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/descriptor-consistent-20261020-probe/libCandidate.dylib",
+    "candidateSHA256": "58dab7f8f9685323d4b4856567cac3bc83d853e812ec9620f70a45cc12e48eff",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/descriptor-consistent-20261020-probe/libProbeGuard.dylib",
+    "proxySHA256": "278ec183f2621bd48e6390c22ec647b41ac4ab4274356d0b0d522b9304debd93",
+    "profileHeader": null,
+    "resourceStatistics": true,
+    "deployed": false
+  },
+  {
+    "timeUTC": "2026-10-21T00:18:47.630765+00:00",
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/descriptor-consistent-20261020-game/libCandidate.dylib",
+    "candidateSHA256": "58dab7f8f9685323d4b4856567cac3bc83d853e812ec9620f70a45cc12e48eff",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/descriptor-consistent-20261020-game/libProbeGuard.dylib",
+    "proxySHA256": "ef13d1175c993d300e6baccbeff9f85074c4e32bb5d4c5068277cfe62febbef0",
+    "profileHeader": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/descriptor-consistent-20261020/game-trial-config.h",
+    "resourceStatistics": true,
+    "deployed": false
+  }
+]

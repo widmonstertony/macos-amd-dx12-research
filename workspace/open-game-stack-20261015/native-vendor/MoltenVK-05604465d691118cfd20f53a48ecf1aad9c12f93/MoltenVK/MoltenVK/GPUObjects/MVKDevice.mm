@@ -3782,6 +3782,7 @@ void MVKLiveList::add(id object) {
 	std::lock_guard<Lock> guard(group->lock);
 	group->entries[object]++;
 	group->additions.fetch_add(1, std::memory_order_release);
+	_allAdditions.fetch_add(1, std::memory_order_release);
 }
 
 void MVKLiveList::remove(id object) {

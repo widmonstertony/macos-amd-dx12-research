@@ -693,8 +693,7 @@ static void executeBindOps(id<MTLCommandEncoder> encoder,
 			auto resources = set->resourceUseCache->resources(src, count, stride);
 			MVKLiveList& list = op.opcode == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck ?
 			    mvkEncoder.getDevice()->getLiveResources().buffers : mvkEncoder.getDevice()->getLiveResources().textures;
-			for (id<MTLResource> resource : *resources)
-				mvkEncoder.getState().mtlShared()._useResource.addImmediateLive(resource, list, encoder, binder.useResource, useResourceStage, target);
+			mvkEncoder.getState().mtlShared()._useResource.addLiveSnapshot(resources, list, encoder, binder.useResource, useResourceStage, target);
 			continue;
 		}
 
@@ -1077,7 +1076,68 @@ void MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages 
 	}
 }
 
+void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
+                                           id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
+                                           MVKResourceUsageStages stage, bool write) {
+    if (resourceUseStats) ++statsSnapshotCalls;
+    // Snapshot identities are immutable. Resources validated earlier are owned
+    // by this helper until the command encoding ends. A later registration
+    // invalidates cached absences, including same-address reuse. Read the epoch
+    // BEFORE checking resources so a concurrent registration cannot be hidden.
+    uint64_t additions = list.additionGeneration();
+    if (descriptorSnapshotReuse) {
+        for (const auto& prior : declaredSnapshots) {
+            if (prior.snapshot == snapshot && prior.list == &list && prior.stage == stage &&
+                prior.write == write && prior.additions == additions) {
+                if (resourceUseStats) { ++statsSnapshotSkips; statsSnapshotWordsSkipped+=snapshot->size(); }
+                return;
+            }
+        }
+    }
+    for (id<MTLResource> resource : *snapshot) addImmediateLive(resource,list,encoder,func,stage,write);
+    if (descriptorSnapshotReuse) {
+        // Bounded metadata only. Eviction causes normal validation; it never
+        // drops the owned Metal references or suppresses a declaration.
+        if (declaredSnapshots.size() >= 64) declaredSnapshots.clear();
+        declaredSnapshots.push_back({std::move(snapshot),&list,stage,write,additions});
+    }
+}
+
+void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
+    if (!resourceUseStats) return;
+    struct Totals {
+        uint64_t calls=0, lookups=0, retainedHits=0, absentHits=0, liveFound=0, snapshotCalls=0, snapshotSkips=0, snapshotWordsSkipped=0, resets=0, capClears=0, maxUsed=0;
+        double start=0;
+    };
+    static std::mutex lock;
+    static Totals total;
+    static unsigned records=0;
+    std::lock_guard<std::mutex> guard(lock);
+    double now=[NSDate timeIntervalSinceReferenceDate];
+    if (!total.start) total.start=now;
+    total.calls+=statsCalls; total.lookups+=statsLookups;
+    total.snapshotCalls+=statsSnapshotCalls;total.snapshotSkips+=statsSnapshotSkips;total.snapshotWordsSkipped+=statsSnapshotWordsSkipped;
+    statsSnapshotCalls=statsSnapshotSkips=statsSnapshotWordsSkipped=0;
+    total.retainedHits+=statsRetainedHits; total.absentHits+=statsAbsentHits; total.liveFound+=statsLiveFound;
+    total.resets+=encoderReset; total.capClears+=encoderReset && used.size()>8192;
+    total.maxUsed=std::max(total.maxUsed,uint64_t(used.size()));
+    statsCalls=statsLookups=statsRetainedHits=statsAbsentHits=statsLiveFound=0;
+    if (now-total.start<5 || records>=1024) return;
+    const char* directory=getenv("MVK_CONFIG_SHADER_DUMP_DIR");
+    if (directory) {
+        char path[4096];snprintf(path,sizeof(path),"%s/resource-use-%d.jsonl",directory,getpid());
+        FILE* file=fopen(path,"a");
+        if(file) {
+            fprintf(file,"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed);
+            fclose(file);++records;
+        }
+    }
+    total=Totals{};total.start=now;
+}
+
 void MVKUseResourceHelper::releaseLiveResources() {
+    publishResourceUseStats(false);
+    declaredSnapshots.clear();
 	releasePendingBatchLiveResources();
 	if (traceLiveCache && (liveLookupCount || liveReuseCount)) {
 		fprintf(stderr, "MVK_LIVE_CACHE enabled=%u lookups=%llu reused=%llu retained=%zu\n",
@@ -1089,6 +1149,7 @@ void MVKUseResourceHelper::releaseLiveResources() {
 	// ResourceInfo pointers remain stable across unordered_map rehash, but not
 	// across the encoder's used.clear(). Never carry them into another encoder.
 	for (auto& recent : recentLiveResources) recent = {};
+	absentLiveResources.clear();
 	for (id<MTLResource> resource : retainedLiveResources) [resource release];
 	retainedLiveResources.clear();
 }
@@ -1107,11 +1168,13 @@ void MVKUseResourceHelper::resetForEncoder() {
 	if (configPath && !configWritten.test_and_set()) {
 		FILE* file = fopen(configPath, "w");
 		if (file) {
-			fprintf(file, "{\"pid\":%d,\"encoderLiveCache\":%u,\"crossEncoderLiveCache\":%u,\"recentCacheSlots\":%zu,\"batchLiveResources\":%u,\"batchArgumentHeaps\":%u,\"heapThreshold\":%u}\n",
-			        getpid(),cacheLiveResources,crossEncoderLiveCache,recentLiveResources.size(),batchLiveResources,batchArgumentHeaps,heapBatchThreshold);
+			fprintf(file, "{\"pid\":%d,\"encoderLiveCache\":%u,\"crossEncoderLiveCache\":%u,\"recentCacheSlots\":%zu,\"batchLiveResources\":%u,\"batchArgumentHeaps\":%u,\"heapThreshold\":%u,\"descriptorSnapshotReuse\":%u,\"negativeLiveCache\":%u}\n",
+			        getpid(),cacheLiveResources,crossEncoderLiveCache,recentLiveResources.size(),batchLiveResources,batchArgumentHeaps,heapBatchThreshold,descriptorSnapshotReuse,negativeLiveCache);
 			fclose(file);
 		}
 	}
+	publishResourceUseStats(true);
+	declaredSnapshots.clear();
 	releasePendingBatchLiveResources();
 	// Direct-map entries contain ResourceInfo pointers. Clear them at every
 	// encoder boundary so the new encoder always receives its own useResource
@@ -1131,6 +1194,7 @@ void MVKUseResourceHelper::resetForEncoder() {
 }
 
 void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
+	if (resourceUseStats) ++statsCalls;
 	auto recordValidatedResource = [&](bool alreadyRetained) {
 		if (batchLiveResources) {
 			// MVKLiveList only protects the object during the lookup. Hold a
@@ -1148,12 +1212,14 @@ void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 		recent = &recentLiveResources[((key >> 4) ^ (key >> 17)) & (recentLiveResources.size() - 1)];
 		if (recent->resource == resource && recent->list == &liveList) {
 			if (recent->retainedInfo) {
+				if(resourceUseStats) ++statsRetainedHits;
 				if (traceLiveCache) { ++liveReuseCount; ++liveRecentReuseCount; }
 				if (!isCompatible(*recent->retainedInfo, ResourceInfo{stage, write, false}))
 						recordValidatedResource(true);
 				return;
 			}
 			if (recent->absentGeneration == liveList.additionGeneration(resource)) {
+				if(resourceUseStats) ++statsAbsentHits;
 				if (traceLiveCache) ++liveAbsentReuseCount;
 				return;
 			}
@@ -1171,6 +1237,7 @@ void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 			// use in every generation as a declaration even when access and stages
 			// are otherwise compatible.
 			bool needsEncoderDeclaration = it->second.generation != encoderGeneration;
+			if(resourceUseStats) ++statsRetainedHits;
 			if (recent) *recent = {resource, &liveList, &it->second, 0};
 			if (traceLiveCache) ++liveReuseCount;
 			// Holding the Metal object prevents pointer reuse (ABA) even if its
@@ -1180,8 +1247,23 @@ void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 			return;
 		}
 	}
+    // A small direct-map cache thrashes on long bindless lists containing
+    // stale, unused identities. Preserve shard-versioned negative results
+    // across encoder transitions. This map never dereferences or owns a raw
+    // pointer; a new registration invalidates its shard epoch before reuse.
+    if (negativeLiveCache) {
+        auto absent = absentLiveResources.find(resource);
+        if (absent != absentLiveResources.end() && absent->second.list == &liveList &&
+            absent->second.additions == liveList.additionGeneration(resource)) {
+            if (resourceUseStats) ++statsAbsentHits;
+            return;
+        }
+        generationBeforeLookup = liveList.additionGeneration(resource);
+    }
+	if(resourceUseStats) ++statsLookups;
 	if (traceLiveCache) ++liveLookupCount;
 	if (auto live = liveList.isLive(resource)) {
+		if(resourceUseStats) ++statsLiveFound;
 		if (cacheLiveResources) {
 			// The live-list guard retains it until this owned reference is taken.
 			retainedLiveResources.push_back([resource retain]);
@@ -1189,10 +1271,16 @@ void MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 			used.find(resource)->second.liveRetained = true;
 			if (recent) *recent = {resource, &liveList, &used.find(resource)->second, 0};
 		} else recordValidatedResource(false);
-	} else if (recent) {
+	} else {
+        if (negativeLiveCache) {
+            if (absentLiveResources.size() >= 32768) absentLiveResources.clear();
+            absentLiveResources.insert_or_assign(resource, AbsentLiveResource{&liveList,generationBeforeLookup});
+        }
+        if (recent) {
 		// No Objective-C message is sent to an absent pointer. A subsequent
 		// registration invalidates this entry, including same-address reuse.
 		*recent = {resource, &liveList, nullptr, generationBeforeLookup};
+        }
 	}
 }
 

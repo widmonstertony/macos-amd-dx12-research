@@ -1,0 +1,36 @@
+{
+  "PID": 35494,
+  "nativeCompletedErrors": 2,
+  "errorWindows": [
+    {
+      "queueFamily": 2,
+      "queueIndex": 0,
+      "wallSeconds": 8.292322,
+      "completed": 4,
+      "validGPUTimestamps": 4,
+      "errors": 1,
+      "hostPrecommitTotalMS": 26.191,
+      "hostPrecommitMaxMS": 17.767,
+      "GPUExecutionTotalMS": 0.075,
+      "GPUExecutionMaxMS": 0.027,
+      "commitToGPUStartTotalMS": 5007.579
+    },
+    {
+      "queueFamily": 0,
+      "queueIndex": 0,
+      "wallSeconds": 7.893427,
+      "completed": 14,
+      "validGPUTimestamps": 14,
+      "errors": 1,
+      "hostPrecommitTotalMS": 981.027,
+      "hostPrecommitMaxMS": 255.896,
+      "GPUExecutionTotalMS": 6553.935,
+      "GPUExecutionMaxMS": 6520.184,
+      "commitToGPUStartTotalMS": 37.865
+    }
+  ],
+  "CPUEncodingBottleneckRemainsMeasured": true,
+  "firstNativeTimeoutCauseNotYetProven": true,
+  "candidateStillOriginalStatsOnly": true,
+  "gamePlayable": false
+}

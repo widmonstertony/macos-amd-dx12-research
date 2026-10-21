@@ -1,0 +1,29 @@
+{
+  "nativeRegressionPassed": true,
+  "nativeRegressionEvidence": [
+    "evidence/descriptor_consistent_transition_gpu_20261020/run.json",
+    "evidence/descriptor_consistent_descriptor_gpu_20261020/run.json",
+    "evidence/descriptor_consistent_memory_gpu_20261020/run.json"
+  ],
+  "originalTencentPresentationPassed": true,
+  "originalTencentPresentationEvidence": "evidence/private-cache-wine-20261021T002059Z/run.json",
+  "deferredGameGuardPassed": true,
+  "deferredRuntime": {
+    "candidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/descriptor-consistent-20261020-game/libCandidate.dylib",
+    "candidateSHA256": "58dab7f8f9685323d4b4856567cac3bc83d853e812ec9620f70a45cc12e48eff",
+    "proxy": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/descriptor-consistent-20261020-game/libProbeGuard.dylib",
+    "proxySHA256": "ef13d1175c993d300e6baccbeff9f85074c4e32bb5d4c5068277cfe62febbef0",
+    "presentationPassed": true,
+    "crossEncoderLiveCache": true,
+    "argumentHeapThreshold": 2,
+    "actualConfigEvidenceRequired": true,
+    "cachePathsPreserved": true,
+    "descriptorSnapshotReuse": true,
+    "negativeLiveCache": true
+  },
+  "diagnosticOnly": false,
+  "resourceUseStatistics": true,
+  "gameFixProven": false,
+  "guardSourceUnchanged": true,
+  "actualHelperEpochEvidence": "evidence/resource-use-stats-20261020/epoch-gpu-consistent.json"
+}

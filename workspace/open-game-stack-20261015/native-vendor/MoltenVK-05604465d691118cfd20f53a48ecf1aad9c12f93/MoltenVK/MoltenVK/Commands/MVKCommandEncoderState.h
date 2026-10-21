@@ -21,6 +21,7 @@
 #include "MVKMTLResourceBindings.h"
 #include "MVKCommandResourceFactory.h"
 #include "MVKDevice.h"
+#include "MVKDescriptorUseCache.h"
 #include "MVKPipeline.h"
 #include "MVKSmallVector.h"
 #include "MVKBitArray.h"
@@ -216,6 +217,12 @@ struct MVKUseResourceHelper {
 		if (cacheLiveResources && value && !strcmp(value, "1")) recentLiveResources.resize(256);
 		value = getenv("MVK_AMD_CROSS_ENCODER_LIVE_CACHE");
 		crossEncoderLiveCache = cacheLiveResources && value && !strcmp(value, "1");
+		value = getenv("MVK_AMD_NEGATIVE_LIVE_CACHE");
+		negativeLiveCache = cacheLiveResources && value && !strcmp(value, "1");
+		value = getenv("MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE");
+		descriptorSnapshotReuse = cacheLiveResources && value && !strcmp(value, "1");
+		value = getenv("MVK_AMD_RESOURCE_USE_STATS");
+		resourceUseStats = value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_TRACE_LIVE_CACHE");
 		traceLiveCache = value && !strcmp(value, "1");
 	}
@@ -250,6 +257,25 @@ struct MVKUseResourceHelper {
 	uint32_t heapBatchThreshold = 16;
 	bool traceArgumentHeaps = false;
 	bool traceLiveCache = false;
+	bool resourceUseStats = false;
+    bool negativeLiveCache = false;
+    struct AbsentLiveResource { MVKLiveList* list; uint64_t additions; };
+    std::unordered_map<id<MTLResource>, AbsentLiveResource> absentLiveResources;
+    bool descriptorSnapshotReuse = false;
+    struct DeclaredSnapshot {
+        MVKDescriptorUseCache::Snapshot snapshot;
+        MVKLiveList* list;
+        MVKResourceUsageStages stage;
+        bool write;
+        uint64_t additions;
+    };
+    std::vector<DeclaredSnapshot> declaredSnapshots;
+    uint64_t statsSnapshotCalls=0, statsSnapshotSkips=0, statsSnapshotWordsSkipped=0;
+    void addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
+                         id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
+                         MVKResourceUsageStages stage, bool write);
+	uint64_t statsCalls=0, statsLookups=0, statsRetainedHits=0, statsAbsentHits=0, statsLiveFound=0;
+	void publishResourceUseStats(bool encoderReset);
 	uint64_t encoderGeneration = 1;
 	uint64_t liveLookupCount = 0, liveReuseCount = 0;
 	uint64_t liveRecentReuseCount = 0, liveAbsentReuseCount = 0;

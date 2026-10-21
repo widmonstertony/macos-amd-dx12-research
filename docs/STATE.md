@@ -1,3 +1,10 @@
+> 最新进展（2026-10-20 17:23 PDT）：仍未达到可玩。实际营地的一分钟对照为约 1.4–2 FPS；3,337 万次注册表查询约 89% 返回不存在，资源缓存容量淘汰为 0。随后出现两次原生队列错误，超时首因尚未定位。新候选缓存注册版本限定的空结果，并复用同一 encoder 内已声明的不可变描述符快照；已通过 GPU 和原应用宝 Wine 回归，正在原 Steam 中验证游戏效果。
+> Latest: not playable. The measured camp baseline delivered about 1.4–2 FPS, with 89% of 33.37 million registry lookups returning absent over one minute, and no capacity evictions. Two later native queue errors remain unresolved. A qualified candidate caches versioned absences and reuses already-declared immutable descriptor snapshots within each encoder. Normal original-Steam game validation is in progress.
+
+Candidate SHA-256: `58dab7f8f9685323d4b4856567cac3bc83d853e812ec9620f70a45cc12e48eff`. [Evidence](release-evidence/descriptor-reuse-20261020/). Actual helper GPU tests verify absent-to-registered invalidation, write upgrades and declarations in four encoders (6 checked GPU words, zero mismatches); separate Vulkan graphics, descriptor and memory readbacks passed. A bounded CPU fixture improved from 212 ms to 17 ms with both caches, which is **not a game FPS speedup claim**. FSR3 upscaling and frame generation remain unvalidated and required.
+
+An earlier candidate `14e35a…` failed regression because editing a header during compilation left objects with incompatible helper layouts. It was never deployed to the game. A complete rebuild from stable sources removed this fixture crash. Failed evidence is retained locally. No closed driver or game binary was modified.
+
 > 最新核对（2026-10-20 16:38 PDT）：游戏尚不可正常游玩。此前 locn2 链接失败已用稳定且唯一的原生 mesh 入口名消除；归档管线保留大量文件映射的问题已通过命中后重建无归档管线处理。实机场景能够正确显示，但上一轮只有约 1–2 FPS，随后发生原生 GPU 超时。当前轮正在验证资源声明优化的实际生效配置与分队列计时，尚无游戏加速结论。
 > Latest: not playable. Unique mesh entry names removed the observed locn2 failures, and archive-hit pipeline rehydration eliminated retained archive mappings in the measured replay. The previous correctly rendered scene delivered about 1–2 FPS and later timed out. Effective resource-declaration configuration and per-queue timing are now being measured in a new normal-Steam run; no playable result is claimed.
 

@@ -6,7 +6,7 @@ int main(int argc,const char**argv) {
  @autoreleasepool {
   if(argc!=4 || !AXIsProcessTrusted()) return 2;
   pid_t pid=atoi(argv[1]); int key=atoi(argv[2]), millis=atoi(argv[3]);
-  if(pid<2 || key < -4 || key>126 || millis<1 || millis>3000) return 3;
+  if(pid<2 || key < -5 || key>126 || millis<1 || millis>3000) return 3;
   if(key == -2) {printf("{\"pid\":%d,\"active\":%s}\n",pid,[NSRunningApplication runningApplicationWithProcessIdentifier:pid].active?"true":"false");return 0;}
   // Full-screen windows in another Space can temporarily disappear from AX.
   // Activate only after independently verifying a named CG window owned by PID.
@@ -41,7 +41,8 @@ int main(int argc,const char**argv) {
   fprintf(stderr,"gamePID=%d active=%d frontmostAttributeResult=%d\n",pid,active,frontError);
   if(key == -1) {printf("{\"pid\":%d,\"focused\":%s}\n",pid,active?"true":"false");return active?0:6;}
   if(!active || [NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier!=pid)return 6;
-  if(key == -3 || key == -4) {
+  if(key == -3 || key == -4 || key == -5) {
+   BOOL hid=key!=-3, right=key==-5;
    NSArray* visible=CFBridgingRelease(CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly,kCGNullWindowID));
    BOOL targetFound=NO;CGPoint point=CGPointZero;NSNumber* targetWindow=nil;
    for(NSDictionary* row in visible) {
@@ -51,7 +52,7 @@ int main(int argc,const char**argv) {
     if(bounds.size.width>300 && bounds.size.height>200) {point=CGPointMake(CGRectGetMidX(bounds),CGRectGetMidY(bounds));targetWindow=row[(id)kCGWindowNumber];targetFound=YES;break;}
    }
    if(!targetFound)return 8;
-   if(key == -4) {
+   if(hid) {
     NSDictionary* hit=nil;
     for(NSDictionary* row in visible) {
      if([row[(id)kCGWindowAlpha] doubleValue]<.01)continue;
@@ -73,13 +74,13 @@ int main(int argc,const char**argv) {
      if(hitError!=kAXErrorSuccess||recipientPID!=pid)return 9;
     }
    }
-   CGEventRef down=CGEventCreateMouseEvent(NULL,kCGEventLeftMouseDown,point,kCGMouseButtonLeft);
-   CGEventRef up=CGEventCreateMouseEvent(NULL,kCGEventLeftMouseUp,point,kCGMouseButtonLeft);
-   if(key == -4)CGEventPost(kCGHIDEventTap,down);else CGEventPostToPid(pid,down);
+   CGEventRef down=CGEventCreateMouseEvent(NULL,right?kCGEventRightMouseDown:kCGEventLeftMouseDown,point,right?kCGMouseButtonRight:kCGMouseButtonLeft);
+   CGEventRef up=CGEventCreateMouseEvent(NULL,right?kCGEventRightMouseUp:kCGEventLeftMouseUp,point,right?kCGMouseButtonRight:kCGMouseButtonLeft);
+   if(hid)CGEventPost(kCGHIDEventTap,down);else CGEventPostToPid(pid,down);
    usleep(millis*1000);
-   if(key == -4 && [NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier==pid)CGEventPost(kCGHIDEventTap,up);else CGEventPostToPid(pid,up);
+   if(hid && [NSWorkspace sharedWorkspace].frontmostApplication.processIdentifier==pid)CGEventPost(kCGHIDEventTap,up);else CGEventPostToPid(pid,up);
    CFRelease(down);CFRelease(up);
-   printf("{\"pid\":%d,\"button\":\"left\",\"holdMS\":%d,\"HIDHitVerified\":%s,\"sent\":true}\n",pid,millis,key == -4?"true":"false");return 0;
+   printf("{\"pid\":%d,\"button\":\"%s\",\"holdMS\":%d,\"HIDHitVerified\":%s,\"sent\":true}\n",pid,right?"right":"left",millis,hid?"true":"false");return 0;
   }
   CGEventRef down=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)key,true);
   CGEventRef up=CGEventCreateKeyboardEvent(NULL,(CGKeyCode)key,false);

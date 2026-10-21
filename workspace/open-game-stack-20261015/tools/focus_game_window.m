@@ -10,7 +10,7 @@ static id copyAttribute(AXUIElementRef element, CFStringRef key) {
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        if (argc != 2 || !AXIsProcessTrusted()) return 2;
+        if ((argc != 2 && argc != 4) || !AXIsProcessTrusted()) return 2;
         pid_t pid = (pid_t)atoi(argv[1]);
         NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
         if (!app) return 3;
@@ -30,7 +30,13 @@ int main(int argc, const char *argv[]) {
             found = YES;
             AXUIElementSetAttributeValue(window, kAXMinimizedAttribute, kCFBooleanFalse);
             CGPoint position = CGPointMake(80, 80);
-            CGSize size = CGSizeMake(950, 600);
+            CGSize size = argc == 4 ? CGSizeMake(atoi(argv[2]), atoi(argv[3])) : CGSizeMake(950, 600);
+            NSRect visible = NSScreen.mainScreen.visibleFrame;
+            if (size.width < 320 || size.height < 240 || size.width > visible.size.width || size.height > visible.size.height) {
+                CFRelease(axApp); return 5;
+            }
+            position.x = MIN(position.x, NSMaxX(visible) - size.width);
+            position.y = MIN(position.y, visible.size.height - size.height);
             AXValueRef positionValue = AXValueCreate(kAXValueCGPointType, &position);
             AXValueRef sizeValue = AXValueCreate(kAXValueCGSizeType, &size);
             AXError positionError = AXUIElementSetAttributeValue(window, kAXPositionAttribute, positionValue);
@@ -38,8 +44,18 @@ int main(int argc, const char *argv[]) {
             AXError raiseError = AXUIElementPerformAction(window, kAXRaiseAction);
             CFRelease(positionValue);
             CFRelease(sizeValue);
-            printf("{\"pid\":%d,\"title\":\"StellarBlade\",\"positionError\":%d,\"sizeError\":%d,\"raiseError\":%d}\n",
-                   pid, positionError, sizeError, raiseError);
+            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.5]];
+            CGRect actual = CGRectZero;
+            NSArray* nativeWindows = CFBridgingRelease(CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID));
+            for (NSDictionary* row in nativeWindows) {
+                if ([row[(id)kCGWindowOwnerPID] intValue] != pid) continue;
+                if (![row[(id)kCGWindowName] hasPrefix:@"StellarBlade"]) continue;
+                CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)row[(id)kCGWindowBounds], &actual);
+                break;
+            }
+            BOOL resized = fabs(actual.size.width-size.width) < 2 && fabs(actual.size.height-size.height) < 2;
+            printf("{\"pid\":%d,\"title\":\"StellarBlade\",\"positionError\":%d,\"sizeError\":%d,\"raiseError\":%d,\"requestedSize\":[%.0f,%.0f],\"actualSize\":[%.0f,%.0f],\"resizeApplied\":%s}\n",
+                   pid, positionError, sizeError, raiseError, size.width, size.height, actual.size.width, actual.size.height, resized?"true":"false");
             break;
         }
         CFRelease(axApp);

@@ -1,3 +1,6 @@
+> 诊断工具补充：命中测试使用系统实际输入接收进程核对可穿透覆盖层；窗口大小请求同时记录实际大小；Wine 正常线程挂起信号原样传递。新的本机测试数据仍只保存在本机，游戏可玩性仍未通过。
+> Diagnostic tooling follow-up: verify the actual accessibility input recipient when a click-through overlay exists; report actual window size alongside resize requests; pass Wine thread-suspension signals unchanged. New local test data remain local. Playability is still unverified.
+
 > 源码工具更新：新增有限时长的 Wine 原生异常捕获；补齐原生启动器的后端配置；明确区分日志请求与实际生效、库加载与设备初始化。诊断工具不改变驱动代码或异常返回值。游戏兼容性与性能仍未解决，FSR3 超分及帧生成仍未验证。本次只发布源码，不发布新的本机诊断日志或运行环境证据。
 > Source tooling update: add bounded native Wine fault capture and preserve complete backend configuration through the original native launcher. Logging requests are distinguished from active logging, and library loading from device initialization. Diagnostics do not change drivers or exception results. Game compatibility and performance remain unresolved; FSR3 upscaling and frame generation are unverified. This update publishes source only, without new local diagnostic logs or machine environment evidence.
 

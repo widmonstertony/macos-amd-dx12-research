@@ -34242,14 +34242,13 @@
     },
     {
       "path": "open-game-stack-20261015/tools/focus_game_window.m",
-      "bytes": 2385,
-      "sha256": "148124ec6146f36dd59c334847671a6ab57e1880cb4eb31dabc57b6afc889c56",
-      "executable": false
+      "sha256": "11e2d278cc968a96ed122d9b573c2ecb8f2335d2649237afff9afa0ebd416942",
+      "bytes": 3769
     },
     {
       "path": "open-game-stack-20261015/tools/game_test_input.m",
-      "sha256": "032c71a02f3aabe46466fb542da969bd064d6e108fedb899bc3981f8f3c3ce0e",
-      "bytes": 5171
+      "sha256": "d860c60b5a8caee11d2230ff5aca274bc7445495dc68d5097a25e57886940932",
+      "bytes": 6035
     },
     {
       "path": "open-game-stack-20261015/tools/game_window_state.m",
@@ -34276,8 +34275,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/lldb_submit_fault.py",
-      "sha256": "8eb10f134bd24ec7c43c15ecd2e0cd180b25b5c716c8035bd6115f7d27c1c76e",
-      "bytes": 4762
+      "sha256": "02e8ef4bdd608a1599747c93251ba1eb29a66978695fa07020b20a837a9eaed2",
+      "bytes": 7227
     },
     {
       "path": "open-game-stack-20261015/tools/mac_session_state.py",

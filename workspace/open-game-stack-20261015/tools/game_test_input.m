@@ -58,7 +58,20 @@ int main(int argc,const char**argv) {
      CGRect bounds=CGRectZero;CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)row[(id)kCGWindowBounds],&bounds);
      if(CGRectContainsPoint(bounds,point)){hit=row;break;}
     }
-    if(!hit||![hit[(id)kCGWindowNumber] isEqual:targetWindow])return 9;
+    if(!hit||![hit[(id)kCGWindowNumber] isEqual:targetWindow]) {
+     // CG ordering includes click-through Dock overlays. Ask the accessibility
+     // hit-test for the actual input recipient before rejecting or clicking.
+     AXUIElementRef system=AXUIElementCreateSystemWide(),recipient=NULL;
+     AXError hitError=AXUIElementCopyElementAtPosition(system,point.x,point.y,&recipient);
+     pid_t recipientPID=0;
+     if(recipient)AXUIElementGetPid(recipient,&recipientPID);
+     if(recipient)CFRelease(recipient);CFRelease(system);
+     fprintf(stderr,"CGOverlay targetWindow=%u hitWindow=%u hitPID=%d hitLayer=%d\n",
+       targetWindow.unsignedIntValue,[hit[(id)kCGWindowNumber] unsignedIntValue],
+       [hit[(id)kCGWindowOwnerPID] intValue],[hit[(id)kCGWindowLayer] intValue]);
+     fprintf(stderr,"accessibilityHitPID=%d hitError=%d\n",recipientPID,hitError);
+     if(hitError!=kAXErrorSuccess||recipientPID!=pid)return 9;
+    }
    }
    CGEventRef down=CGEventCreateMouseEvent(NULL,kCGEventLeftMouseDown,point,kCGMouseButtonLeft);
    CGEventRef up=CGEventCreateMouseEvent(NULL,kCGEventLeftMouseUp,point,kCGMouseButtonLeft);

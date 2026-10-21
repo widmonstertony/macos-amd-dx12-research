@@ -33855,6 +33855,11 @@
       "bytes": 3004
     },
     {
+      "path": "open-game-stack-20261015/src/heap_write_declaration_gpu.mm",
+      "sha256": "8511e0bf132410d9680ab02fc32224c1f81623012be19e1d49f713d18d56c100",
+      "bytes": 5542
+    },
+    {
       "path": "open-game-stack-20261015/src/mesh_archive_gpu_probe.mm",
       "bytes": 6352,
       "sha256": "022d89b88b0b7336f542b22b7328e1ba8256beb71be8ccf19ca9b7a94493cb34",
@@ -34140,6 +34145,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/build_heap_write_fixture.py",
+      "sha256": "cab5055007e39d816a18f76f3f241728ebd01af4fe4214413a103a326b3b296a",
+      "bytes": 1311
+    },
+    {
       "path": "open-game-stack-20261015/tools/build_link_repro_inputs.py",
       "bytes": 7714,
       "sha256": "018ef92fa31fdcc5cbe443742924113af5ad087808a985567b7c1267690d68ff",
@@ -34253,6 +34263,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/pause_simulator_media_analysis.py",
+      "sha256": "7b3ca627de29e5a1ebffda046bcc9b34691606fdfe540c0ff9b8c1f07c21db1a",
+      "bytes": 2448
+    },
+    {
       "path": "open-game-stack-20261015/tools/prepare_stellar_crash_state.py",
       "bytes": 2870,
       "sha256": "e58f1c50459ce3b0cec52b7c7eb99ab64ebcc036cc3696c3f7757f1b837155f6",
@@ -34313,6 +34328,11 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/read_thermal_state.m",
+      "sha256": "e0684275da448b1aed228bce9c32a918110299f7cb194d874af6b152ea47223a",
+      "bytes": 326
+    },
+    {
       "path": "open-game-stack-20261015/tools/recapture_main_display.m",
       "bytes": 446,
       "sha256": "12ccd7c4e60a53166dea662d260fd68bfcc1384a254fba83503e3e21a1109862",
@@ -34347,6 +34367,11 @@
       "bytes": 3640,
       "sha256": "5ed77be6e28f4ac393e2e3993c86372c7019fd9a709fe41572169de8809c512c",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/thermal_pause_game.py",
+      "sha256": "d6ff53c67321aa46b04cdbce9eeff906f9a6c5fbfca42df964951f1e66fdd0c7",
+      "bytes": 1818
     },
     {
       "path": "open-game-stack-20261015/vendor/SPIRV-Headers-c8ad050fcb29e42a2f57d9f59e97488f465c436d/.gitattributes",
@@ -69778,6 +69803,6 @@
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Still unplayable: actual camp5.189FPS in726x526 output with60/60 foreground samples; prior3.22FPS was3072x1920 so no causal speedup ratio.13,779 compute archives allloaded/rehydrated with0errors. Stable paged-value/flat-index map reduces measuredCPUcost and preservescachedValue addresses; all5CPUcontrolruns and actualMoltenVKhelperGPUplusgraphics,multiheap,memory,originalTencentWinecache/presentpass. Native0da8acf now normalSteam game validation. Extra pointer hash mixing disproven andnotintegrated. BothFSR3featuresunvalidated.",
-  "lastSourceUpdateUTC": "2026-10-21T07:14:44.517394+00:00"
+  "currentSourceState": "Actual stable-map game camp5.7187FPS in726x526 output,60/60foregroundvisible,0GPUfailurefiles;stillunplayable. ActiveiOSsimulatormediaanalysisd692-885%CPU andCPUSpeedLimit36-46observed,AC94W,lowpowermodeoff. Boundedgameonlypauseautomaticallyresumed;unrelatedsimulatorunchanged,pauseapprovalpending. Native0da8acfsourceandruntimequalified/backedup. BothFSR3featuresunvalidated. Heapwriteledgercompiledonly,notrunordeployed;donotclaimgamecause.",
+  "lastSourceUpdateUTC": "2026-10-21T07:32:03.632827+00:00"
 }

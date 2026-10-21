@@ -1,3 +1,8 @@
+> 最新实测（2026-10-21）：`0da8acf5…` 实际营地 **5.72 FPS**，726×526 输出，60/60 次前台/可见，未记录 GPU 超时，**仍不可玩**。新发现：另一项 iOS 模拟器 `mediaanalysisd` 占 692–885% CPU，系统报告 CPU_Speed_Limit 36–46；接电 94W，低电量模式关闭。仅暂停本游戏的两分钟减载对照已自动恢复，尚不能分离外部负载的影响。模拟器进程未改，临时暂停等待用户确认。
+> Latest actual scene for `0da8acf5…`: **5.72 FPS** at 726×526, with 60/60 foreground/visible samples and no GPU timeout files. **Still unplayable.** A separate iOS Simulator media analyzer consumes 692–885% CPU while the system reports CPU_Speed_Limit 36–46. AC adapter is 94W and Low Power Mode is off. A bounded game-only pause auto-resumed; the simulator remains untouched pending approval for a temporary load-isolation control. This is an observed confounder, not proof that it explains all low FPS. FSR3 upscaling and frame generation remain required and unvalidated.
+
+[Measured scene and load-control evidence](release-evidence/stable-use-map-20261021/). The heap-child write-declaration ledger is saved as a compiled-only future diagnostic: it has not run during this live game or changed its backend, and is not a claimed game failure cause. The simulator-pause helper must be used only with the user's approval and restores the verified original process on timeout or interruption.
+
 > 最新实测（2026-10-21）：上一版营地 **5.19 FPS**，60/60 次前台可见，未见 GPU 超时，仍不可玩。窗口为 726×526；更早的 3.22 FPS 使用 3072×1920 输出，因此不能把差值全归于代码优化。13,779 条计算归档全部加载并重建成功，0 创建/重建错误，缓存未清除。
 > Latest actual scene: **5.19 FPS**, with 60/60 foreground/visible observations and no GPU timeout files. Still unplayable. Output was 726×526 versus 3072×1920 for the earlier 3.22 FPS run; this is not a controlled source-speedup ratio. All 13,779 compute archives loaded and rehydrated, with zero creation/rehydration errors. Caches remain preserved.
 

@@ -1,0 +1,47 @@
+{
+  "samples": 9,
+  "first": {
+    "thermalState": 1,
+    "lowPowerModeEnabled": false,
+    "activeProcessorCount": 16,
+    "timeUTC": "2026-10-21T07:23:29.842058+00:00",
+    "sample": 0,
+    "limits": {
+      "CPU_Scheduler_Limit": 100,
+      "CPU_Available_CPUs": 16,
+      "CPU_Speed_Limit": 38
+    }
+  },
+  "last": {
+    "thermalState": 1,
+    "lowPowerModeEnabled": false,
+    "activeProcessorCount": 16,
+    "timeUTC": "2026-10-21T07:25:30.461824+00:00",
+    "sample": 8,
+    "limits": {
+      "CPU_Scheduler_Limit": 100,
+      "CPU_Available_CPUs": 16,
+      "CPU_Speed_Limit": 44
+    }
+  },
+  "separateHighCPUProcess": {
+    "pid": 1443,
+    "role": "iOS26.5 simulator mediaanalysisd",
+    "observedCPUPercent": 885.1,
+    "pausedByAgent": false,
+    "approvalRequested": true
+  },
+  "ACChargerWatts": 94,
+  "memoryFreePercentReported": 76,
+  "lowPowerMode": false,
+  "gamePID": 74290,
+  "gameResume": {
+    "timeUTC": "2026-10-21T07:25:30.462448+00:00",
+    "pid": 74290,
+    "resumeSent": true,
+    "cacheDeleted": false,
+    "powerSettingsChanged": false
+  },
+  "gamePlayable": false,
+  "CPUFrequencyRestored": false
+}

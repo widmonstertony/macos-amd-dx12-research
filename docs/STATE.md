@@ -1,3 +1,6 @@
+> 源码工具更新：新增有限时长的 Wine 原生异常捕获；补齐原生启动器的后端配置；明确区分日志请求与实际生效、库加载与设备初始化。诊断工具不改变驱动代码或异常返回值。游戏兼容性与性能仍未解决，FSR3 超分及帧生成仍未验证。本次只发布源码，不发布新的本机诊断日志或运行环境证据。
+> Source tooling update: add bounded native Wine fault capture and preserve complete backend configuration through the original native launcher. Logging requests are distinguished from active logging, and library loading from device initialization. Diagnostics do not change drivers or exception results. Game compatibility and performance remain unresolved; FSR3 upscaling and frame generation are unverified. This update publishes source only, without new local diagnostic logs or machine environment evidence.
+
 > 2026-10-21：挥剑动作已通过游戏截图确认，但随后仍发生 4 次 GPU 超时；两段一分钟采样未保持前台，因此没有可用的稳定 FPS 结果。**仍未修好。**
 > Sword input was visually verified in the actual game, but four later GPU timeouts still occurred. Both one-minute samples lost foreground, so neither provides a valid sustained FPS result. **Still unresolved.**
 

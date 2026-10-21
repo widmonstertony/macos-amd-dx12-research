@@ -34271,8 +34271,13 @@
     },
     {
       "path": "open-game-stack-20261015/tools/launch_stellar_deferred_proxy.py",
-      "sha256": "81099aa198ca6893e19fdf839102ed85882dbc967419cd2e83c05d9e3ad5e2e3",
-      "bytes": 9438
+      "sha256": "eec6342387bf437ecf68661a2b375fb4f63afc831b91b76f8b2e12771193a94e",
+      "bytes": 10076
+    },
+    {
+      "path": "open-game-stack-20261015/tools/lldb_submit_fault.py",
+      "sha256": "8eb10f134bd24ec7c43c15ecd2e0cd180b25b5c716c8035bd6115f7d27c1c76e",
+      "bytes": 4762
     },
     {
       "path": "open-game-stack-20261015/tools/mac_session_state.py",
@@ -34372,6 +34377,11 @@
       "bytes": 2624,
       "sha256": "ea9db2d07e759d5356d3329cc607184b7ce64c74f4c2d8558453c83a5cabe724",
       "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/restart_original_steam_game_diagnostics.py",
+      "sha256": "94f5ba19575b3db3dfcbe2c5e35f2191b361fdda4006b91d8b1a1988166fb782",
+      "bytes": 4117
     },
     {
       "path": "open-game-stack-20261015/tools/run_mixed_compute_barrier.py",
@@ -69998,6 +70008,6 @@
     }
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
-  "currentSourceState": "Diagnostic740c588usesfixed64eventCPUring36880bytesperCB;100000events11.519msvs385.035msoldFoundationallocationfixture,notgameFPS. CPUconcurrent/sequencecontrols,realAMDgraphics/memory/geometry,originalTencentWinecompute/present/strictcachepassed. Actualpreviousgame24562visuallyverifiedHIDsword,butlater4GPUtimeoutsafterdetailedcapturedisabled;noexactshaderrootproven. Both60secFPSsamplesinvalidforeground,neverreportFPSfromthem. NewnormalSteamgame33374mappedqualifieddiagnosticbutexitedbeforegraphicslogs;causeunknown,askeduser. NoGPUsemanticschanged,cachesintact,notplayable,bothFSR3unvalidated.",
+  "currentSourceState": "Open-source diagnostic tooling update only. Original native launcher preserves complete backend selection. Bounded Wine handler capture detaches after a matching fault, unexpected debugger event or timeout. Logging requests are not proof of active logging; mapped libraries are not proof of device initialization. No new machine logs or runtime environment evidence published with this update. Playability and both FSR3 features remain unverified.",
   "lastSourceUpdateUTC": "2026-10-21T18:14:31.601414+00:00"
 }

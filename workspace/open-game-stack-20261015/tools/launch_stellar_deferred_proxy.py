@@ -39,6 +39,8 @@ def process_rows() -> list[tuple[int, int, str]]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--proof", type=Path, default=PROOF)
+    parser.add_argument("--game-exception-log", action="store_true",
+                        help="Request game-scoped Wine diagnostics; Tencent may override WINEDEBUG")
     args = parser.parse_args()
     proof_path = args.proof.resolve()
     assert proof_path.is_relative_to(ROOT / "evidence"), "Owned qualification proof required"
@@ -94,6 +96,8 @@ def main() -> int:
         MVK_CONFIG_SHADER_DUMP_DIR=str(out / "msl"),
     )
     command = [str(SUPPORT / "wine-loader"), str(STEAM), "-applaunch", "3489700", "-dx12", "-windowed", "-ResX=1280", "-ResY=800"]
+    if args.game_exception_log:
+        env['WINEDEBUG'] = '-all,SB-Win64-Shipping.exe:trace+seh,SB-Win64-Shipping.exe:err+vulkan'
     stdout = (out / "client-stdout.log").open("w")
     stderr = (out / "client-stderr.log").open("w")
     client = subprocess.Popen(command, cwd=STEAM.parent, env=env, stdout=stdout, stderr=stderr, start_new_session=True)
@@ -103,6 +107,11 @@ def main() -> int:
         "privateCrashState": str(ROOT / "build/stellar-crash-report-state"),
         "proxySHA256": deferred["proxySHA256"], "candidateSHA256": deferred["candidateSHA256"],
         "command": command, "observed": {}, "verified": False,
+        "gameOnlyExceptionLogging": args.game_exception_log,
+        "gameOnlyExceptionLoggingRequested": args.game_exception_log,
+        "gameOnlyExceptionLoggingVerified": False,
+        "verificationScope": "candidate/window module mappings and original asset write protection only",
+        "graphicsInitializationVerified": False,
     }
     (out / "launch.json").write_text(json.dumps(record, indent=2) + "\n")
     print(json.dumps({"directory": str(out), "clientPID": client.pid, "submitted": True}), flush=True)

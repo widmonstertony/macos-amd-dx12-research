@@ -54,6 +54,13 @@ public:
         return lock;
     }
     Snapshot resources(const char* src, uint32_t count, size_t stride) {
+        return stride == sizeof(id) ? resourcesImpl<true>(src,count,stride)
+                                    : resourcesImpl<false>(src,count,stride);
+    }
+    // Keep strided layouts in a separate specialization with the original
+    // scalar loop. Optimizing OneID tables must not change that loop's codegen.
+    template<bool Contiguous> [[gnu::noinline]]
+    Snapshot resourcesImpl(const char* src, uint32_t count, size_t stride) {
         std::lock_guard<std::mutex> lock(_lock);
         if (count > 2*1024*1024) {
             auto result = std::make_shared<Resources>();
@@ -89,6 +96,17 @@ public:
         bool trackDelta = entry.snapshot && dirtySlots <= 4096;
         std::unordered_set<id<MTLResource>> added, removed;
         for (auto range : entry.dirty) {
+            uint32_t originalCount = range.second-range.first;
+            if constexpr (Contiguous) {
+                // Trim only byte-identical identity blocks at large dirty
+                // range edges; all possibly changed slots use the normal path.
+                if (originalCount >= 256) {
+                    while (range.second-range.first >= 32 && !memcmp(src + range.first*stride,
+                            entry.slots.data() + range.first, 32*sizeof(id))) range.first += 32;
+                    while (range.second-range.first >= 32 && !memcmp(src + (range.second-32)*stride,
+                            entry.slots.data() + range.second-32, 32*sizeof(id))) range.second -= 32;
+                }
+            }
             for (uint32_t i = range.first; i < range.second; ++i) {
                 id<MTLResource> resource = *reinterpret_cast<const id<MTLResource>*>(src + i * stride);
                 id<MTLResource> old = entry.slots[i];
@@ -105,7 +123,7 @@ public:
                 entry.slots[i] = resource;
                 changed = true;
             }
-            _scanned += range.second-range.first;
+            _scanned += originalCount;
         }
         entry.dirty.clear();
         // The snapshot describes a set, not slot order or multiplicity. A

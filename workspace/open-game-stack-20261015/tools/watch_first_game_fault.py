@@ -2,11 +2,11 @@
 """Bounded preservation and teardown of one already-failed, verified game test."""
 import argparse,pathlib,json,subprocess,time,shutil,os,signal,datetime,re
 root=pathlib.Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--launch-record',type=pathlib.Path,required=True);p.add_argument('--profile',required=True);p.add_argument('--seconds',type=int,default=600);a=p.parse_args();assert 10<=a.seconds<=1800 and re.fullmatch('[a-z0-9-]{1,64}',a.profile)
+p=argparse.ArgumentParser();p.add_argument('--launch-record',type=pathlib.Path,required=True);p.add_argument('--profile',required=True);p.add_argument('--seconds',type=int,default=600);p.add_argument('--output',type=pathlib.Path);a=p.parse_args();assert 10<=a.seconds<=1800 and re.fullmatch('[a-z0-9-]{1,64}',a.profile)
 lp=a.launch_record.resolve();assert lp.is_relative_to(root/'evidence');launch=json.loads(lp.read_text());assert launch['verified'] and launch['normalLicensedSteamRequest'];game=[x for x in launch['observed'].values() if x.get('candidateMapped') and x.get('originalWriteDenied')];assert len(game)==1;pid=game[0]['pid'];trace=root/'evidence'/a.profile/'msl'
 def identity():return subprocess.run(['ps','-p',str(pid),'-o','lstart=,comm='],capture_output=True,text=True).stdout.strip()
 original=identity();assert 'SB-Win64-Shipping.exe' in original
-out=root/'evidence'/f'first-armed-sword-fault-{pid}-20261021';out.mkdir(exist_ok=False);start=time.monotonic();detected=None
+out=a.output.resolve() if a.output else root/'evidence'/f'first-armed-sword-fault-{pid}-20261021';assert out.is_relative_to(root/'evidence');out.mkdir(exist_ok=False);start=time.monotonic();detected=None
 record={'gamePID':pid,'startUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'maximumSeconds':a.seconds,'cacheDeleted':False,'signalSent':False,'gamePlayable':False}
 while time.monotonic()-start<a.seconds:
  files=list(trace.glob(f'trace-gpu-timeout-{pid}-*.json'))

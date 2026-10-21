@@ -2155,8 +2155,9 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDescriptorUseCache.h",
-      "sha256": "3072df7ea639adf82b5b8e640092630076bbfb262a8577f1d5e39ca91340159f",
-      "bytes": 6772
+      "bytes": 7931,
+      "sha256": "8b59f4df47ebbc4c9860e18d00955c67642724e9c2ee2d033efb8c565524fe6b",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h",
@@ -33741,6 +33742,24 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/descriptor_clean_blocks_control.mm",
+      "bytes": 3873,
+      "sha256": "c2d84b555730b93efb0df8f102359d282023039c207f3fb5f8c8e2c46a67b5d3",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/descriptor_clean_blocks_gpu.mm",
+      "bytes": 5130,
+      "sha256": "2564264d6875972376d8c95bd350b299ba49a321ad5cc608ebc5e691fac96494",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/descriptor_clean_blocks_paired.mm",
+      "bytes": 2767,
+      "sha256": "f0f964e52e9ad464adf8cc12d9f199e8673dc9992d282ce8e0d510ad02a28c4c",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/descriptor_membership_delta_control.mm",
       "sha256": "5ffd236577a5b1ceb23913ac9b48a58ca35ad323315f7f356567da14e759c425",
       "bytes": 3422
@@ -34238,8 +34257,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_resource_lookup_fixture.py",
-      "bytes": 2192,
-      "sha256": "bcd8acfb9bb5bb34637cb8a54f2206f8adadfe84e645aedc9090d3ed32d4c92c",
+      "bytes": 2313,
+      "sha256": "a4444dc26208d8d5e2e980130e23e05055321617e5df7bd587d0c9edab25f79e",
       "executable": false
     },
     {
@@ -34316,6 +34335,12 @@
       "path": "open-game-stack-20261015/tools/launch_stellar_deferred_proxy.py",
       "sha256": "eec6342387bf437ecf68661a2b375fb4f63afc831b91b76f8b2e12771193a94e",
       "bytes": 10076
+    },
+    {
+      "path": "open-game-stack-20261015/tools/lldb_descriptor_counts.py",
+      "bytes": 3401,
+      "sha256": "d798942df7c960a5dcac61f5542b6c5bd0b7abe57205a460fc99a802170eb346",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/lldb_submit_fault.py",
@@ -34485,8 +34510,9 @@
     },
     {
       "path": "open-game-stack-20261015/tools/watch_first_game_fault.py",
-      "sha256": "b64811a23a89503f9d5c3e7ced19ccd4ccf3fb73b804c9436acca30a6d4812b6",
-      "bytes": 2553
+      "bytes": 2677,
+      "sha256": "d59f14321f4db51471c70fc3e6661d10f3f383061833b109825503a143325585",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/watch_game_disk_budget.py",
@@ -70066,5 +70092,5 @@
   ],
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
-  "lastSourceUpdateUTC": "2026-10-21T22:01:23.898056+00:00"
+  "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00"
 }

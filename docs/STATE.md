@@ -1,3 +1,6 @@
+> 连续 OneID 描述符表的大范围写入现在先裁去字节完全相同的首尾块，变化区仍走原来的引用计数和增量路径；其他布局使用独立编译的原循环。增加同进程交错 CPU 对照、随机集合校验和 50 万槽位真实 GPU 回读源码。此改动针对已采样的 CPU 扫描热点，不代表间歇性 GPU 超时已修复或游戏已稳定可玩。FSR3 超分与帧生成仍未验证；仅更新源码和通用说明。
+> Trim byte-identical edge blocks of large contiguous OneID descriptor writes, retaining the original reference-count/delta path for potentially changed slots and a separately compiled original loop for strided layouts. Add paired in-process CPU controls, randomized set oracles and a 500,000-slot real GPU readback fixture. This targets an observed CPU scan hotspot; intermittent GPU timeouts and stable game playability remain unresolved. Both FSR3 features are unvalidated. Source and generic documentation only.
+
 > 增加三独立队列、间接原子写入和像素回读的通用 GPU 对照源码。图形管线的诊断标签改为使用已有着色器源码身份，避免不同程序都显示为 main0。此修改只改善故障归因，未修复或验收游戏超时；稳定可玩和 FSR3 超分/帧生成仍未验证。新的本机故障日志保持私有。
 > Add a generic three-queue indirect atomic-write and pixel-readback control. Graphics failure labels now carry existing shader source identities instead of ambiguous main0 entry names. This improves attribution only; game timeouts and stable playability remain unresolved, and both FSR3 features are unvalidated. New local fault logs remain private.
 

@@ -1,8 +1,8 @@
 # Geometry-emulation investigation / 几何阶段模拟排查
 
-Status: experimental source checkpoint. This is **not a playable-game release**. The new native library has not been deployed to the original Wine environment.
+Status: experimental source checkpoint. This is **not a playable-game release**. The ordinary-indirect candidate was tested in the original Wine environment; the CPU replay optimization below is separately qualified.
 
-状态：实验性源码检查点，**不是已经能流畅游玩的发布版**。本次原生库尚未部署到原 Wine 环境。
+状态：实验性源码检查点，**不是已经能流畅游玩的发布版**。普通间接绘制候选已通过原 Wine 进入场景；下述 CPU 资源复用优化另做独立验证。
 
 ## Changes / 修改
 
@@ -85,3 +85,21 @@ Additional upstream references examined for implementation alternatives:
 - [MoltenVK indexed/indirect geometry work](https://github.com/KhronosGroup/MoltenVK/pull/2812)
 
 DXMT-style explicit payload capacity and a SIMD-sized object group did not fix the owned large-grid control. A mesh-only diagnostic also did not pass both paths. These controls are not deployed fixes. The ordinary-indirect GPU fan-out above is the alternative that passed the native output oracle.
+
+
+## CPU resource replay / CPU 资源复用
+
+The ordinary-indirect candidate reached the camp scene with correct visible geometry. A foreground native-presentation interval measured **8.90 FPS**, at the existing 363×263-point window (726×470 content pixels). This remains unplayable. No full-resolution performance or attack/equipment stability claim is made. Shader compiler services were idle. Queue timing and CPU samples identify host-side resource tracking before submission as the next bottleneck.
+
+普通间接绘制候选已进入营地并显示场景，但沿用的小窗口中仍只有约 **8.90 FPS**，没有达到可玩水平。编译服务已空闲，采样主要落在提交前的 CPU 资源登记。尚未证实攻击和装备菜单稳定，也未验证全屏性能。
+
+The next source change caches stable `ResourceInfo` handles alongside validated, retained snapshot resources. Replay avoids rehashing those already-owned identities. Every new Metal encoder still gets the required resource declaration; shader-stage coverage, write upgrades, registry invalidation and descriptor removal remain enforced. Handles are discarded before references or map nodes are released. No shader cache revision, resolution or feature support bit changes.
+
+已验证并持有引用的快照资源附带稳定节点，重复使用时跳过再次查表；仍逐编码器声明资源，并保留阶段、写权限、新注册和描述符删除规则。先销毁快照句柄，再释放引用和节点。没有改分辨率、功能支持位或缓存版本。
+
+- Alternating three-pair CPU control: median **111.862 ms → 19.5033 ms**, **5.74×** for the isolated replay workload. This is not an FPS multiplier.
+- Actual AMD GPU: resource-stage/write and registry/descriptor controls checked **275** values with zero mismatches. Twelve geometry cases checked **148,464** components with zero mismatches under Metal API Validation.
+- Pointer-hash collision hypothesis rejected: libc++ already mixes pointer keys. The new CPU control records this; no hash modification was deployed.
+- New library: `885f999c637f39eadb947b9ae490ffe4d8e6c2d02aa0deba2be46fa9996e7fef`. Original Tencent Wine compute/presentation and strict warm-cache controls passed. The qualified candidate is deployed for a normal original-Steam game run; actual scene FPS remains pending.
+
+单项对照中位耗时减少约 83%，不能据此声称游戏帧率提升 5.74 倍。真实 GPU 资源与几何回归通过；这个新候选的原 Wine 计算、呈现和严格缓存命中回归也已通过，已部署供原 Steam 游戏实测，实际场景帧率待测。FSR3 超分、帧生成和持续流畅游玩均未验证。本次仅备份源码，现有下载包不代表新的可玩发布版。

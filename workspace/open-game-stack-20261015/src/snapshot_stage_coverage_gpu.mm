@@ -56,7 +56,34 @@ int main(int argc,const char**argv){@autoreleasepool{try{
   id<MTLBlitCommandEncoder> blit=[cb blitCommandEncoder];[blit copyFromTexture:target sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0,0,0) sourceSize:MTLSizeMake(8,8,1) toBuffer:readback destinationOffset:0 destinationBytesPerRow:256 destinationBytesPerImage:2048];[blit endEncoding];[cb commit];[cb waitUntilCompleted];need(cb.status==MTLCommandBufferStatusCompleted,"GPU failed");
   if(*(uint32_t*)active.contents!=(pass%2+1)*65)++mismatches;for(unsigned y=0;y<8;y++)for(unsigned x=0;x<8;x++)if(((uint32_t*)((char*)readback.contents+y*256))[x]!=0xff00ff00u)++mismatches;
  }
+ // Time real native helper replay separately from GPU readback. Metal objects
+ // remain owned; each encoder still receives fresh read/write declarations.
+ double retainedReplayMS = 0; uint64_t retainedReplayLookups = 0;
+ {
+  std::vector<id<MTLBuffer>> resources;
+  auto snapshot = std::make_shared<MVKDescriptorUseCache::Resources>();
+  MVKLiveList registry;
+  for (unsigned i=0;i<1588;i++) {
+   auto buffer=[device newBufferWithLength:256 options:MTLResourceStorageModeShared];
+   need(buffer!=nil,"retained replay allocation failed");
+   resources.push_back(buffer); snapshot->push_back(buffer); registry.add(buffer);
+  }
+  {
+   MVKUseResourceHelper replay;
+   auto start=std::chrono::steady_clock::now();
+   for (unsigned i=0;i<512;i++) {
+    replay.resetForEncoder();
+    replay.addLiveSnapshot(snapshot,registry,nil,immediate,MVKResourceUsageStages::Vertex,false);
+    replay.addLiveSnapshot(snapshot,registry,nil,immediate,MVKResourceUsageStages::Fragment,true);
+    replay.bindAndResetGraphics(nil);
+   }
+   retainedReplayMS=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+   retainedReplayLookups=replay.statsLookups;
+   need(replay.used.size()==1588,"retained replay lost resources");
+  }
+  for(auto buffer:resources){registry.remove(buffer);[buffer release];}
+ }
  uint64_t benchCold=0;double benchMS=0;{MVKUseResourceHelper bench;MVKLiveList empty;auto start=std::chrono::steady_clock::now();for(unsigned iteration=0;iteration<32;iteration++){auto tableCopy=std::make_shared<MVKDescriptorUseCache::Resources>(*values);bench.resetForEncoder();for(auto stage:{MVKResourceUsageStages::Vertex,MVKResourceUsageStages::Fragment})for(bool write:{false,true})bench.addLiveSnapshot(tableCopy,empty,nil,immediate,stage,write);benchCold+=bench.statsSnapshotColdWords;}benchMS=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();}
- std::ofstream out(argv[1]);out<<"{\"passed\":"<<(mismatches?"false":"true")<<",\"baseline\":"<<(baseline?"true":"false")<<",\"GPUValuesChecked\":260,\"mismatches\":"<<mismatches<<",\"nativeResourceDeclarations\":"<<nativeResourceDeclarations<<",\"coldWords\":"<<coldWords<<",\"liveLookups\":"<<lookups<<",\"registrationFallbackLiveLookups\":"<<registrationLookups<<",\"CPUControlColdWords\":"<<benchCold<<",\"CPUControlMilliseconds\":"<<benchMS<<",\"newEncoderAndStageAndWriteDeclarationsChecked\":true}\n";
+ std::ofstream out(argv[1]);out<<"{\"passed\":"<<(mismatches?"false":"true")<<",\"baseline\":"<<(baseline?"true":"false")<<",\"GPUValuesChecked\":260,\"mismatches\":"<<mismatches<<",\"nativeResourceDeclarations\":"<<nativeResourceDeclarations<<",\"coldWords\":"<<coldWords<<",\"liveLookups\":"<<lookups<<",\"registrationFallbackLiveLookups\":"<<registrationLookups<<",\"retainedReplayMilliseconds\":"<<retainedReplayMS<<",\"retainedReplayLiveLookups\":"<<retainedReplayLookups<<",\"CPUControlColdWords\":"<<benchCold<<",\"CPUControlMilliseconds\":"<<benchMS<<",\"newEncoderAndStageAndWriteDeclarationsChecked\":true}\n";
  live.remove(input);live.remove(next);[queue release];[target release];[table release];[ae release];[readback release];[input release];[next release];[pipe release];[pd release];[vs release];[fs release];[lib release];[device release];return mismatches?5:0;
  }catch(const std::exception&e){fprintf(stderr,"ERROR %s\n",e.what());return 2;}}}

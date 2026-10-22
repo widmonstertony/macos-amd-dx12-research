@@ -1110,6 +1110,36 @@ void MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages 
 	}
 }
 
+// Snapshot handles are admitted only after validation and an owned retain.
+// Stable map nodes survive reserve/rehash. releaseLiveResources() discards all
+// snapshot handles before releasing references or clearing those nodes.
+void MVKUseResourceHelper::addRetainedSnapshotResource(const RetainedSnapshotResource& record,
+    id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
+    MVKResourceUsageStages stage, bool write) {
+    if (resourceUseStats) { ++statsCalls; ++statsRetainedHits; }
+    ResourceInfo& stored = *record.info;
+    assert(stored.liveRetained);
+    if (!batchLiveResources) {
+        addImmediate(record.resource,encoder,func,stage,write);
+        // addImmediate may start a fresh declaration generation, but the
+        // helper still owns this snapshot's independent liveness reference.
+        stored.liveRetained = true;
+        return;
+    }
+    ResourceInfo info{stage,write,true,true,encoderGeneration};
+    bool fresh = stored.generation != encoderGeneration;
+    if (fresh) stored = info;
+    if (fresh || !isCompatible(stored,info)) {
+        if (!fresh) {
+            supersedePending(record.resource,stored);
+            stored.deferred = true;
+            stored.write |= write;
+            stored.stages = combineStages(stored.stages,stage);
+        }
+        queuePending(record.resource,stored);
+    }
+}
+
 void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                                            id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
                                            MVKResourceUsageStages stage, bool write) {
@@ -1155,7 +1185,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
                 // helper still owns. Each new encoder still receives all its
                 // stage/access declarations through the normal helper path.
                 if (resourceUseStats) { ++statsSnapshotFilterHits; statsSnapshotWordsSkipped+=snapshot->size()-entry.liveSnapshot->size(); }
-                for (id<MTLResource> resource : *entry.liveSnapshot) addImmediateLive(resource,list,encoder,func,stage,write);
+                for (const auto& record : *entry.liveSnapshot) addRetainedSnapshotResource(record,encoder,func,stage,write);
                 if (entry.generation != encoderGeneration) entry.readStages = entry.writeStages = 0;
                 entry.readStages |= stageMask;
                 if (write) entry.writeStages |= stageMask;
@@ -1165,7 +1195,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
             break;
         }
     }
-    auto live = crossEncoderSnapshotReuse ? std::make_shared<MVKDescriptorUseCache::Resources>() : nullptr;
+    auto live = crossEncoderSnapshotReuse ? std::make_shared<RetainedSnapshot>() : nullptr;
     // An immutable successor can reuse a parent's filtered, owned identities.
     // A registration affecting the successor invalidates this shortcut too:
     // an old absent identity may now be live without a descriptor-slot edit.
@@ -1186,16 +1216,19 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         std::unordered_set<id<MTLResource>> manyRemoved;
         if (removed.size() > 8) manyRemoved.insert(removed.begin(),removed.end());
         live->reserve(deltaPrior->liveSnapshot->size()+snapshot->added.size());
-        for (id<MTLResource> resource : *deltaPrior->liveSnapshot) {
+        for (const auto& record : *deltaPrior->liveSnapshot) {
+            id<MTLResource> resource = record.resource;
             bool erased = removed.size() > 8 ? manyRemoved.count(resource) != 0
                 : std::find(removed.begin(),removed.end(),resource) != removed.end();
             if (erased) continue;
             // Retention prevents address reuse; the normal helper still emits
             // every encoder's stage/access declaration and any write upgrade.
-            if (addImmediateLive(resource,list,encoder,func,stage,write)) live->push_back(resource);
+            addRetainedSnapshotResource(record,encoder,func,stage,write);
+            live->push_back(record);
         }
         for (id<MTLResource> resource : snapshot->added)
-            if (addImmediateLive(resource,list,encoder,func,stage,write)) live->push_back(resource);
+            if (addImmediateLive(resource,list,encoder,func,stage,write))
+                live->push_back({resource,&used.find(resource)->second});
         if (resourceUseStats) {
             ++statsSnapshotDeltaHits;
             statsSnapshotDeltaReused += snapshot->size()-snapshot->added.size();
@@ -1205,7 +1238,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         if (resourceUseStats) statsSnapshotColdWords += snapshot->size();
         for (id<MTLResource> resource : *snapshot) {
             bool valid = addImmediateLive(resource,list,encoder,func,stage,write);
-            if (valid && live) live->push_back(resource);
+            if (valid && live) live->push_back({resource,&used.find(resource)->second});
         }
     }
     if (descriptorSnapshotReuse) {

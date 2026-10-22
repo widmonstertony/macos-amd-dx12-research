@@ -270,6 +270,14 @@ struct MVKUseResourceHelper {
     std::unordered_map<id<MTLResource>, AbsentLiveResource> absentLiveResources;
     bool descriptorSnapshotReuse = false;
     bool crossEncoderSnapshotReuse = false;
+    struct RetainedSnapshotResource {
+        id<MTLResource> resource;
+        ResourceInfo* info; // Stable deque node; helper owns the Metal reference.
+    };
+    using RetainedSnapshot = std::vector<RetainedSnapshotResource>;
+    void addRetainedSnapshotResource(const RetainedSnapshotResource& record,
+                                    id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
+                                    MVKResourceUsageStages stage, bool write);
     struct DeclaredSnapshot {
         MVKDescriptorUseCache::Snapshot snapshot;
         MVKLiveList* list;
@@ -277,7 +285,7 @@ struct MVKUseResourceHelper {
         uint32_t writeStages;
         uint64_t additions;
         uint64_t generation;
-        MVKDescriptorUseCache::Snapshot liveSnapshot;
+        std::shared_ptr<RetainedSnapshot> liveSnapshot;
     };
     size_t snapshotLiveIdentities = 0;
     std::vector<DeclaredSnapshot> declaredSnapshots;

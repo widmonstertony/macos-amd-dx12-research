@@ -41,7 +41,7 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
   deltaHits += h.statsSnapshotDeltaHits-hits;
   id<MTLBuffer> active=pass<2?input:pass==2?next:late;
   need(h.used.find(active)!=h.used.end()&&h.used.find(active)->second.generation==h.encoderGeneration&&h.used.find(active)->second.write,"encoder write declaration missing");
-  if(pass>=3){auto declared=h.declaredSnapshots.back().liveSnapshot;need(std::find(declared->begin(),declared->end(),input)==declared->end(),"removed input remained in filtered successor");}
+  if(pass>=3){auto declared=h.declaredSnapshots.back().liveSnapshot;need(std::find_if(declared->begin(),declared->end(),[&](const auto& record){return record.resource==input;})==declared->end(),"removed input remained in filtered successor");}
   h.bindAndResetCompute(enc);[args setBuffer:active offset:0 atIndex:0];[enc setComputePipelineState:pipeline];[enc setBuffer:table offset:0 atIndex:0];[enc setBuffer:output offset:0 atIndex:1];[enc setBytes:&pass length:4 atIndex:2];[enc dispatchThreads:MTLSizeMake(1,1,1) threadsPerThreadgroup:MTLSizeMake(1,1,1)];[enc endEncoding];[cb commit];[cb waitUntilCompleted];need(cb.status==MTLCommandBufferStatusCompleted,"GPU command failed");
  }
  list.remove(input);list.remove(next);list.remove(late);list.remove(unrelated);

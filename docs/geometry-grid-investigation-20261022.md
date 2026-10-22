@@ -58,3 +58,30 @@ This blocks the proposed GPU-generated batched mesh ICB route on the tested 5600
 自有能力测试在管线描述符校验阶段被 Metal 明确拒绝，尚未执行 GPU 工作。当前设备不支持网格管线的间接命令缓冲，所以这条 GPU 分批方案停止。未伪造支持或修改闭源驱动。该限制本身不能证明游戏所有超时的根因。
 
 An alternative compute-based or CPU-mediated path requires a separate engineering and performance assessment. The incomplete native candidate remains undeployed; no new playable-game claim is made.
+
+
+## Ordinary-indirect alternative / 普通间接绘制替代方案
+
+The mesh-ICB restriction does not block every batching strategy. A new source checkpoint expands Vulkan geometry indirect arguments on the GPU into ordinary Metal indirect mesh commands. It uses no mesh ICB, no CPU readback, and no shader/draw skip.
+
+The bounded prefix follows instance-major primitive order, and generated wrappers restore original primitive IDs, instance IDs, strip parity and per-instance vertex fetches. The last two commands retain the remaining current instance and all subsequent instances. The encoding budget cannot silently drop remainder geometry. Very large remainders may still hit the original large-grid issue; this is not a full resolution of every workload.
+
+GPU results on the 5600M:
+
+- All 12 cases passed at both 1,031 and 4,096 primitives per instance, three instances. Coverage includes list/strip/fan and direct, indexed direct, non-indexed indirect and indexed indirect. Total output components: **738,288; zero mismatches**.
+- The actual native parameter-conversion kernel passed **675** combinations of topology, instance count, primitive count and batch budget, checking **9,990** generated commands and **713,610** fields. This checks empty draws, large integer arithmetic, continuous primitive coverage and complete remainder retention; it does not rasterize enormous remainders.
+- Original Tencent Wine compute/presentation and warm-cache controls passed. Qualified library SHA-256: `1e327d32fc53ce70fc7b0d0dd7fe991cce6d43486a4bda334289945f8807083c`.
+- The qualified library has been deployed for a normal original-Steam game test. Actual scene FPS, attack stability and equipment-menu stability remain pending. No playable-game release claim is made.
+
+已实现不依赖 mesh ICB 的普通间接绘制分批。两档规模的十二种绘制全部通过，另通过 675 组 GPU 参数覆盖检查。尾部保留所有剩余内容；超大尾部仍可能遇到旧的大网格问题。原应用宝 Wine 的计算、呈现和缓存复用回归通过，已进入原 Steam 游戏实测；实际场景帧率和攻击、装备菜单稳定性尚未验证。
+
+The normal-Steam launcher no longer forces a window mode or resolution. Existing game caches and user graphics settings are retained.
+
+Additional upstream references examined for implementation alternatives:
+
+- [DXMT geometry pipeline](https://github.com/3Shain/dxmt/blob/main/src/d3d11/d3d11_pipeline_gs.cpp)
+- [DXMT geometry conversion](https://github.com/3Shain/dxmt/blob/main/src/airconv/dxbc_converter_gs.cpp)
+- [Tempest compute/vertex mesh conversion](https://github.com/Try/Tempest/blob/master/Engine/gapi/spirv/meshconverter.cpp)
+- [MoltenVK indexed/indirect geometry work](https://github.com/KhronosGroup/MoltenVK/pull/2812)
+
+DXMT-style explicit payload capacity and a SIMD-sized object group did not fix the owned large-grid control. A mesh-only diagnostic also did not pass both paths. These controls are not deployed fixes. The ordinary-indirect GPU fan-out above is the alternative that passed the native output oracle.

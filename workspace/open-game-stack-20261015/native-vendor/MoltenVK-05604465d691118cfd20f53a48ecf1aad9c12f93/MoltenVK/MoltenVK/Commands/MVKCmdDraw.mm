@@ -243,9 +243,12 @@ struct GeometryIndirectParams {
 	uint32_t indexSize;
 	uint32_t vertsPerPrim;
 	uint32_t topology;       // MVKGeometryTopology
+	uint32_t batchCount;     // Number of ordinary indirect mesh commands per Vulkan draw.
 	uint32_t vertexStrides[kMVKMaxBufferCount];
 	uint32_t vertexDivisors[kMVKMaxBufferCount];
 };
+static_assert(offsetof(GeometryIndirectParams, vertexStrides) == 28 && sizeof(GeometryIndirectParams) == 280,
+              "GeometryIndirectParams must match the GPU converter");
 
 /* Binds the transform feedback state of the geometry stage for a draw: mode 0 (off), 1 (count the
  * captured vertices of each input primitive) or 2 (write them at the slots computed from the counts).
@@ -374,20 +377,31 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 	params.indexed = ibb != nullptr;
 	params.vertsPerPrim = vertsPerPrim;
 	params.topology = topology;
+	params.batchCount = 1;
 	if (ibb) {
 		params.indexSize = (uint32_t)mvkMTLIndexTypeSizeInBytes((MTLIndexType)ibb->mtlIndexType);
 		params.indexBuffer = ibb->mtlBuffer.gpuAddress + ibb->offset;
 	}
+	if (cmdEncoder->getDevice()->getPhysicalDevice()->isAMDHardware()) {
+		// Register ordinary indirect commands up front; the GPU fills each
+		// command's count. This does not require mesh ICB device support or a
+		// CPU readback. Limit encoding overhead and scratch storage. The final
+		// command retains every remaining primitive, so a size hint can never
+		// truncate a draw (including robust out-of-range index fetches).
+		uint64_t capacity = (4ull * 1024 * 1024) / (uint64_t(drawCount) * (sizeof(DrawInfo) + 12));
+		params.batchCount = uint32_t(std::min<uint64_t>(64, std::max<uint64_t>(1, capacity)));
+	}
+	const uint32_t encodedDrawCount = drawCount * params.batchCount;
 	DrawInfo strides = {};
 	setGeometryVertexStrides(strides, cmdEncoder, pipeline);
 	memcpy(params.vertexStrides, strides.vertexStrides, sizeof(params.vertexStrides));
 	memcpy(params.vertexDivisors, strides.vertexDivisors, sizeof(params.vertexDivisors));
 
 	// Per draw: MTLDispatchThreadgroupsIndirectArguments (mesh threadgroups) and DrawInfo.
-	const VkDeviceSize dispatchSize = sizeof(MTLDispatchThreadgroupsIndirectArguments) * drawCount;
+	const VkDeviceSize dispatchSize = sizeof(MTLDispatchThreadgroupsIndirectArguments) * encodedDrawCount;
 	const VkDeviceSize drawInfoOffset = mvkAlignByteCount(dispatchSize, 256);
 	const VkDeviceSize drawInfoStride = mvkAlignByteCount(sizeof(DrawInfo), 16);
-	const MVKMTLBufferAllocation* tempBuff = cmdEncoder->getTempMTLBuffer(drawInfoOffset + drawInfoStride * drawCount, true);
+	const MVKMTLBufferAllocation* tempBuff = cmdEncoder->getTempMTLBuffer(drawInfoOffset + drawInfoStride * encodedDrawCount, true);
 
 	cmdEncoder->encodeStoreActions(true);
 	MVKMetalComputeCommandEncoderState& state = cmdEncoder->getMtlCompute();
@@ -402,7 +416,7 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 	state.bindStructBytes(mtlConvertEncoder, &drawCount,            4);
 	state.bindStructBytes(mtlConvertEncoder, &params,               5);
 	state.bindStructBytes(mtlConvertEncoder, &drawInfoStride32,     6);
-	[mtlConvertEncoder dispatchThreadgroups: MTLSizeMake(mvkCeilingDivide<NSUInteger>(drawCount, mtlConvertState.threadExecutionWidth), 1, 1)
+	[mtlConvertEncoder dispatchThreadgroups: MTLSizeMake(mvkCeilingDivide<NSUInteger>(encodedDrawCount, mtlConvertState.threadExecutionWidth), 1, 1)
 					  threadsPerThreadgroup: MTLSizeMake(mtlConvertState.threadExecutionWidth, 1, 1)];
 	// Opt-in owned-fixture diagnostic. Copy only the generated draw parameters,
 	// never vertex/index contents; no synchronous CPU wait or runtime fallback.
@@ -431,7 +445,7 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 		cmdEncoder->reportMessage(MVK_CONFIG_LOG_LEVEL_ERROR, "Transform feedback is not captured by indirect draws with a geometry shader.");
 	}
 	bindGeometryXfb(cmdEncoder, pipeline, 0, nullptr);
-	for (uint32_t drawIdx = 0; drawIdx < drawCount; drawIdx++) {
+	for (uint32_t drawIdx = 0; drawIdx < encodedDrawCount; drawIdx++) {
 		[mtlRendEnc setObjectBuffer: tempBuff->_mtlBuffer
 							 offset: tempBuff->_offset + drawInfoOffset + drawInfoStride * drawIdx
 							atIndex: pipeline->getDrawInfoBufferIndex()];

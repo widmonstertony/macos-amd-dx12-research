@@ -95,7 +95,8 @@ def main() -> int:
         VKD3D_LOG_FILE="Z:" + str(out / "vkd3d-game.log").replace("/Users/tonytan", "").replace("/", "\\"),
         MVK_CONFIG_SHADER_DUMP_DIR=str(out / "msl"),
     )
-    command = [str(SUPPORT / "wine-loader"), str(STEAM), "-applaunch", "3489700", "-dx12", "-windowed", "-ResX=1280", "-ResY=800"]
+    # Preserve the user's resolution and window/fullscreen preference.
+    command = [str(SUPPORT / "wine-loader"), str(STEAM), "-applaunch", "3489700", "-dx12"]
     if args.game_exception_log:
         env['WINEDEBUG'] = '-all,SB-Win64-Shipping.exe:trace+seh,SB-Win64-Shipping.exe:err+vulkan'
     stdout = (out / "client-stdout.log").open("w")

@@ -2404,6 +2404,12 @@ void CompilerMSL::emit_mesh_wrapper()
 		// index, strip parity, fan anchor, and transform-feedback ordering.
 		statement("uint primitiveIndex = drawInfo->primitiveBase + positionInGrid.x;");
 		statement("uint globalInstance = drawInfo->instanceBase + positionInGrid.y;");
+		// Ordinary indirect batches may cross an instance boundary; retain
+		// original primitive IDs, strip parity, and vertex instance divisors.
+		statement("if (drawInfo->primitiveCount && primitiveIndex >= drawInfo->primitiveCount) {");
+		statement("    globalInstance += primitiveIndex / drawInfo->primitiveCount;");
+		statement("    primitiveIndex %= drawInfo->primitiveCount;");
+		statement("}");
 		statement("int vertexCount = ", vertices_per_primitive, ";");
 		statement("int startingIndex = drawInfo->topoStrip ? int(primitiveIndex) : int(primitiveIndex) * vertexCount;");
 

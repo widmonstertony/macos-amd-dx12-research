@@ -293,6 +293,7 @@ typedef struct {
 	uint32_t indexSize;
 	uint32_t vertsPerPrim;
 	uint32_t topology;          // 0 list, 1 strip, 2 fan
+	uint32_t batchCount;
 	uint32_t vertexStrides[31];
 	uint32_t vertexDivisors[31];
 } MVKGeometryIndirectParams;
@@ -393,8 +394,10 @@ kernel void cmdDrawIndirectGeometryConvertBuffers(const device char* srcBuff [[b
                                                   constant MVKGeometryIndirectParams& params [[buffer(5)]],
                                                   constant uint32_t& drawInfoStride [[buffer(6)]],
                                                   uint idx [[thread_position_in_grid]]) {
-	if (idx >= drawCount) { return; }
-	const device uint32_t* src = reinterpret_cast<const device uint32_t*>(srcBuff + idx * srcStride);
+	if (idx >= drawCount * params.batchCount) { return; }
+	uint32_t drawIndex = idx / params.batchCount;
+	uint32_t batchIndex = idx % params.batchCount;
+	const device uint32_t* src = reinterpret_cast<const device uint32_t*>(srcBuff + drawIndex * srcStride);
 	uint32_t count = src[0];
 	uint32_t instanceCount = src[1];
 	uint32_t firstIndex = 0;
@@ -418,8 +421,32 @@ kernel void cmdDrawIndirectGeometryConvertBuffers(const device char* srcBuff [[b
 	} else {
 		primCount = count / params.vertsPerPrim;
 	}
-	destDispatch[idx].threadgroupsPerGrid[0] = primCount;
-	destDispatch[idx].threadgroupsPerGrid[1] = primCount ? instanceCount : 0;
+	uint32_t primitiveBase = 0, instanceBase = 0;
+	uint32_t batchPrimitives = primCount, batchInstances = instanceCount;
+	if (params.batchCount > 1) {
+		// Flatten in Vulkan's instance-major primitive order. The two final
+		// commands cover the unfinished instance and all subsequent instances,
+		// even when the bounded prefix cannot cover the entire draw.
+		uint32_t prefixBatches = params.batchCount - 2;
+		uint64_t total = uint64_t(primCount) * instanceCount;
+		uint64_t first = min(total, uint64_t(min(batchIndex, prefixBatches)) * 256u);
+		primitiveBase = primCount ? uint32_t(first % primCount) : 0;
+		instanceBase = primCount ? uint32_t(first / primCount) : instanceCount;
+		if (batchIndex < prefixBatches) {
+			batchPrimitives = uint32_t(min(total - first, uint64_t(256)));
+			batchInstances = batchPrimitives ? 1 : 0;
+		} else if (batchIndex == prefixBatches) {
+			batchPrimitives = first < total ? primCount - primitiveBase : 0;
+			batchInstances = batchPrimitives ? 1 : 0;
+		} else {
+			if (instanceBase < instanceCount) { ++instanceBase; }
+			primitiveBase = 0;
+			batchInstances = instanceCount - instanceBase;
+			batchPrimitives = batchInstances ? primCount : 0;
+		}
+	}
+	destDispatch[idx].threadgroupsPerGrid[0] = batchPrimitives;
+	destDispatch[idx].threadgroupsPerGrid[1] = batchInstances;
 	destDispatch[idx].threadgroupsPerGrid[2] = 1;
 
 	device auto& drawInfo = *reinterpret_cast<device MVKGeometryDrawInfo*>(destDrawInfo + idx * drawInfoStride);
@@ -433,9 +460,9 @@ kernel void cmdDrawIndirectGeometryConvertBuffers(const device char* srcBuff [[b
 		drawInfo.vertexDivisors[i] = params.vertexDivisors[i];
 	}
 	drawInfo.topoStrip = uint8_t(params.topology);
-	drawInfo.primitiveBase = 0;
+	drawInfo.primitiveBase = primitiveBase;
 	drawInfo.primitiveCount = primCount;
-	drawInfo.instanceBase = 0;
+	drawInfo.instanceBase = instanceBase;
 }
 
 kernel void cmdDrawIndirectConvertBuffers(const device char* srcBuff [[buffer(0)]],

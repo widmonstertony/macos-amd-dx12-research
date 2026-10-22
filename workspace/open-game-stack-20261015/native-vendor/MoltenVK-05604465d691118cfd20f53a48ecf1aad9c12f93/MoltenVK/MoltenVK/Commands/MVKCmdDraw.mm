@@ -171,8 +171,13 @@ struct DrawInfo {
 	uint32_t vertexStrides[kMVKMaxBufferCount];  // by Metal vertex buffer index
 	uint32_t vertexDivisors[kMVKMaxBufferCount]; // by Metal vertex buffer index: kMVKGeometryPerVertex or instance divisor
 	uint8_t topoStrip;
+	uint32_t primitiveBase;
+	uint32_t primitiveCount;
+	uint32_t instanceBase;
 };
 static_assert(kMVKMaxBufferCount == 31, "DrawInfo.vertexStrides must match the SPIRV-Cross object stage");
+static_assert(offsetof(DrawInfo, primitiveBase) == 276 && offsetof(DrawInfo, primitiveCount) == 280 && offsetof(DrawInfo, instanceBase) == 284 && sizeof(DrawInfo) == 288,
+              "DrawInfo must match generated MSL and indirect conversion");
 
 /* Sets the vertex buffer strides the geometry-shader object stage fetches vertices with: the
  * strides bound with vkCmdBindVertexBuffers2 when the pipeline has dynamic strides, else the
@@ -284,11 +289,29 @@ static void encodeGeometryMeshDraw(MVKCommandEncoder* cmdEncoder, MVKGraphicsPip
 	auto draw = [&](uint32_t xfbMode, const MVKMTLBufferAllocation* prims) {
 		id<MTLRenderCommandEncoder> mtlRendEnc = cmdEncoder->_mtlRenderEncoder;
 		if (indexBuffer) { [mtlRendEnc useResource: indexBuffer usage: MTLResourceUsageRead stages: MTLRenderStageObject]; }
-		[mtlRendEnc setObjectBytes: &drawInfo length: sizeof(drawInfo) atIndex: pipeline->getDrawInfoBufferIndex()];
 		bindGeometryXfb(cmdEncoder, pipeline, xfbMode, prims);
-		[mtlRendEnc drawMeshThreadgroups: MTLSizeMake(primCount, instanceCount, 1)
-			 threadsPerObjectThreadgroup: MTLSizeMake(1, 1, 1)
-			   threadsPerMeshThreadgroup: MTLSizeMake(1, 1, 1)];
+		// On AMD, large object grids in layered geometry emulation have a
+		// reproducible output corruption/timeout even with valid owned inputs.
+		// Bound each native dispatch, retaining all global Vulkan indices.
+		const bool bounded = cmdEncoder->getDevice()->getPhysicalDevice()->isAMDHardware();
+		const uint32_t batchLimit = bounded ? std::min<uint32_t>(256, primCount) : primCount;
+		const uint32_t instanceLimit = bounded ? std::max<uint32_t>(1, 256 / batchLimit) : instanceCount;
+		for (uint64_t firstInstance = 0; firstInstance < instanceCount; ) {
+		 uint32_t instances = std::min<uint32_t>(instanceLimit, instanceCount - uint32_t(firstInstance));
+		 for (uint64_t first = 0; first < primCount; ) {
+			uint32_t count = std::min<uint32_t>(batchLimit, primCount - uint32_t(first));
+			DrawInfo batch = drawInfo;
+			batch.primitiveBase = uint32_t(first);
+			batch.primitiveCount = primCount;
+			batch.instanceBase = uint32_t(firstInstance);
+			[mtlRendEnc setObjectBytes: &batch length: sizeof(batch) atIndex: pipeline->getDrawInfoBufferIndex()];
+			[mtlRendEnc drawMeshThreadgroups: MTLSizeMake(count, instances, 1)
+				 threadsPerObjectThreadgroup: MTLSizeMake(1, 1, 1)
+				   threadsPerMeshThreadgroup: MTLSizeMake(1, 1, 1)];
+			first += count;
+		 }
+		 firstInstance += instances;
+		}
 	};
 
 	uint32_t inputPrimCount = primCount * instanceCount;
@@ -337,6 +360,11 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 										uint32_t indirectBufferStride, uint32_t drawCount,
 										const MVKIndexMTLBufferBinding* ibb) {
 	if (drawCount == 0) { return; }
+	// Topology, dynamic strides, and vertex-resource state are materialized
+	// during finalization. Reading Metal state before it sees the Vulkan
+	// bindings uses the previous/default topology for indirect geometry.
+	cmdEncoder->finalizeDrawState(kMVKGraphicsStageRasterization);
+	if (!pipeline->hasValidMTLPipelineStates()) { return; }
 
 	uint32_t vertsPerPrim = 0;
 	MVKGeometryTopology topology = kMVKGeometryTopologyList;
@@ -376,6 +404,22 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 	state.bindStructBytes(mtlConvertEncoder, &drawInfoStride32,     6);
 	[mtlConvertEncoder dispatchThreadgroups: MTLSizeMake(mvkCeilingDivide<NSUInteger>(drawCount, mtlConvertState.threadExecutionWidth), 1, 1)
 					  threadsPerThreadgroup: MTLSizeMake(mtlConvertState.threadExecutionWidth, 1, 1)];
+	// Opt-in owned-fixture diagnostic. Copy only the generated draw parameters,
+	// never vertex/index contents; no synchronous CPU wait or runtime fallback.
+	if (getenv("MVK_OWNED_GEOMETRY_PARAMETER_READBACK") && drawCount == 1) {
+		NSUInteger bytes = drawInfoOffset + drawInfoStride;
+		id<MTLBuffer> readback = [tempBuff->_mtlBuffer.device newBufferWithLength:bytes options:MTLResourceStorageModeShared];
+		id<MTLBlitCommandEncoder> blit = cmdEncoder->getMTLBlitEncoder(kMVKCommandUseDrawIndirectConvertBuffers);
+		[blit copyFromBuffer:tempBuff->_mtlBuffer sourceOffset:tempBuff->_offset toBuffer:readback destinationOffset:0 size:bytes];
+		[cmdEncoder->_mtlCmdBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+			if (cb.status == MTLCommandBufferStatusCompleted) {
+				const uint32_t* grid = (const uint32_t*)readback.contents;
+				const DrawInfo* info = (const DrawInfo*)((const char*)readback.contents + drawInfoOffset);
+				fprintf(stderr, "GEOMETRY_PARAMETERS grid=%u,%u,%u primitives=%u primitiveBase=%u instanceBase=%u vertex=%d instance=%u topology=%u\n", grid[0], grid[1], grid[2], info->primitiveCount, info->primitiveBase, info->instanceBase, info->baseVertex, info->baseInstance, info->topoStrip);
+			}
+		}];
+		[readback release];
+	}
 	cmdEncoder->beginMetalRenderPass(kMVKCommandUseRestartSubpass);
 
 	cmdEncoder->finalizeDrawState(kMVKGraphicsStageRasterization);	// Ensure all updated state has been submitted to Metal

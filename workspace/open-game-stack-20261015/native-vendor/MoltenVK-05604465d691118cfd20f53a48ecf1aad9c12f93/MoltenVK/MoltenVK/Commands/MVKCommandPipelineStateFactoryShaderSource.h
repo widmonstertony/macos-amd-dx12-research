@@ -306,6 +306,9 @@ typedef struct {
 	uint32_t vertexStrides[31];
 	uint32_t vertexDivisors[31];
 	uint8_t topoStrip;
+	uint32_t primitiveBase;
+	uint32_t primitiveCount;
+	uint32_t instanceBase;
 } MVKGeometryDrawInfo;
 
 // Converts Vulkan indirect draws (VkDrawIndirectCommand or VkDrawIndexedIndirectCommand) for a
@@ -430,6 +433,9 @@ kernel void cmdDrawIndirectGeometryConvertBuffers(const device char* srcBuff [[b
 		drawInfo.vertexDivisors[i] = params.vertexDivisors[i];
 	}
 	drawInfo.topoStrip = uint8_t(params.topology);
+	drawInfo.primitiveBase = 0;
+	drawInfo.primitiveCount = primCount;
+	drawInfo.instanceBase = 0;
 }
 
 kernel void cmdDrawIndirectConvertBuffers(const device char* srcBuff [[buffer(0)]],

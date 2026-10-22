@@ -21,6 +21,8 @@ def main():
     ap.add_argument('--sync-mesh-libraries', action='store_true')
     ap.add_argument('--sync-mesh-pipelines', action='store_true')
     ap.add_argument('--mesh-link-differential', action='store_true')
+    ap.add_argument('--parameter-readback', action='store_true')
+    ap.add_argument('--probe-binary',type=Path,default=ROOT/'build/probes/geometry_specialization_gpu')
     args = ap.parse_args()
     lib, shaders = args.library.resolve(), args.shaders.resolve()
     assert lib.is_relative_to(ROOT / 'build') and lib.is_file()
@@ -50,7 +52,11 @@ def main():
         env['MVK_AMD_SYNC_MESH_PIPELINES'] = '1'
     if args.mesh_link_differential:
         env['MVK_AMD_LINK_DIFFERENTIAL_CAPTURE'] = '1'
-    command = [str(ROOT / 'build/probes/geometry_specialization_gpu'), str(shaders), str(out / 'output.json')]
+    if args.parameter_readback:
+        env['MVK_OWNED_GEOMETRY_PARAMETER_READBACK'] = '1'
+    probe=args.probe_binary.resolve()
+    assert probe.is_relative_to(ROOT/'build/probes') and probe.is_file()
+    command = [str(probe), str(shaders), str(out / 'output.json')]
     start = time.monotonic()
     p = subprocess.run(command, env=env, capture_output=True, text=True, timeout=35)
     (out / 'stdout.log').write_text(p.stdout)
@@ -61,6 +67,7 @@ def main():
            'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math, 'syncMeshLibraries': args.sync_mesh_libraries, 'syncMeshPipelines': args.sync_mesh_pipelines, 'meshLinkDifferential': args.mesh_link_differential,
            'metalValidationEnabled': 'Metal API Validation Enabled' in p.stderr}
     row['passed'] = p.returncode == 0 and result.get('passed', False)
+    row['parameterReadback'] = args.parameter_readback
     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')
     print(json.dumps(row))
     return 0 if row['passed'] else 1

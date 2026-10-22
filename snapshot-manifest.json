@@ -1954,8 +1954,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCmdDraw.mm",
-      "bytes": 91443,
-      "sha256": "92b502a166691dc6cf09178481117c2ba32f40ecf29abe33a5ea5338eaed71d4",
+      "bytes": 94350,
+      "sha256": "049063d868bce9a8d802dfe338a6db4564b7e5b2945f8fdbc11fec8a5c316210",
       "executable": false
     },
     {
@@ -2050,8 +2050,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandPipelineStateFactoryShaderSource.h",
-      "bytes": 29567,
-      "sha256": "6461c6c82a7056ac55372b7e6273fc71b56800739a34acf5643fc883db4a7913",
+      "bytes": 29737,
+      "sha256": "b5e1ac5311a2a33f108a6b463bb2cfd60a6ab5144941d85a56932177aa6bc13f",
       "executable": false
     },
     {
@@ -2248,8 +2248,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPatchRevision.h",
-      "bytes": 39,
-      "sha256": "caddbae94162cc75c223d8cc6e2ef66866b72b6dfda302f56880b73666b6fb28",
+      "bytes": 117,
+      "sha256": "e09dec406cd422e5cf2ff192bf71cce0240edcfda3de85c3cec2a6d38d371748",
       "executable": false
     },
     {
@@ -2260,8 +2260,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm",
-      "bytes": 222658,
-      "sha256": "6f58e11e62d9bcbb04b0d237a72448b7342b2f23a5681dff93ca085ac483a924",
+      "bytes": 223244,
+      "sha256": "aa94ef106d1d503321bcd16369a00347a38d8681fe0b4d9820d34e180f5eeccf",
       "executable": false
     },
     {
@@ -31100,8 +31100,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f/spirv_msl.cpp",
-      "bytes": 872482,
-      "sha256": "59608ef58af018c309e71b2569b15d19bf25a02a2631dd7d1ade41eecad88687",
+      "bytes": 872914,
+      "sha256": "cd86d712feef36b5ecccef86580ffb57d2f83b0da7b25969321676843d931a47",
       "executable": false
     },
     {
@@ -33494,8 +33494,8 @@
     },
     {
       "path": "open-game-stack-20261015/repro-geometry-interface-20261015/geometry_gpu_common.hpp",
-      "bytes": 8218,
-      "sha256": "73188439da98c1fa2527cfce8dd7553bf2f7b10fd46d869f8fd6404233591b5d",
+      "bytes": 8471,
+      "sha256": "00d8a048bde1bb2030091ceceee17fea71aadffed3c09ce8fb0d884fc001b708",
       "executable": false
     },
     {
@@ -33801,6 +33801,36 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/geometry_batch_semantics_gpu.cpp",
+      "bytes": 9381,
+      "sha256": "cc60fecfcda33caca8a0dffcee1c06fb817ae68699167986d92734300ef31fe5",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/geometry_batch_shaders/test.frag",
+      "bytes": 117,
+      "sha256": "ac9bd6477fd9c2543f05aef3d71eb5306e394faca49f0c4219bdc57d2c203a07",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/geometry_batch_shaders/test.geom",
+      "bytes": 678,
+      "sha256": "0dd10f5178dbe9feffbb3b5c8514dc69f49eae80b8afc8b384713c774f40f86e",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/geometry_batch_shaders/test.vert",
+      "bytes": 137,
+      "sha256": "3ff6f181f7a3c63bd8d175cfd7f0a64719b1eef04ef9292ce120e249b1acb3e9",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/geometry_indirect_parameters_gpu.mm",
+      "bytes": 4025,
+      "sha256": "602937ca223807fceca133c8fc46163dc832fb61134f47a6835a9b17bcc58502",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/gpu_common.hpp",
       "bytes": 8202,
       "sha256": "904769f8cbd94dd6b912ad2b04ebdfb174b61a6a98252f2373a7564b2f099398",
@@ -33931,6 +33961,12 @@
       "bytes": 5542
     },
     {
+      "path": "open-game-stack-20261015/src/layered_skinning_gpu_control.mm",
+      "bytes": 17427,
+      "sha256": "2e7a317e392eb2035a7e1e84b272989fc0462fbea70578b4fb38dfd72a38bea0",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/mesh_archive_gpu_probe.mm",
       "bytes": 6352,
       "sha256": "022d89b88b0b7336f542b22b7328e1ba8256beb71be8ccf19ca9b7a94493cb34",
@@ -33946,6 +33982,12 @@
       "path": "open-game-stack-20261015/src/mesh_differential_control.mm",
       "bytes": 6661,
       "sha256": "21f9c7727b4cacd9d38f6e4ed01bbc3a5b0d9a642e642e921de3166707d552d0",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/mesh_indirect_grid_gpu.mm",
+      "bytes": 4858,
+      "sha256": "5498146398b755e851df3a7894aab5544b5a47b86ea92956b2f8d49e491b7993",
       "executable": false
     },
     {
@@ -34302,8 +34344,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_stable_moltenvk.py",
-      "bytes": 1801,
-      "sha256": "b601252752a00b6c369d6af645ef951cbff967f66c08fbfed038eb912a5d6036",
+      "bytes": 1931,
+      "sha256": "aa1dc20575489e5abe362354dc25c7cabb2ea5582339cf09c402dfb96d07dbdf",
       "executable": false
     },
     {
@@ -34424,8 +34466,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_geometry_specialization.py",
-      "bytes": 3582,
-      "sha256": "347d118c4cb4c8300e30b0c118e5d3851a54a0d9cf64a8394b4d093d16342b33",
+      "bytes": 3964,
+      "sha256": "e88fa9305c4199cc73865a1e1be64e9696783b21ebddf85c34f3d29927b777c7",
       "executable": false
     },
     {
@@ -70138,5 +70180,6 @@
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
-  "latestSourceUpdateUTC": "2026-10-22T00:01:11.697030+00:00"
+  "latestSourceUpdateUTC": "2026-10-22T00:01:11.697030+00:00",
+  "lastSourceOnlyUpdateUTC": "2026-10-22T01:42:11.052834+00:00"
 }

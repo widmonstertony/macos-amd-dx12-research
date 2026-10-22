@@ -5,8 +5,9 @@ root=pathlib.Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser();p.add_argument('--label',required=True);p.add_argument('--jobs',type=int,default=4);a=p.parse_args()
 if not re.fullmatch('[a-z0-9-]{1,64}',a.label) or not 1<=a.jobs<=6:p.error('Safe label and 1..6 jobs required')
 out=root/'evidence'/a.label;out.mkdir(exist_ok=False)
-source=root/'native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93'
-def snapshot():return {str(f.relative_to(source)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(source.rglob('*')) if f.is_file() and f.suffix in ('.h','.m','.mm','.c','.cpp')}
+sources=[root/'native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93',
+         root/'native-vendor/SPIRV-Cross-939b40b33a44443c404c4078823c406e3c94866f']
+def snapshot():return {str(f.relative_to(root/'native-vendor')):hashlib.sha256(f.read_bytes()).hexdigest() for source in sources for f in sorted(source.rglob('*')) if f.is_file() and f.suffix in ('.h','.hpp','.m','.mm','.c','.cpp')}
 before=snapshot();(out/'source-before.json').write_text(json.dumps(before,indent=2)+'\n');start=time.monotonic()
 with (out/'build.log').open('w') as log:r=subprocess.run(['/usr/local/bin/cmake','--build',str(root/'build/moltenvk-bounded-archive'),'--target','MoltenVK','-j'+str(a.jobs)],stdout=log,stderr=subprocess.STDOUT,timeout=1200)
 after=snapshot();changed=[k for k in set(before)|set(after) if before.get(k)!=after.get(k)];library=root/'build/moltenvk-bounded-archive/MoltenVK/libMoltenVK.1.4.2.dylib'

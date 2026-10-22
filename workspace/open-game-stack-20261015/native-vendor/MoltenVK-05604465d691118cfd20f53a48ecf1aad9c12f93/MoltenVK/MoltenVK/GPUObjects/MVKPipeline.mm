@@ -1357,6 +1357,16 @@ MTLMeshRenderPipelineDescriptor* MVKGraphicsPipeline::newMTLMeshRenderPipelineDe
 
 	MTLMeshRenderPipelineDescriptor* plDesc = [MTLMeshRenderPipelineDescriptor new];    // retained
 
+	// The generated geometry-emulation object shader always calls
+	// set_threadgroups_per_grid(uint3(1, 1, 1)). Advertise that exact bound
+	// so Metal need not schedule for the device's default maximum mesh grid.
+	// This descriptor is specific to Vulkan geometry emulation, not native mesh shaders.
+	plDesc.maxTotalThreadgroupsPerMeshGrid = 1;
+	// Both generated wrappers execute serially, and both direct and indirect
+	// geometry dispatches pass one thread per object/mesh threadgroup.
+	plDesc.maxTotalThreadsPerObjectThreadgroup = 1;
+	plDesc.maxTotalThreadsPerMeshThreadgroup = 1;
+
 	// pMultisampleState may be NULL (and must be ignored) when rasterization is disabled.
 	if (_isRasterizing && pCreateInfo->pMultisampleState) {
 		plDesc.rasterSampleCount = mvkSampleCountFromVkSampleCountFlagBits(getPhysicalDevice()->getSupportedSampleCount(pCreateInfo->pMultisampleState->rasterizationSamples));

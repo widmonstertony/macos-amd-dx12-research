@@ -2284,7 +2284,7 @@ void CompilerMSL::emit_mesh_vertex_input_load(const SPIRType &type, const string
 	std::string type_name = get_variable_format_string(variable.format);
 	std::string component = type_name + get_vertex_loader_component_suffix(load_elements);
 	std::string packed = load_elements > 1 ? "packed_" : "";
-	std::string load_string = "*(device " + packed + component + " *)(vb" + std::to_string(variable.binding) + " + " + std::to_string(variable.offset) + " + spvFetchIndex(drawInfo, " + std::to_string(variable.binding) + ", vertexIndex, positionInGrid.y) * drawInfo->vertexStrides[" + std::to_string(variable.binding) + "])";
+	std::string load_string = "*(device " + packed + component + " *)(vb" + std::to_string(variable.binding) + " + " + std::to_string(variable.offset) + " + spvFetchIndex(drawInfo, " + std::to_string(variable.binding) + ", vertexIndex, globalInstance) * drawInfo->vertexStrides[" + std::to_string(variable.binding) + "])";
 	auto loaded_type = parent_type;
 	loaded_type.vecsize = load_elements;
 	loaded_type.columns = 1;
@@ -2343,6 +2343,9 @@ void CompilerMSL::emit_mesh_wrapper()
 		// Per Metal buffer index: 0xffffffff for per-vertex data, else the instance divisor.
 		statement("uint32_t vertexDivisors[31];");
 		statement("uint8_t topoStrip;");
+		statement("uint32_t primitiveBase;");
+		statement("uint32_t primitiveCount;");
+		statement("uint32_t instanceBase;");
 
 		end_scope(";");
 		statement("");
@@ -2397,13 +2400,17 @@ void CompilerMSL::emit_mesh_wrapper()
 		// One object threadgroup per input primitive. The topology (list or strip) is a draw-time
 		// property (it can be dynamic state), so it comes from drawInfo->topoStrip, not from the
 		// pipeline's input primitive type: a list primitive starts at x * N, a strip one at x.
+		// A native object-grid batch must retain Vulkan's global primitive
+		// index, strip parity, fan anchor, and transform-feedback ordering.
+		statement("uint primitiveIndex = drawInfo->primitiveBase + positionInGrid.x;");
+		statement("uint globalInstance = drawInfo->instanceBase + positionInGrid.y;");
 		statement("int vertexCount = ", vertices_per_primitive, ";");
-		statement("int startingIndex = drawInfo->topoStrip ? int(positionInGrid.x) : int(positionInGrid.x) * vertexCount;");
+		statement("int startingIndex = drawInfo->topoStrip ? int(primitiveIndex) : int(primitiveIndex) * vertexCount;");
 
-		statement("int instanceIndex = int(positionInGrid.y + drawInfo->baseInstance);");
-		statement("payload.primitiveId = positionInGrid.x;");
+		statement("int instanceIndex = int(globalInstance + drawInfo->baseInstance);");
+		statement("payload.primitiveId = primitiveIndex;");
 		// Input primitive of the draw over all instances, for the transform feedback of the geometry stage.
-		statement("payload.spvPayloadPad[0] = positionInGrid.y * gridSize.x + positionInGrid.x;");
+		statement("payload.spvPayloadPad[0] = globalInstance * drawInfo->primitiveCount + primitiveIndex;");
 
 		statement("for (int i = 0; i < vertexCount; ++i)");
 		begin_scope();
@@ -2411,16 +2418,16 @@ void CompilerMSL::emit_mesh_wrapper()
 		// Odd triangles of a strip take their vertices in the order (n, n + 2, n + 1) to keep the
 		// winding (Vulkan spec, triangle strips).
 		// drawInfo->topoStrip: 0 list, 1 strip, 2 triangle fan (primitive x is (0, x + 1, x + 2)).
-		statement("int element = (drawInfo->topoStrip == 1 && vertexCount == 3 && (positionInGrid.x & 1) && i > 0) ? 3 - i : i;");
+		statement("int element = (drawInfo->topoStrip == 1 && vertexCount == 3 && (primitiveIndex & 1) && i > 0) ? 3 - i : i;");
 		if (vertices_per_primitive == 3)
-			statement("if (drawInfo->topoStrip == 2 && i == 0) element = -int(positionInGrid.x);");
+			statement("if (drawInfo->topoStrip == 2 && i == 0) element = -int(primitiveIndex);");
 		if (vertices_per_primitive == 6)
 		{
 			// Triangle strips with adjacency (Vulkan spec, "Triangle Strips With Adjacency"): absolute
 			// vertex of each geometry shader input, depending on the primitive's position in the strip.
 			statement("if (drawInfo->topoStrip == 1)");
 			begin_scope();
-			statement("int p = int(positionInGrid.x), n = int(gridSize.x), b = 2 * p;");
+			statement("int p = int(primitiveIndex), n = int(drawInfo->primitiveCount), b = 2 * p;");
 			statement("int v;");
 			statement("if (n == 1) { const int o[6] = { 0, 1, 2, 5, 4, 3 }; v = o[i]; }");
 			statement("else if (p == 0) { const int o[6] = { 0, 1, 2, 6, 4, 3 }; v = o[i]; }");

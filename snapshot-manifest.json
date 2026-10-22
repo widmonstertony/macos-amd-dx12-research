@@ -33976,6 +33976,12 @@
       "bytes": 5542
     },
     {
+      "path": "open-game-stack-20261015/src/layered_morph_shadow_gpu_control.mm",
+      "bytes": 17701,
+      "sha256": "d0fa155412a9446ce9870b172c8fe89de9bb56373cad1ab1fde3028383a39733",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/layered_skinning_gpu_control.mm",
       "bytes": 17427,
       "sha256": "2e7a317e392eb2035a7e1e84b272989fc0462fbea70578b4fb38dfd72a38bea0",

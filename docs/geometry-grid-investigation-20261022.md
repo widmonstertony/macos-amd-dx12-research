@@ -121,6 +121,24 @@ The next opt-in source candidate shares immutable, owned validation results acro
 - Six independent helpers verified shared validation, registration removal, surviving borrowed leases and prompt cache ownership release. **1,000** concurrent mutation iterations passed.
 - Same native library and same resources, three alternating CPU pairs: **164.309 ms → 62.9491 ms** median, **2.61×** for 128 helpers × four encoders. External CPU load produced visible timing variance; this is not an FPS multiplier.
 - Original Tencent Wine D3D12 descriptor-UAV output, compute/presentation and strict warm-cache controls passed.
-- Library SHA-256: `5f47d2fdf977f5fbab6c2ea45bbb18c639ba978d539d3c5d8862c70b9a3bdd50`. Deployed for a normal original-Steam run. Actual scene FPS and equipment timeout behavior are pending for this candidate.
+- Library SHA-256: `5f47d2fdf977f5fbab6c2ea45bbb18c639ba978d539d3c5d8862c70b9a3bdd50`. Deployed for a normal original-Steam run. Actual game results follow below; this shared-cache experiment is disabled in the selected runtime.
 
 共享验证已通过真实 GPU、并发寿命、原应用宝 Wine 与缓存回归；已部署供原 Steam 实测，游戏效果仍待验证。不开启计数采样测基础帧率，再单独限时采集装备页故障。未修改分辨率、缓存版本、闭源驱动或游戏文件。仍没有可玩或 FSR3 全功能通过的发布声明。
+
+
+### Actual outcome and next boundary / 实测结果与下一处边界
+
+The shared-cache candidate measured **3.75 FPS** in the inherited window and reproduced the equipment-page GPU timeout. No game improvement was established. View/content differences prevent a strict FPS causal comparison. The helper's outer lookup counter excludes validation inside the shared cache, so it cannot represent total registry work. The experiment is disabled in the selected configuration; geometry and retained-handle changes remain. Original Tencent Wine compute/presentation and warm-cache controls passed with it disabled. This is rejection of an experiment, not a playable-game fix.
+
+共享缓存本轮只有约 **3.75 FPS**，装备页仍超时，未证明游戏收益。外层查活计数不包含共享缓存内部的验证，不能代表全部成本。选用配置停用这个实验，保留其余代码，原 Wine 回归通过；游戏仍未修到可玩。没有关闭游戏功能、降低分辨率或清空缓存。
+
+Timed counters resolved 112 samples: 77 had nonzero timestamps. The last nonzero sample marks a depth-only geometry pipeline, followed by zero timestamps; the graphics command buffer failed after **6.64 seconds**. This locates a boundary and does not prove the exact failing shader or draw.
+
+The new owned `layered_morph_shadow_gpu_control.mm` uses unmodified external object/mesh sources and privately verified source hashes and actual compile options. It models four address roots, seven vertex streams, morph offsets, skin weights and the 288-byte draw-info ABI. Game-derived source files and game buffer contents are excluded from publication.
+
+- Direct and indirect 256-group batches passed at 1, 256 and 4,096 triangles, each checking **4,590** final-depth/padding values without mismatches.
+- Three alternating same-source/same-input GPU pairs at 4,096 triangles measured median **88.87 ms** for one indirect grid versus **3.08 ms** for 256-group batches, a **28.8×** GPU-time difference.
+- Overlapping identical triangles verify final depth/padding, not unique output from every primitive. Runtime game buffers were not replayed.
+- Actual game draw counts, index/instance ranges and descriptor contents at the boundary remain uncaptured. The owned performance cliff does not prove the game timeout root. Do not increase batch limits blindly.
+
+计数器将故障缩小到六层阴影几何阶段附近；同一未修改着色器的自有输入对照，确认大网格与有界分批约有 29 倍 GPU 耗时差。但游戏那次绘制的实际规模和资源状态仍未知，不能说已经找到最终根因。下一步应捕获这些参数，核对是否进入仍未分完的大尾部，再改通用规则。持续流畅游玩和 FSR3 均未验证。

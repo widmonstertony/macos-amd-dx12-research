@@ -3771,6 +3771,8 @@ MVKPhysicalDevice::~MVKPhysicalDevice() {
 #pragma mark - MVKLiveList
 
 MVKLiveList::MVKLiveList() {
+    const char* shared = getenv("MVK_AMD_SHARED_LIVE_SNAPSHOTS");
+    _snapshotCacheEnabled = shared && !strcmp(shared,"1");
     const char* value = getenv("MVK_AMD_REGISTRATION_DELTA_CACHE");
     if (value && !strcmp(value, "1")) _registrationLog.reset(new MVKRegistrationLog<id>());
 }
@@ -3786,21 +3788,72 @@ void MVKLiveList::add(id object) {
 	Group* group = getGroup(object);
 	std::lock_guard<Lock> guard(group->lock);
 	group->entries[object]++;
+    if (_snapshotCacheEnabled) _mutations.fetch_add(1,std::memory_order_release);
 	group->additions.fetch_add(1, std::memory_order_release);
 	if (_registrationLog) _registrationLog->append(object);
 	else _allAdditions.fetch_add(1, std::memory_order_release);
 }
 
 void MVKLiveList::remove(id object) {
-	Group* group = getGroup(object);
-	std::lock_guard<Lock> guard(group->lock);
-	auto it = group->entries.find(object);
-	if (it == group->entries.end())
-		return;
-	if (it->second <= 1)
-		group->entries.erase(it);
-	else
-		it->second--;
+    Group* group = getGroup(object);
+    bool removed = false;
+    {
+        std::lock_guard<Lock> guard(group->lock);
+        auto it = group->entries.find(object);
+        if (it == group->entries.end()) return;
+        if (it->second <= 1) { group->entries.erase(it); removed = true; }
+        else it->second--;
+        if (_snapshotCacheEnabled) _mutations.fetch_add(1,std::memory_order_release);
+    }
+    if (removed && _snapshotCacheEnabled) {
+        // Never acquire the snapshot lock while holding a registry shard.
+        // Prompt eviction avoids pinning unloaded assets in a cache entry.
+        std::lock_guard<std::mutex> guard(_snapshotLock);
+        _snapshotEntries.clear(); _snapshotResources = 0;
+    }
+}
+
+MVKLiveList::SnapshotLease MVKLiveList::retainedSnapshot(MVKDescriptorUseCache::Snapshot snapshot) {
+    if (!_snapshotCacheEnabled) return {};
+    std::lock_guard<std::mutex> guard(_snapshotLock);
+    for (auto it=_snapshotEntries.begin();it!=_snapshotEntries.end();) {
+        if (it->key.expired()) { _snapshotResources-=it->lease->size(); it=_snapshotEntries.erase(it); }
+        else ++it;
+    }
+    uint64_t before = _mutations.load(std::memory_order_acquire);
+    for (const auto& entry : _snapshotEntries) {
+        if (entry.mutation==before && entry.key.lock()==snapshot) {
+            if (snapshotCacheHits.fetch_add(1,std::memory_order_relaxed)==0) {
+                // Bounded proof of actual cache use, not an advertised feature bit.
+                if (const char* dir=getenv("MVK_CONFIG_SHADER_DUMP_DIR")) {
+                    char path[4096];int n=snprintf(path,sizeof(path),"%s/shared-live-snapshot-hit-%d.json",dir,getpid());
+                    if (n>0 && size_t(n)<sizeof(path)) if (FILE* f=fopen(path,"w")) {
+                        fprintf(f,"{\"pid\":%d,\"cacheHitObserved\":true,\"resources\":%zu,\"mutation\":%llu}\n",getpid(),entry.lease->size(),(unsigned long long)before);
+                        fclose(f);
+                    }
+                }
+            }
+            return entry.lease;
+        }
+    }
+    auto retained = std::make_shared<RetainedSnapshot>();
+    for (id<MTLResource> resource : *snapshot) {
+        if (auto live=isLive(resource)) retained->push_back([resource retain]);
+    }
+    snapshotCacheBuilds.fetch_add(1,std::memory_order_relaxed);
+    // Concurrent mutation makes this a one-use owned observation. A later
+    // query must validate again instead of publishing a mixed registry view.
+    if (_mutations.load(std::memory_order_acquire)!=before || retained->size()>16384) return retained;
+    for (auto it=_snapshotEntries.begin();it!=_snapshotEntries.end();) {
+        if (it->key.lock()==snapshot) { _snapshotResources-=it->lease->size(); it=_snapshotEntries.erase(it); }
+        else ++it;
+    }
+    if (_snapshotEntries.size()>=16 || _snapshotResources+retained->size()>16384) {
+        _snapshotEntries.clear(); _snapshotResources=0;
+    }
+    _snapshotResources+=retained->size();
+    _snapshotEntries.push_back({snapshot,before,retained});
+    return retained;
 }
 
 MVKLiveList::IsLiveResult MVKLiveList::isLive_(id object) {

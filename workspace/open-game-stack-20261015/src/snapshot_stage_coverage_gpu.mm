@@ -45,9 +45,9 @@ int main(int argc,const char**argv){@autoreleasepool{try{
   id<MTLRenderCommandEncoder> enc=[cb renderCommandEncoderWithDescriptor:rp];h.resetForEncoder();
   h.addLiveSnapshot(snapshot,live,enc,immediate,MVKResourceUsageStages::Vertex,false);
   if(pass==2)live.add(next); // Must invalidate a previous absent identity mid-encoder.
-  uint64_t before=h.statsLookups;
+  uint64_t before=h.statsLookups, beforeBuilds=live.snapshotCacheBuilds.load();
   h.addLiveSnapshot(snapshot,live,enc,immediate,MVKResourceUsageStages::Fragment,false);
-  if(pass==2){registrationLookups=h.statsLookups-before;need(registrationLookups>4000,"late registration did not force full validation");}
+  if(pass==2){registrationLookups=h.statsLookups-before;need(registrationLookups>4000 || live.snapshotCacheBuilds.load()>beforeBuilds,"late registration did not force full validation");}
   h.addLiveSnapshot(snapshot,live,enc,immediate,MVKResourceUsageStages::Vertex,true);
   h.addLiveSnapshot(snapshot,live,enc,immediate,MVKResourceUsageStages::Fragment,true);
   id<MTLBuffer> active=pass<2?input:next;auto it=h.used.find(active);need(it!=h.used.end()&&it->second.generation==h.encoderGeneration&&it->second.write&&it->second.stages==MVKResourceUsageStages::All,"per-encoder stage/write upgrade missing");

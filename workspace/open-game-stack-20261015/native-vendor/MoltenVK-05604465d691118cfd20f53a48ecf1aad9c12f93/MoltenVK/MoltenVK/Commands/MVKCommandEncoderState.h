@@ -306,6 +306,7 @@ struct MVKUseResourceHelper {
 	uint64_t liveLookupCount = 0, liveReuseCount = 0;
 	uint64_t liveRecentReuseCount = 0, liveAbsentReuseCount = 0;
 	MVKSmallVector<id<MTLResource>> retainedLiveResources;
+    std::vector<MVKLiveList::SnapshotLease> retainedSnapshotLeases;
 	/** Keeps newly validated resources alive until their batched useResources call. */
 	MVKSmallVector<id<MTLResource>> pendingBatchLiveResources;
 	void releasePendingBatchLiveResources();

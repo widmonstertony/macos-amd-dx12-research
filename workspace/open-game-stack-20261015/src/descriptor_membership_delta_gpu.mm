@@ -34,9 +34,9 @@ int main(int argc,const char**argv) { @autoreleasepool { try {
   if(pass==3){list.add(late);auto w=cache.beginWrite((const char*)&slots[1],sizeof(id));slots[1]=nil;}
   if(pass==5){list.add(unrelated);auto w=cache.beginWrite((const char*)&slots.back(),sizeof(id));slots.back()=(id<MTLResource>)0xdead2000;}
   auto current=snapshot();h.resetForEncoder();id<MTLCommandBuffer> cb=[queue commandBuffer];id<MTLComputeCommandEncoder> enc=[cb computeCommandEncoder];
-  uint64_t before=h.statsLookups,hits=h.statsSnapshotDeltaHits;h.addLiveSnapshot(current,list,enc,immediate,MVKResourceUsageStages::Compute,true);
+  uint64_t before=h.statsLookups,hits=h.statsSnapshotDeltaHits,builds=list.snapshotCacheBuilds.load();h.addLiveSnapshot(current,list,enc,immediate,MVKResourceUsageStages::Compute,true);
   if(pass==1){oneSlotLookups=h.statsLookups-before;need(oneSlotLookups==1&&h.statsSnapshotDeltaHits==hits+1,"single edit scanned unchanged descriptors");}
-  if(pass==3){registrationFallbackLookups=h.statsLookups-before;need(h.statsSnapshotDeltaHits==hits&&registrationFallbackLookups>4000,"newly registered unchanged identity escaped full validation");}
+  if(pass==3){registrationFallbackLookups=h.statsLookups-before;need(h.statsSnapshotDeltaHits==hits&&(registrationFallbackLookups>4000||list.snapshotCacheBuilds.load()>builds),"newly registered unchanged identity escaped full validation");}
   if(pass==5){unrelatedDeltaLookups=h.statsLookups-before;need(unrelatedDeltaLookups==1&&h.statsSnapshotDeltaHits==hits+1,"unrelated registration disabled safe delta reuse");}
   deltaHits += h.statsSnapshotDeltaHits-hits;
   id<MTLBuffer> active=pass<2?input:pass==2?next:late;

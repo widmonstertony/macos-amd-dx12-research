@@ -2026,14 +2026,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "bytes": 36451,
-      "sha256": "201590a9d5962268b2e0c1168ddce37cf2602d9d62112d27168476067cabdbfb",
+      "bytes": 36519,
+      "sha256": "f93b88aa04cb10ec0e56dcfb883e99b8cdd6f815ba2d3775a4b2ce21b976a6dd",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 135507,
-      "sha256": "7e7913e74eb6d87bd8683421931ea154fa2cb3fdf5ce004df69901ff5b3393e2",
+      "bytes": 136310,
+      "sha256": "90159afabaafb9e3279290f5fb398d118e799f47570f14e756e7a59aac19abad",
       "executable": false
     },
     {
@@ -2161,13 +2161,15 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h",
-      "sha256": "9806d563956108de80360b9b3cd26c83f10c93a421ebdf2b8c789a1e74664de0",
-      "bytes": 59044
+      "bytes": 60061,
+      "sha256": "2f56d9ed27cc1329687f85ee9f48d3455fe0d592ec8e00187cae0d6c5ed5883e",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.mm",
-      "sha256": "9708abc8a1d8391f1211c2025653bd37539f653a0475bae0d2c374a7317e589b",
-      "bytes": 267773
+      "bytes": 270808,
+      "sha256": "c47ee37ab4446f9ed160f91068fe89fe6457eb3d27a8a0b416552ed665da3ab9",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDeviceFeatureStructs.def",
@@ -33780,8 +33782,8 @@
     },
     {
       "path": "open-game-stack-20261015/src/descriptor_membership_delta_gpu.mm",
-      "bytes": 6209,
-      "sha256": "38ed71f5bee1cab6e0f240cfc0721b4f38a0352b6cd1b2f0fa3dfb71d1e075c8",
+      "bytes": 6290,
+      "sha256": "0d901f2114317e4781c56db297adac30ee9d8db316c72ba61c6b36b5ff378db6",
       "executable": false
     },
     {
@@ -34156,9 +34158,15 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/shared_snapshot_registry_gpu.mm",
+      "bytes": 7339,
+      "sha256": "9d7ef21d1fe07b53f0797e8d54fa8ea15cd84233c3f71724f0f75ec92d124779",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/snapshot_stage_coverage_gpu.mm",
-      "bytes": 9860,
-      "sha256": "a9bf1a341ab2021b69ea88c005f214eab1280f0931854c665d0dd91ad8d316f8",
+      "bytes": 9954,
+      "sha256": "8424c3097ea6b1400809b22ff97bb6fc62adc9893651e06cf1c2f2596ccee49d",
       "executable": false
     },
     {
@@ -34351,8 +34359,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "bytes": 4828,
-      "sha256": "f0bbd29dc8deb4df7a6003c001c78ec17afa4b22c649e56a5954326cf684007a",
+      "bytes": 5121,
+      "sha256": "c7ceb26c0425a58c57c67223547ef8341bf510e5dc61e95834fbc341c1e2c9ea",
       "executable": false
     },
     {
@@ -34363,8 +34371,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_resource_lookup_fixture.py",
-      "bytes": 2313,
-      "sha256": "a4444dc26208d8d5e2e980130e23e05055321617e5df7bd587d0c9edab25f79e",
+      "bytes": 2444,
+      "sha256": "a1fadca337a637d91761ad45ce7fbd43df276949981a1c8665d5c3ae6bc8b164",
       "executable": false
     },
     {
@@ -34492,8 +34500,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_geometry_specialization.py",
-      "bytes": 3964,
-      "sha256": "e88fa9305c4199cc73865a1e1be64e9696783b21ebddf85c34f3d29927b777c7",
+      "bytes": 4363,
+      "sha256": "9e37cf483323075df7b7e60b84b31814176ccc0c0aea693a12b81e4e30b0137c",
       "executable": false
     },
     {
@@ -34504,8 +34512,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "bytes": 16472,
-      "sha256": "ce4beae2f4c6514c1966845cda9aa1f80bf2e0306a335ae618114ca51339681e",
+      "bytes": 16669,
+      "sha256": "6176ae340474bae16aa4cdfe93d68bc73cfaaeb36e0394249c5a51e2f7af2d7c",
       "executable": false
     },
     {

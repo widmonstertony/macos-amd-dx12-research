@@ -26,6 +26,7 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--private-directory', type=Path, default=PRIVATE)
+    parser.add_argument('--shared-live-snapshots',action='store_true')
     parser.add_argument('--compute-only', action='store_true', help='Headless compute/cache qualification; does not qualify presentation')
     parser.add_argument('--descriptor-only', action='store_true', help='Run the real UAV-table compute readback control')
     parser.add_argument('--d3d12-directory', type=Path, help='Stage owned candidate D3D12 DLLs per probe; never replace a live module')
@@ -81,6 +82,7 @@ def main():
                MVK_AMD_RENDER_BINARY_ARCHIVE_PATH=str(out / "render.metalar"),
                MVK_AMD_BINARY_ARCHIVE_FLUSH_INTERVAL="1",
                MVK_AMD_RUNTIME_REPLAY_ONLY="1")
+    if args.shared_live_snapshots:env['MVK_AMD_SHARED_LIVE_SNAPSHOTS']='1'
     if args.compute_shards:
         env.pop('MVK_AMD_BINARY_ARCHIVE_PATH', None)
         env.pop('MVK_AMD_RUNTIME_REPLAY_ONLY', None)
@@ -139,7 +141,7 @@ def main():
     shared_before = digest(shared)
     result = {"timeLocal": datetime.datetime.now().astimezone().isoformat(),
               "candidateSHA256": digest(candidate), "proxySHA256": digest(proxy),
-              "liveGameLibrariesChanged": False, "gpuTimeoutTrace": args.gpu_timeout_trace,
+              "liveGameLibrariesChanged": False, "sharedLiveSnapshots": args.shared_live_snapshots, "gpuTimeoutTrace": args.gpu_timeout_trace,
               "specializedQueues": args.specialized_queues, "useMTLHeap": args.use_mtl_heap,
               "crossEncoderLiveCache": args.cross_encoder_live_cache,
               "registrationDeltaCache": args.registration_delta_cache,

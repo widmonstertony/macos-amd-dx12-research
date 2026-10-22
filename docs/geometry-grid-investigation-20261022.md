@@ -103,3 +103,24 @@ The next source change caches stable `ResourceInfo` handles alongside validated,
 - New library: `885f999c637f39eadb947b9ae490ffe4d8e6c2d02aa0deba2be46fa9996e7fef`. Original Tencent Wine compute/presentation and strict warm-cache controls passed. The qualified candidate is deployed for a normal original-Steam game run; actual scene FPS remains pending.
 
 单项对照中位耗时减少约 83%，不能据此声称游戏帧率提升 5.74 倍。真实 GPU 资源与几何回归通过；这个新候选的原 Wine 计算、呈现和严格缓存命中回归也已通过，已部署供原 Steam 游戏实测，实际场景帧率待测。FSR3 超分、帧生成和持续流畅游玩均未验证。本次仅备份源码，现有下载包不代表新的可玩发布版。
+
+
+### Actual replay-only candidate outcome / 第一项复用优化实测
+
+The `885f999c…` candidate completed compilation and reached the camp. The foreground scene measured **7.50 FPS** at the inherited window size; the view differed from the prior interval, and no game FPS improvement is established. Opening inventory worked, but switching three tabs toward equipment reproduced a GPU timeout. The failed game was stopped after preserving evidence; original Steam and caches remained. Resource replay speed and equipment GPU stability are separate unresolved issues.
+
+第一项候选已编译完成并进场景，但实测仍只有约 **7.50 FPS**，不能声称游戏加速。背包能打开，连续切向装备页仍复现 GPU 超时。失败证据保留后仅结束了游戏，原 Steam 和缓存保留。CPU 单项快不等于装备页稳定。
+
+### Shared registry validation / 跨命令缓冲共享验证
+
+The next opt-in source candidate shares immutable, owned validation results across command buffers. It caches at most 16 snapshots and 16,384 retained identities per registry. Registrations change the version; removing the last registration promptly evicts cached owners. Readers hold independent shared leases, so cache eviction cannot destroy an in-flight resource. Every new encoder still receives stage/access declarations. Concurrent mutation prevents publishing a mixed registry observation.
+
+新的可选路径让多个命令缓冲共享验证结果，每个注册表最多 16 个快照、16,384 个资源引用。新注册使版本失效；最后一项注册移除时立即清掉缓存引用。执行中的读者持有独立引用，逐编码器的权限声明仍保留。并发变更期间的混合观察不会发布进缓存。
+
+- Real AMD GPU controls: **283** resource output values, zero mismatches, across registry/descriptor/stage tests; **148,464** geometry components, zero mismatches.
+- Six independent helpers verified shared validation, registration removal, surviving borrowed leases and prompt cache ownership release. **1,000** concurrent mutation iterations passed.
+- Same native library and same resources, three alternating CPU pairs: **164.309 ms → 62.9491 ms** median, **2.61×** for 128 helpers × four encoders. External CPU load produced visible timing variance; this is not an FPS multiplier.
+- Original Tencent Wine D3D12 descriptor-UAV output, compute/presentation and strict warm-cache controls passed.
+- Library SHA-256: `5f47d2fdf977f5fbab6c2ea45bbb18c639ba978d539d3c5d8862c70b9a3bdd50`. Deployed for a normal original-Steam run. Actual scene FPS and equipment timeout behavior are pending for this candidate.
+
+共享验证已通过真实 GPU、并发寿命、原应用宝 Wine 与缓存回归；已部署供原 Steam 实测，游戏效果仍待验证。不开启计数采样测基础帧率，再单独限时采集装备页故障。未修改分辨率、缓存版本、闭源驱动或游戏文件。仍没有可玩或 FSR3 全功能通过的发布声明。

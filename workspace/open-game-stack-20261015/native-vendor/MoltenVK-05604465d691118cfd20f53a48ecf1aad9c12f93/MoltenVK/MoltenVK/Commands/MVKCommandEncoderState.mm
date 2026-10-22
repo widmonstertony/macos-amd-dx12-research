@@ -1236,9 +1236,22 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         prior = deltaPrior;
     } else {
         if (resourceUseStats) statsSnapshotColdWords += snapshot->size();
-        for (id<MTLResource> resource : *snapshot) {
-            bool valid = addImmediateLive(resource,list,encoder,func,stage,write);
-            if (valid && live) live->push_back({resource,&used.find(resource)->second});
+        auto lease = crossEncoderSnapshotReuse ? list.retainedSnapshot(snapshot) : nullptr;
+        if (lease) {
+            if (std::find(retainedSnapshotLeases.begin(),retainedSnapshotLeases.end(),lease)==retainedSnapshotLeases.end())
+                retainedSnapshotLeases.push_back(lease);
+            for (id<MTLResource> resource : *lease) {
+                auto inserted=used.emplace(resource,ResourceInfo{stage,write,true,true,0});
+                inserted.first->second.liveRetained=true;
+                RetainedSnapshotResource record{resource,&inserted.first->second};
+                addRetainedSnapshotResource(record,encoder,func,stage,write);
+                if (live) live->push_back(record);
+            }
+        } else {
+            for (id<MTLResource> resource : *snapshot) {
+                bool valid = addImmediateLive(resource,list,encoder,func,stage,write);
+                if (valid && live) live->push_back({resource,&used.find(resource)->second});
+            }
         }
     }
     if (descriptorSnapshotReuse) {
@@ -1321,6 +1334,7 @@ void MVKUseResourceHelper::releaseLiveResources() {
 	absentLiveResources.clear();
 	for (id<MTLResource> resource : retainedLiveResources) [resource release];
 	retainedLiveResources.clear();
+    retainedSnapshotLeases.clear();
 }
 
 void MVKUseResourceHelper::releasePendingBatchLiveResources() {

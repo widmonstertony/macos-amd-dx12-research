@@ -33,6 +33,7 @@
 #include <atomic>
 #include <os/lock.h>
 #include "MVKRegistrationLog.h"
+#include "MVKDescriptorUseCache.h"
 #include <memory>
 
 #import <Metal/Metal.h>
@@ -584,6 +585,28 @@ class MVKLiveList {
 	Group* getGroup(id object);
 
 public:
+    // Own Metal identities while a helper borrows the immutable validation.
+    // Registry removal evicts cached owners; in-flight helper leases survive.
+    struct RetainedSnapshot : std::vector<id<MTLResource>> {
+        RetainedSnapshot() = default;
+        RetainedSnapshot(const RetainedSnapshot&) = delete;
+        ~RetainedSnapshot() { for (id object : *this) [object release]; }
+    };
+    using SnapshotLease = std::shared_ptr<const RetainedSnapshot>;
+private:
+    struct SnapshotEntry {
+        std::weak_ptr<const MVKDescriptorUseCache::Resources> key;
+        uint64_t mutation;
+        SnapshotLease lease;
+    };
+    std::mutex _snapshotLock;
+    std::vector<SnapshotEntry> _snapshotEntries;
+    size_t _snapshotResources = 0;
+    bool _snapshotCacheEnabled = false;
+    std::atomic<uint64_t> _mutations{0};
+public:
+    std::atomic<uint64_t> snapshotCacheHits{0}, snapshotCacheBuilds{0};
+    SnapshotLease retainedSnapshot(MVKDescriptorUseCache::Snapshot snapshot);
 	class IsLiveResult {
 		friend class MVKLiveList;
 		id _retainedObject;

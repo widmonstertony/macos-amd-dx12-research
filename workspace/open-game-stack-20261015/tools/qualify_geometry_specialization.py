@@ -17,6 +17,7 @@ def main():
     ap.add_argument('--library', type=Path, required=True)
     ap.add_argument('--label', required=True)
     ap.add_argument('--shaders', type=Path, required=True)
+    ap.add_argument('--shared-live-snapshots',action='store_true')
     ap.add_argument('--safe-math', action='store_true')
     ap.add_argument('--sync-mesh-libraries', action='store_true')
     ap.add_argument('--sync-mesh-pipelines', action='store_true')
@@ -43,6 +44,8 @@ def main():
                MVK_CONFIG_SHADER_DUMP_DIR=str(out / 'msl'),
                MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES='1', MVK_AMD_FRESH_MESH_LIBRARIES='1',
                MVK_AMD_SERIALIZE_PIPELINE_LINK='1')
+    if args.shared_live_snapshots:
+        env.update(MVK_AMD_SHARED_LIVE_SNAPSHOTS="1",MVK_AMD_ENCODER_LIVE_CACHE="1",MVK_AMD_CROSS_ENCODER_LIVE_CACHE="1",MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE="1",MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE="1",MVK_AMD_BATCH_LIVE_USE_RESOURCE="1")
     if args.safe_math:
         env['MVK_AMD_SAFE_MESH_LIBRARIES'] = '1'
     if args.sync_mesh_libraries:
@@ -68,6 +71,7 @@ def main():
            'metalValidationEnabled': 'Metal API Validation Enabled' in p.stderr}
     row['passed'] = p.returncode == 0 and result.get('passed', False)
     row['parameterReadback'] = args.parameter_readback
+    row['sharedLiveSnapshots'] = args.shared_live_snapshots
     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')
     print(json.dumps(row))
     return 0 if row['passed'] else 1

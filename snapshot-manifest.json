@@ -34255,8 +34255,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/arm_gpu_counters.py",
-      "bytes": 2759,
-      "sha256": "2a910035b8a104824ee90a7443e05151fae3193b1b49077aee4af7095d2c36ac",
+      "bytes": 5401,
+      "sha256": "3041e6eebc39484173538453fe182903345365407374c4a73b42c84690bb79ec",
       "executable": false
     },
     {
@@ -70138,5 +70138,5 @@
   "updatedUTC": "2026-10-20T17:13:21.607156+00:00",
   "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
-  "latestSourceUpdateUTC": "2026-10-21T23:41:34.462604+00:00"
+  "latestSourceUpdateUTC": "2026-10-22T00:01:11.697030+00:00"
 }

@@ -33831,6 +33831,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/geometry_payload_pressure_gpu.mm",
+      "bytes": 5436,
+      "sha256": "85ebf80d0857e183950500880530e081f6715bf5c19a75762a5f5b767fd0aa71",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/gpu_common.hpp",
       "bytes": 8202,
       "sha256": "904769f8cbd94dd6b912ad2b04ebdfb174b61a6a98252f2373a7564b2f099398",
@@ -33982,6 +33988,12 @@
       "path": "open-game-stack-20261015/src/mesh_differential_control.mm",
       "bytes": 6661,
       "sha256": "21f9c7727b4cacd9d38f6e4ed01bbc3a5b0d9a642e642e921de3166707d552d0",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/mesh_icb_capability_gpu.mm",
+      "bytes": 5931,
+      "sha256": "e8606fdc0953b1ec25151a8ed51cdfae2339b00e83ed158ada9330ab926172d6",
       "executable": false
     },
     {
@@ -70181,5 +70193,5 @@
   "currentSourceState": "Experimental descriptor-set membership delta path. Set-equivalent slot edits preserve snapshot identity. Small updates record weak-parent membership additions/removals. Resource helper reuses only retained parent identities, emits required per-encoder declarations, and falls back to full validation for intersecting registrations. CPU set-oracle and real GPU fixtures are included as authored source. Game performance benefit remains unverified; FSR3 support unverified. This source-only update includes no new local logs or environment evidence.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-22T00:01:11.697030+00:00",
-  "lastSourceOnlyUpdateUTC": "2026-10-22T01:42:11.052834+00:00"
+  "lastSourceOnlyUpdateUTC": "2026-10-22T01:49:04.059918+00:00"
 }

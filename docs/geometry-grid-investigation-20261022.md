@@ -43,4 +43,18 @@ No new game FPS result, costume stability result, or FSR3 validation is claimed.
 
 本检查点没有新的游戏帧率、换装稳定性或 FSR3 验证结论。未修改游戏分辨率及活动缓存。公开内容仅包含开源修改、自有测试和这份结论；不含游戏派生着色器或私人日志。
 
-Next investigation: compare compact shared vertex-payload layouts with matched vertex/geometry interfaces, then re-run the unique-output large indirect oracle. Do not deploy a failed control or call this complete based on device creation.
+Follow-up owned-source control: reducing both vertex/geometry payload layouts from 32 location slots to one did not fix a 1,031-primitive single dispatch. Both direct and indirect raw-Metal controls still missed 12,368 components each. Unused payload capacity alone is therefore insufficient to explain the failure. This control does not establish the exact driver scheduling mechanism.
+
+后续自有着色器对照：生产者和消费者同时缩减为一个位置槽位，大网格仍然错误，不能将未使用的载荷容量认作根因。
+
+## Device boundary / 设备能力障碍
+
+The owned `mesh_icb_capability_gpu.mm` probe requested a mesh pipeline with `supportIndirectCommandBuffers=YES`. Metal rejected the descriptor before GPU execution and terminated the process with this explicit validation message:
+
+> Use of mesh shader pipelines in indirect command buffers is not supported by this device.
+
+This blocks the proposed GPU-generated batched mesh ICB route on the tested 5600M/current macOS Metal implementation. No support bit was overridden and no closed driver was modified. This device restriction does not by itself identify the root cause of every game timeout or exclude every alternative translation design.
+
+自有能力测试在管线描述符校验阶段被 Metal 明确拒绝，尚未执行 GPU 工作。当前设备不支持网格管线的间接命令缓冲，所以这条 GPU 分批方案停止。未伪造支持或修改闭源驱动。该限制本身不能证明游戏所有超时的根因。
+
+An alternative compute-based or CPU-mediated path requires a separate engineering and performance assessment. The incomplete native candidate remains undeployed; no new playable-game claim is made.

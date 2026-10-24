@@ -31,6 +31,16 @@ static void append_record(const char *message);
 #endif
 
 static void *candidate_symbol(const char *name) {
+    /* The candidate is a re-export dependency, so it is already mapped before
+     * any exported Vulkan trampoline can run.  Resolving from RTLD_NEXT avoids
+     * re-entering dlopen while Wine is still inside its Vulkan-driver pthread
+     * once callback.  On macOS 26 that nested open can wait indefinitely in
+     * dyld even though the exact candidate image is already present. */
+    void *resolved = dlsym(RTLD_NEXT, name);
+    if (resolved) return resolved;
+
+    /* Keep the explicit handle as a fallback for standalone probe layouts
+     * that do not load the candidate through the re-export dependency. */
     static void *candidate;
     if (!candidate) {
         candidate = dlopen(

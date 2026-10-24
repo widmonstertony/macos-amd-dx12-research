@@ -1,0 +1,20 @@
+{
+  "nativeSHA256": "11e1412231c0f6ad8d8e8d05414f0a50b56072da4b2a31b1bc09df918caf1781",
+  "consumerSubmittedBeforeProducer": true,
+  "mutualQueueDependency": true,
+  "metalValidation": true,
+  "openExitCode": 0,
+  "elapsedSeconds": 4.441898584002047,
+  "output": {
+    "passed": true,
+    "consumerFamily": 3,
+    "producerFamily": 0,
+    "rounds": 1024,
+    "checkedWords": 4194304,
+    "mismatches": 0,
+    "totalMilliseconds": 1428.69,
+    "slowestRoundMilliseconds": 96.4984
+  },
+  "passed": true,
+  "gameStarted": false
+}

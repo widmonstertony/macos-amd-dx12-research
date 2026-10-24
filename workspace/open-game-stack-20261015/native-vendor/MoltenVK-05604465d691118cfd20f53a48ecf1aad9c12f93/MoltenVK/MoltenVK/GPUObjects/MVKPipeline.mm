@@ -44,6 +44,7 @@ using namespace std;
 using namespace mvk;
 using namespace SPIRV_CROSS_NAMESPACE;
 #include "MVKRuntimeTrace.h"
+#include "MVKQueueDependencyTrace.h"
 #include "MVKMeshReplay.h"
 #include "MVKPipelineLinkGate.h"
 #include "MVKMeshLinkDifferential.h"
@@ -3287,6 +3288,30 @@ MVKShaderLibrary* MVKPipelineCache::getShaderLibrary(SPIRVToMSLConversionConfigu
 													 MVKPipeline* pipeline,
 													 VkPipelineCreationFeedback* pShaderFeedback,
 													 uint64_t startTime) {
+	const char* shardedOption = getenv("MVK_AMD_SHARDED_SHADER_CACHE_LOCKS");
+	bool sharded = shardedOption && !strcmp(shardedOption, "1") &&
+		getPhysicalDevice()->isAMDHardware() && !_isExternallySynchronized;
+	if (sharded) {
+		// The legacy path held the global cache mutex while SPIR-V conversion
+		// and Metal library compilation completed. Protect only the module-key
+		// table here; each module cache serializes its own conversion variants.
+		MVKShaderLibraryCache* slCache;
+		{
+			lock_guard<mutex> lock(_shaderCacheLock);
+			slCache = getShaderLibraryCache(shaderModule->getKey());
+		}
+		bool wasAdded = false;
+		MVKShaderLibrary* shLib = slCache->getShaderLibrary(pContext, shaderModule, pipeline,
+			&wasAdded, pShaderFeedback, startTime);
+		if (wasAdded) {
+			lock_guard<mutex> lock(_shaderCacheLock);
+			markDirty();
+		} else if (pShaderFeedback) {
+			mvkEnableFlags(pShaderFeedback->flags,
+				VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT);
+		}
+		return shLib;
+	}
 	if (_isExternallySynchronized) {
 		return getShaderLibraryImpl(pContext, shaderModule, pipeline, pShaderFeedback, startTime);
 	} else {
@@ -3345,9 +3370,12 @@ protected:
 	SPIRVToMSLConversionConfiguration& getShaderConversionConfig() { return _pSLCache->_shaderLibraries[_index].first; }
 	MVKCompressor<std::string>& getCompressedMSL() { return _pSLCache->_shaderLibraries[_index].second->getCompressedMSL(); }
 	SPIRVToMSLConversionResultInfo& getShaderConversionResultInfo() { return _pSLCache->_shaderLibraries[_index].second->_shaderConversionResultInfo; }
-	MVKShaderCacheIterator(MVKShaderLibraryCache* pSLCache) : _pSLCache(pSLCache) {}
+	MVKShaderCacheIterator(MVKShaderLibraryCache* pSLCache) :
+		_pSLCache(pSLCache),
+		_cacheLock(pSLCache ? unique_lock<mutex>(pSLCache->_accessLock) : unique_lock<mutex>()) {}
 
 	MVKShaderLibraryCache* _pSLCache;
+	unique_lock<mutex> _cacheLock;
 	size_t _count = 0;
 	int32_t _index = -1;
 };
@@ -4143,6 +4171,13 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 		}
 		[detachedDesc release];
 	}
+	// Metal does not consistently copy a render descriptor's diagnostic label
+	// to the immutable pipeline state on Intel macOS. Preserve the shader-pair
+	// identity explicitly so failure snapshots and selected counter captures do
+	// not contain anonymous graphics pipelines.
+	if (_mtlRenderPipelineState && mtlRPLDesc.label.length)
+		objc_setAssociatedObject(_mtlRenderPipelineState, mvkPipelineTraceLabelKey(),
+			mtlRPLDesc.label, OBJC_ASSOCIATION_COPY_NONATOMIC);
 	// MTLRenderPipelineState is immutable and owns everything needed for use.
 	// Vulkan pipeline objects keep this descriptor alive, so leaving the
 	// per-request archive attached would pin one mapped .metalar file for every
@@ -4152,7 +4187,7 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 	uint64_t publishStart = mvkGetTimestamp();
 	bool published = shardPath && !loaded && !requireHit && _mtlRenderPipelineState &&
 		mvkStoreRenderShard(getMTLDevice(), mtlRPLDesc, shardPath);
-	if (useShards && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE"))
+	if (useShards && mvkRuntimeEnvFlagEnabled("MVK_AMD_RENDER_ARCHIVE_TRACE"))
 		mvkWriteRuntimeTrace(getMVKConfig(), @"render-archive", @{
 			@"shard":shardPath.lastPathComponent ?: @"", @"loaded":@(loaded),
 			@"strictArchiveHit":@(strictHit), @"requireHit":@(requireHit),
@@ -4314,7 +4349,7 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
     uint64_t publishStart = shardPath ? mvkGetTimestamp() : 0;
     if (shardPath && !shardLoaded && !requireHit && _mtlComputePipelineState)
         shardPublished = mvkStoreComputeShard(getMTLDevice(), plDesc, shardPath);
-    if (shardPath && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE"))
+    if (shardPath && mvkRuntimeEnvFlagEnabled("MVK_AMD_COMPUTE_ARCHIVE_TRACE"))
         mvkWriteRuntimeTrace(getMVKConfig(), @"compute-archive", @{
             @"request":request, @"key":plDesc.label ?: @"", @"loaded":@(shardLoaded),
             @"published":@(shardPublished), @"requireHit":@(requireHit),

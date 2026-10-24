@@ -31,6 +31,7 @@
 #include <string>
 #include <mutex>
 #include <atomic>
+#include <unordered_set>
 #include <os/lock.h>
 #include "MVKRegistrationLog.h"
 #include "MVKDescriptorUseCache.h"
@@ -583,6 +584,7 @@ class MVKLiveList {
 	std::atomic<uint64_t> _allAdditions{0};
 	std::unique_ptr<MVKRegistrationLog<id>> _registrationLog;
 	Group* getGroup(id object);
+	size_t getGroupIndex(id object);
 
 public:
     // Own Metal identities while a helper borrows the immutable validation.
@@ -595,18 +597,50 @@ public:
     using SnapshotLease = std::shared_ptr<const RetainedSnapshot>;
 private:
     struct SnapshotEntry {
-        std::weak_ptr<const MVKDescriptorUseCache::Resources> key;
-        uint64_t mutation;
+        // Strong ownership is bounded below. It keeps one predecessor alive so
+        // an immutable successor can reuse its retained liveness result.
+        MVKDescriptorUseCache::Snapshot key;
+        // Registration generation last proven unrelated to this immutable
+        // descriptor snapshot. Removals are handled by exact lease eviction.
+        uint64_t additions;
         SnapshotLease lease;
     };
     std::mutex _snapshotLock;
     std::vector<SnapshotEntry> _snapshotEntries;
+    // Resource identity -> immutable descriptor snapshots which retain it.
+    // This keeps destruction exact without scanning every large lease, so the
+    // cache can cover several real game frames instead of thrashing at 64K
+    // references.
+    std::unordered_map<id<MTLResource>,
+                       std::unordered_set<const MVKDescriptorUseCache::Resources*>> _snapshotReverse;
     size_t _snapshotResources = 0;
     bool _snapshotCacheEnabled = false;
+    using SnapshotIterator = std::vector<SnapshotEntry>::iterator;
+    SnapshotIterator eraseSnapshotEntry(SnapshotIterator it);
+    void indexSnapshotEntry(const SnapshotEntry& entry);
     std::atomic<uint64_t> _mutations{0};
 public:
-    std::atomic<uint64_t> snapshotCacheHits{0}, snapshotCacheBuilds{0};
+    struct SharedSnapshotStats {
+        uint64_t hits = 0, fullBuilds = 0, deltaBuilds = 0, evictions = 0;
+        uint64_t relatedFallbacks = 0, publishedEntries = 0, publishedResources = 0;
+    };
+    static SharedSnapshotStats takeSharedSnapshotStats() {
+        return {
+            _globalSnapshotHits.exchange(0, std::memory_order_acq_rel),
+            _globalSnapshotFullBuilds.exchange(0, std::memory_order_acq_rel),
+            _globalSnapshotDeltaBuilds.exchange(0, std::memory_order_acq_rel),
+            _globalSnapshotEvictions.exchange(0, std::memory_order_acq_rel),
+            _globalSnapshotRelatedFallbacks.exchange(0, std::memory_order_acq_rel),
+            _globalSnapshotPublishedEntries.exchange(0, std::memory_order_acq_rel),
+            _globalSnapshotPublishedResources.exchange(0, std::memory_order_acq_rel),
+        };
+    }
+    std::atomic<uint64_t> snapshotCacheHits{0}, snapshotCacheBuilds{0}, snapshotDeltaBuilds{0};
     SnapshotLease retainedSnapshot(MVKDescriptorUseCache::Snapshot snapshot);
+	// Validate one immutable descriptor snapshot while taking each sharded live
+	// registry lock at most once. The returned lease owns every accepted Metal
+	// object exactly as repeated isLive() calls would.
+	SnapshotLease retainedSnapshotOnce(MVKDescriptorUseCache::Snapshot snapshot);
 	class IsLiveResult {
 		friend class MVKLiveList;
 		id _retainedObject;
@@ -633,6 +667,10 @@ public:
         return _registrationLog->requiresValidation(since, contains, observed);
     }
 private:
+	inline static std::atomic<uint64_t> _globalSnapshotHits{0}, _globalSnapshotFullBuilds{0};
+	inline static std::atomic<uint64_t> _globalSnapshotDeltaBuilds{0}, _globalSnapshotEvictions{0};
+	inline static std::atomic<uint64_t> _globalSnapshotRelatedFallbacks{0};
+	inline static std::atomic<uint64_t> _globalSnapshotPublishedEntries{0}, _globalSnapshotPublishedResources{0};
 	IsLiveResult isLive_(id object);
 };
 

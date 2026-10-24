@@ -4,9 +4,9 @@
 
 Open-source D3D12 → Vulkan → Metal compatibility research for Intel Macs with AMD GPUs. The primary reproduction target is the licensed Windows Steam edition of **Stellar Blade**. Contributions on shaders, synchronization, caches, Wine windows, and performance are welcome.
 
-> **Experimental; not yet playable.** Earlier builds reached controllable scenes, with very low frame rates, blue rectangular corruption, and GPU timeouts. The latest complete game replay failed. Downloads are developer test kits, **not a finished solution that lets every Mac run Stellar Blade**. Probe success does not establish game compatibility, FSR3 support, or support for other games/GPUs.
+> **Experimental; not yet playable.** The latest game run reached correctly rendered output at about 6.5 FPS, then a single Metal command buffer ran for 6.34 seconds and triggered the AMD GPU watchdog. Downloads are developer test kits, **not a finished solution that lets every Mac run Stellar Blade**. Probe success does not establish game compatibility, FSR3 support, or support for other games/GPUs.
 
-See the [current research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
+See the [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and [full research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
 
 ## Download and test
 
@@ -42,9 +42,9 @@ Licensed Windows game → vkd3d-proton / DXIL-DXBC translation → Vulkan/SPIR-V
 | Compute / graphics fixtures | GPU readback and pixel comparisons | Complete DX12 / Robustness2 support |
 | Compute archives | 33 strict hits in an isolated Wine fixture | Elimination of game recompilation |
 | Steam launch and scene entry | Reached earlier; serious defects | Stable gameplay |
-| Latest full replay | Compute/graphics GPU timeout | A proven offending shader or driver bug |
+| Latest full replay | About 6.5 FPS; a 23-encoder graphics command buffer ran for 6.34 seconds before watchdog | A proven offending draw/dispatch or safe split point |
 
-See [STATE.md](docs/STATE.md). Priorities are the earliest incomplete graphics signal producer, native submission ordering, resource-declaration cost, and blue corruption. Feature-bit changes and device creation alone are not valid compatibility evidence.
+See the [latest checkpoint](docs/CHECKPOINT-2026-10-23.md). The immediate priority is a 30-second bounded per-draw capture that identifies the offending draw/dispatch among the 23 encoders, followed by an evidence-based shader, resource-binding, or intra-command-buffer segmentation fix. Feature-bit changes and device creation alone are not valid compatibility evidence.
 
 ## Source, build, recovery
 

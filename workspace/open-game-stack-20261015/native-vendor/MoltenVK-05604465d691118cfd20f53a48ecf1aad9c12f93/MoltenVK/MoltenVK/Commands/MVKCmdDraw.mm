@@ -23,11 +23,80 @@
 #include "MVKPipeline.h"
 #include "MVKQueryPool.h"
 #include "MVKFoundation.h"
+#include "MVKRuntimeTrace.h"
+#include "MVKGPUTimestampTrace.h"
+#include "MVKQueueDependencyTrace.h"
 #include "mvk_datatypes.hpp"
 
 
 #pragma mark -
 #pragma mark MVKCmdBindVertexBuffers
+
+template<class Bits>
+static uint32_t mvkCountTraceBits(const Bits& bits) {
+	uint32_t count = 0;
+	for (auto word : bits.setBitsList()) {
+		for (auto bit : word) { (void)bit; ++count; }
+	}
+	return count;
+}
+
+struct MVKDrawResourceTraceCounts {
+	uint32_t buffers = 0;
+	uint32_t textures = 0;
+	uint32_t samplers = 0;
+	uint32_t descriptorSets = 0;
+	uint32_t vertexBuffers = 0;
+	uint64_t vertexBytes = 0;
+};
+
+static MVKDrawResourceTraceCounts mvkDrawResourceTraceCounts(MVKCommandEncoder* cmdEncoder) {
+	MVKDrawResourceTraceCounts result;
+	auto add = [&](const MVKStageResourceBits& stage) {
+		result.buffers += mvkCountTraceBits(stage.buffers);
+		result.textures += mvkCountTraceBits(stage.textures);
+		result.samplers += mvkCountTraceBits(stage.samplers);
+		result.descriptorSets += mvkCountTraceBits(stage.descriptorSetData);
+	};
+	auto& exists = cmdEncoder->getMtlGraphics()._exists;
+	add(exists.vertex());
+	add(exists.fragment());
+#if MVK_XCODE_14
+	add(exists.object());
+	add(exists.mesh());
+#endif
+	for (const auto& binding : cmdEncoder->getVkGraphics()._vertexBuffers) {
+		id<MTLBuffer> buffer = binding.mtlBuffer;
+		if (!buffer) { continue; }
+		++result.vertexBuffers;
+		uint64_t length = buffer.length;
+		uint64_t available = binding.offset < length ? length - binding.offset : 0;
+		uint64_t requested = binding.size;
+		result.vertexBytes += std::min<uint64_t>(available, requested);
+	}
+	return result;
+}
+
+static void mvkRecordDrawMetadata(MVKCommandEncoder* cmdEncoder,
+							  id<MTLRenderCommandEncoder> encoder,
+							  NSString* mode,
+							  uint32_t elements,
+							  uint32_t instances,
+							  bool indexed) {
+	if (!mvkEncoderWorkTraceEnabled()) { return; }
+	auto counts = mvkDrawResourceTraceCounts(cmdEncoder);
+	auto& index = cmdEncoder->getVkGraphics()._indexBuffer;
+	id<MTLRenderPipelineState> pipeline = cmdEncoder->getMtlGraphics()._pipeline;
+	NSString* label = [NSString stringWithFormat:
+		@"mode=%@;pipeline=%@;elements=%u;instances=%u;buffers=%u;textures=%u;samplers=%u;sets=%u;vertexBuffers=%u;vertexBytes=%llu;index=%p;indexOffset=%llu;indexSize=%llu",
+		mode ?: @"", mvkPipelineTraceLabel(pipeline), elements, instances,
+		counts.buffers, counts.textures, counts.samplers, counts.descriptorSets,
+		counts.vertexBuffers, (unsigned long long)counts.vertexBytes,
+		indexed ? index.mtlBuffer : nil,
+		(unsigned long long)(indexed ? index.offset : 0),
+		(unsigned long long)(indexed ? index.size : 0)];
+	mvkRecordEncoderWorkImpl(encoder, @"draw", label);
+}
 
 template <size_t N>
 VkResult MVKCmdBindVertexBuffers<N>::setContent(MVKCommandBuffer* cmdBuff,
@@ -250,6 +319,84 @@ struct GeometryIndirectParams {
 static_assert(offsetof(GeometryIndirectParams, vertexStrides) == 28 && sizeof(GeometryIndirectParams) == 280,
               "GeometryIndirectParams must match the GPU converter");
 
+// Timed diagnostics for one selected geometry pipeline. These snapshots contain only public Metal
+// resource metadata and generated draw arguments; no vertex, index, texture, or descriptor content.
+static bool mvkTraceSelectedGeometryPipeline(MVKCommandEncoder* cmdEncoder) {
+	if (!mvkGPUTimestampArmed()) { return false; }
+	const char* selected = getenv("MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL");
+	if (!selected || !selected[0]) { return false; }
+	id<MTLRenderPipelineState> state = cmdEncoder->getMtlGraphics()._pipeline;
+	NSString* label = state.label ?: @"";
+	return (!strcmp(selected, "*")) || [label containsString:@(selected)];
+}
+
+static bool mvkTraceEverySelectedGeometryDraw() {
+	const char* selected = getenv("MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL");
+	return selected && !strcmp(selected, "*");
+}
+
+static NSDictionary* mvkGeometryResourceMetadata(MVKCommandEncoder* cmdEncoder) {
+	NSMutableArray* objectBuffers = [NSMutableArray array];
+	NSMutableArray* objectTextures = [NSMutableArray array];
+	NSMutableArray* vertexBuffers = [NSMutableArray array];
+	auto& mtl = cmdEncoder->getMtlGraphics();
+	const auto& objectExists = mtl._exists.object();
+	const auto& objectBindings = mtl._bindings.object();
+	for (uint32_t idx = 0; idx < kMVKMaxBufferCount; ++idx) {
+		if (!objectExists.buffers.get(idx)) { continue; }
+		const auto& binding = objectBindings.buffers[idx];
+		id<MTLBuffer> buffer = binding.buffer;
+		[objectBuffers addObject:buffer ? @{
+			@"index":@(idx), @"object":[NSString stringWithFormat:@"%p", buffer],
+			@"gpuAddress":@((unsigned long long)buffer.gpuAddress),
+			@"offset":@((unsigned long long)binding.offset),
+			@"length":@((unsigned long long)buffer.length),
+			@"storageMode":@(buffer.storageMode), @"hazardTrackingMode":@(buffer.hazardTrackingMode)
+		} : @{@"index":@(idx), @"object":@"nil", @"implicitMarker":@((unsigned long long)binding.offset)}];
+	}
+	for (uint32_t idx = 0; idx < kMVKMaxTextureCount; ++idx) {
+		if (!objectExists.textures.get(idx)) { continue; }
+		id<MTLTexture> texture = objectBindings.textures[idx];
+		[objectTextures addObject:texture ? @{
+			@"index":@(idx), @"object":[NSString stringWithFormat:@"%p", texture],
+			@"type":@(texture.textureType), @"pixelFormat":@(texture.pixelFormat),
+			@"width":@(texture.width), @"height":@(texture.height), @"depth":@(texture.depth),
+			@"arrayLength":@(texture.arrayLength), @"mipLevels":@(texture.mipmapLevelCount),
+			@"storageMode":@(texture.storageMode), @"usage":@(texture.usage)
+		} : @{@"index":@(idx), @"object":@"nil"}];
+	}
+	const auto& vk = cmdEncoder->getVkGraphics();
+	for (uint32_t idx = 0; idx < kMVKMaxBufferCount; ++idx) {
+		const auto& binding = vk._vertexBuffers[idx];
+		id<MTLBuffer> buffer = binding.mtlBuffer;
+		if (!buffer) { continue; }
+		[vertexBuffers addObject:@{
+			@"binding":@(idx), @"object":[NSString stringWithFormat:@"%p", buffer],
+			@"gpuAddress":@((unsigned long long)buffer.gpuAddress),
+			@"offset":@((unsigned long long)binding.offset), @"size":@((unsigned long long)binding.size),
+			@"stride":@(binding.stride), @"length":@((unsigned long long)buffer.length)
+		}];
+	}
+	const auto& index = vk._indexBuffer;
+	NSDictionary* indexBuffer = index.mtlBuffer ? @{
+		@"object":[NSString stringWithFormat:@"%p", index.mtlBuffer],
+		@"gpuAddress":@((unsigned long long)index.mtlBuffer.gpuAddress),
+		@"offset":@((unsigned long long)index.offset), @"size":@((unsigned long long)index.size),
+		@"length":@((unsigned long long)index.mtlBuffer.length), @"indexType":@(index.mtlIndexType)
+	} : @{};
+	return @{@"objectBuffers":objectBuffers, @"objectTextures":objectTextures,
+	         @"vertexBuffers":vertexBuffers, @"indexBuffer":indexBuffer};
+}
+
+static NSDictionary* mvkGeometryTraceBase(MVKCommandEncoder* cmdEncoder, NSString* mode) {
+	id<MTLRenderPipelineState> state = cmdEncoder->getMtlGraphics()._pipeline;
+	return @{
+		@"mode":mode, @"pipeline":state.label ?: @"",
+		@"commandBuffer":[NSString stringWithFormat:@"%p", cmdEncoder->_mtlCmdBuffer],
+		@"resources":mvkGeometryResourceMetadata(cmdEncoder)
+	};
+}
+
 /* Binds the transform feedback state of the geometry stage for a draw: mode 0 (off), 1 (count the
  * captured vertices of each input primitive) or 2 (write them at the slots computed from the counts).
  * See SPIRV-Cross emit_mesh_wrapper(). */
@@ -289,6 +436,27 @@ static void bindGeometryXfb(MVKCommandEncoder* cmdEncoder, MVKGraphicsPipeline* 
  * writes the vertices at their slots. indexBuffer is used by the object stage of indexed draws. */
 static void encodeGeometryMeshDraw(MVKCommandEncoder* cmdEncoder, MVKGraphicsPipeline* pipeline, const DrawInfo& drawInfo,
 								   uint32_t primCount, uint32_t instanceCount, id<MTLBuffer> indexBuffer) {
+	const bool traceSelected = mvkTraceSelectedGeometryPipeline(cmdEncoder);
+	if (traceSelected) {
+		NSMutableDictionary* trace = [mvkGeometryTraceBase(cmdEncoder, @"direct") mutableCopy];
+		trace[@"primitiveCount"] = @(primCount);
+		trace[@"instanceCount"] = @(instanceCount);
+		trace[@"indexed"] = @(indexBuffer != nil);
+		trace[@"baseVertex"] = @(drawInfo.baseVertex);
+		trace[@"baseInstance"] = @(drawInfo.baseInstance);
+		trace[@"topology"] = @(drawInfo.topoStrip);
+		trace[@"batchPrimitiveLimit"] = @(std::min<uint32_t>(256, primCount));
+		[cmdEncoder->_mtlCmdBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+			NSMutableDictionary* result = [trace mutableCopy];
+			result[@"commandBufferStatus"] = @(cb.status);
+			result[@"commandBufferError"] = cb.error.localizedDescription ?: @"";
+			mvkWriteRuntimeTrace(getGlobalMVKConfig(), @"geometry-draw", result);
+			[result release];
+		}];
+		[trace release];
+		mvkRecordEncoderWork(cmdEncoder->_mtlRenderEncoder, @"geometry-direct",
+			[NSString stringWithFormat:@"primitives=%u instances=%u indexed=%u", primCount, instanceCount, indexBuffer != nil]);
+	}
 	auto draw = [&](uint32_t xfbMode, const MVKMTLBufferAllocation* prims) {
 		id<MTLRenderCommandEncoder> mtlRendEnc = cmdEncoder->_mtlRenderEncoder;
 		if (indexBuffer) { [mtlRendEnc useResource: indexBuffer usage: MTLResourceUsageRead stages: MTLRenderStageObject]; }
@@ -402,6 +570,9 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 	const VkDeviceSize drawInfoOffset = mvkAlignByteCount(dispatchSize, 256);
 	const VkDeviceSize drawInfoStride = mvkAlignByteCount(sizeof(DrawInfo), 16);
 	const MVKMTLBufferAllocation* tempBuff = cmdEncoder->getTempMTLBuffer(drawInfoOffset + drawInfoStride * encodedDrawCount, true);
+	const bool traceSelected = mvkTraceSelectedGeometryPipeline(cmdEncoder);
+	const bool traceEverySelected = traceSelected && mvkTraceEverySelectedGeometryDraw();
+	NSDictionary* traceBase = traceSelected ? [mvkGeometryTraceBase(cmdEncoder, @"indirect") retain] : nil;
 
 	cmdEncoder->encodeStoreActions(true);
 	MVKMetalComputeCommandEncoderState& state = cmdEncoder->getMtlCompute();
@@ -418,6 +589,56 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 	state.bindStructBytes(mtlConvertEncoder, &drawInfoStride32,     6);
 	[mtlConvertEncoder dispatchThreadgroups: MTLSizeMake(mvkCeilingDivide<NSUInteger>(encodedDrawCount, mtlConvertState.threadExecutionWidth), 1, 1)
 					  threadsPerThreadgroup: MTLSizeMake(mtlConvertState.threadExecutionWidth, 1, 1)];
+	// The timed selected-pipeline diagnostic copies only the converter's generated dispatch and
+	// DrawInfo metadata. It never reads application vertex/index/texture data and never waits on CPU.
+	if (traceSelected) {
+		NSUInteger bytes = drawInfoOffset + drawInfoStride * encodedDrawCount;
+		id<MTLBuffer> readback = [tempBuff->_mtlBuffer.device newBufferWithLength:bytes options:MTLResourceStorageModeShared];
+		id<MTLBlitCommandEncoder> blit = cmdEncoder->getMTLBlitEncoder(kMVKCommandUseDrawIndirectConvertBuffers);
+		[blit copyFromBuffer:tempBuff->_mtlBuffer sourceOffset:tempBuff->_offset
+		          toBuffer:readback destinationOffset:0 size:bytes];
+		[cmdEncoder->_mtlCmdBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+			const uint32_t* grids = (const uint32_t*)readback.contents;
+			uint64_t maxWork = 0;
+			uint32_t maxIndex = 0;
+			for (uint32_t idx = 0; idx < encodedDrawCount; ++idx) {
+				uint64_t work = uint64_t(grids[idx * 3]) * grids[idx * 3 + 1];
+				if (work > maxWork) { maxWork = work; maxIndex = idx; }
+			}
+			// Small draws are already bounded and do not need a file. A failed command buffer is
+			// always retained, even if metadata was not yet visible after a GPU fault.
+			if (traceEverySelected || maxWork > 256 || cb.status != MTLCommandBufferStatusCompleted) {
+				NSMutableArray* rows = [NSMutableArray array];
+				for (uint32_t idx = 0; idx < encodedDrawCount; ++idx) {
+					uint32_t batchIndex = idx % params.batchCount;
+					bool nearMaximum = idx + 2 >= maxIndex && idx <= maxIndex + 2;
+					if (encodedDrawCount > 128 && batchIndex + 2 < params.batchCount && !nearMaximum) { continue; }
+					const DrawInfo* info = (const DrawInfo*)((const char*)readback.contents + drawInfoOffset + drawInfoStride * idx);
+					[rows addObject:@{
+						@"encodedIndex":@(idx), @"sourceDraw":@(idx / params.batchCount), @"batchIndex":@(batchIndex),
+						@"gridX":@(grids[idx * 3]), @"gridY":@(grids[idx * 3 + 1]), @"gridZ":@(grids[idx * 3 + 2]),
+						@"primitiveBase":@(info->primitiveBase), @"primitiveCount":@(info->primitiveCount),
+						@"instanceBase":@(info->instanceBase), @"baseInstance":@(info->baseInstance),
+						@"baseVertex":@(info->baseVertex), @"indexed":@(info->indexed),
+						@"indexSize":@(info->indexSize), @"indexBufferAddress":@((unsigned long long)info->indexBuffer),
+						@"topology":@(info->topoStrip)
+					}];
+				}
+				NSMutableDictionary* result = [traceBase mutableCopy];
+				result[@"sourceDrawCount"] = @(drawCount);
+				result[@"batchCount"] = @(params.batchCount);
+				result[@"encodedDrawCount"] = @(encodedDrawCount);
+				result[@"maximumGridWork"] = @((unsigned long long)maxWork);
+				result[@"maximumGridIndex"] = @(maxIndex);
+				result[@"commandBufferStatus"] = @(cb.status);
+				result[@"commandBufferError"] = cb.error.localizedDescription ?: @"";
+				result[@"generatedDraws"] = rows;
+				mvkWriteRuntimeTrace(getGlobalMVKConfig(), @"geometry-draw", result);
+				[result release];
+			}
+		}];
+		[readback release];
+	}
 	// Opt-in owned-fixture diagnostic. Copy only the generated draw parameters,
 	// never vertex/index contents; no synchronous CPU wait or runtime fallback.
 	if (getenv("MVK_OWNED_GEOMETRY_PARAMETER_READBACK") && drawCount == 1) {
@@ -437,7 +658,7 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 	cmdEncoder->beginMetalRenderPass(kMVKCommandUseRestartSubpass);
 
 	cmdEncoder->finalizeDrawState(kMVKGraphicsStageRasterization);	// Ensure all updated state has been submitted to Metal
-	if ( !pipeline->hasValidMTLPipelineStates() ) { return; }
+	if ( !pipeline->hasValidMTLPipelineStates() ) { [traceBase release]; return; }
 
 	id<MTLRenderCommandEncoder> mtlRendEnc = cmdEncoder->_mtlRenderEncoder;
 	if (ibb) { [mtlRendEnc useResource: ibb->mtlBuffer usage: MTLResourceUsageRead stages: MTLRenderStageObject]; }
@@ -449,11 +670,18 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 		[mtlRendEnc setObjectBuffer: tempBuff->_mtlBuffer
 							 offset: tempBuff->_offset + drawInfoOffset + drawInfoStride * drawIdx
 							atIndex: pipeline->getDrawInfoBufferIndex()];
+		if (traceSelected && drawIdx % params.batchCount + 2 >= params.batchCount) {
+			mvkRecordEncoderWork(mtlRendEnc, @"geometry-tail",
+				[NSString stringWithFormat:@"sourceDraw=%u batch=%u/%u drawInfoOffset=%llu",
+				 drawIdx / params.batchCount, drawIdx % params.batchCount, params.batchCount,
+				 (unsigned long long)(tempBuff->_offset + drawInfoOffset + drawInfoStride * drawIdx)]);
+		}
 		[mtlRendEnc drawMeshThreadgroupsWithIndirectBuffer: tempBuff->_mtlBuffer
 									  indirectBufferOffset: tempBuff->_offset + sizeof(MTLDispatchThreadgroupsIndirectArguments) * drawIdx
 								threadsPerObjectThreadgroup: MTLSizeMake(1, 1, 1)
 								  threadsPerMeshThreadgroup: MTLSizeMake(1, 1, 1)];
 	}
+	[traceBase release];
 }
 #endif
 
@@ -633,6 +861,8 @@ void MVKCmdDraw::encode(MVKCommandEncoder* cmdEncoder) {
                 break;
 			}
             case kMVKGraphicsStageRasterization:
+				mvkRecordDrawMetadata(cmdEncoder, cmdEncoder->_mtlRenderEncoder,
+					@"direct", _vertexCount, _instanceCount, false);
                 if (pipeline->isTessellationPipeline()) {
                     if (pipeline->needsTessCtlOutputBuffer()) {
                         [cmdEncoder->_mtlRenderEncoder setVertexBuffer: tcOutBuff->_mtlBuffer
@@ -901,6 +1131,8 @@ void MVKCmdDrawIndexed::encode(MVKCommandEncoder* cmdEncoder) {
                 break;
 			}
             case kMVKGraphicsStageRasterization:
+				mvkRecordDrawMetadata(cmdEncoder, cmdEncoder->_mtlRenderEncoder,
+					@"direct-indexed", _indexCount, _instanceCount, true);
                 if (pipeline->isTessellationPipeline()) {
                     if (pipeline->needsTessCtlOutputBuffer()) {
                         [cmdEncoder->_mtlRenderEncoder setVertexBuffer: tcOutBuff->_mtlBuffer

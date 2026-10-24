@@ -1,0 +1,93 @@
+{
+  "timeUTC": "2026-10-24T03:26:51.371375+00:00",
+  "nativeSHA256": "11e1412231c0f6ad8d8e8d05414f0a50b56072da4b2a31b1bc09df918caf1781",
+  "registrationDeltaCache": true,
+  "descriptorWriteShards": true,
+  "metalValidationEnabled": true,
+  "tests": [
+    {
+      "test": "registration_log_control",
+      "exitCode": 0,
+      "elapsedSeconds": 0.04382072400767356,
+      "output": {
+        "passed": true,
+        "concurrentAppends": 100000,
+        "monotonicReads": 23765,
+        "boundedFallbacksTested": true
+      },
+      "passed": true
+    },
+    {
+      "test": "resource_lookup_epoch_gpu",
+      "exitCode": 0,
+      "elapsedSeconds": 1.5586970939912135,
+      "output": {
+        "passed": true,
+        "GPUWordsChecked": 6,
+        "mismatches": 0,
+        "absentIdentities": 4096,
+        "initialLookups": 0,
+        "lookupsAfterDuplicate": 0,
+        "crossEncoderSnapshotReuse": true,
+        "negativeLiveCache": false,
+        "lastEncoderSnapshotSkips": 1,
+        "CPUControls": [
+          {
+            "snapshotReuse": false,
+            "negativeCache": false,
+            "CPUms": 13.4514,
+            "liveLookups": 0,
+            "absenceHits": 0
+          },
+          {
+            "snapshotReuse": true,
+            "negativeCache": false,
+            "CPUms": 0.161516,
+            "liveLookups": 0,
+            "absenceHits": 0
+          },
+          {
+            "snapshotReuse": false,
+            "negativeCache": true,
+            "CPUms": 11.9503,
+            "liveLookups": 0,
+            "absenceHits": 0
+          },
+          {
+            "snapshotReuse": true,
+            "negativeCache": true,
+            "CPUms": 0.153015,
+            "liveLookups": 0,
+            "absenceHits": 0
+          }
+        ],
+        "unrelatedRegistrationsPerCPUControl": 32,
+        "GPUUnrelatedOnlyLookupDelta": 0
+      },
+      "passed": true
+    },
+    {
+      "test": "heap_write_declaration_gpu",
+      "exitCode": 0,
+      "elapsedSeconds": 1.3919914799917024,
+      "output": {
+        "GPUOutputPassed": true,
+        "GPUWordsChecked": 128,
+        "mismatches": 0,
+        "nativeHeapDeclarations": 1,
+        "nativeReadResourceDeclarations": 0,
+        "nativeWriteResourceDeclarations": 2,
+        "requiredWriteResources": 2,
+        "overlappingSnapshots": 2,
+        "duplicateNativeReadDeclarations": 0,
+        "snapshotBulkFastHits": 2,
+        "snapshotBulkResources": 8,
+        "writeDeclarationContractPassed": true,
+        "passed": true
+      },
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "gameStarted": false
+}

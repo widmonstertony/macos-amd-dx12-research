@@ -42,6 +42,18 @@ public:
         }
         return end();
     }
+    // Hot resource-binding paths only need the mapped value. Returning it
+    // directly avoids reconstructing a deque iterator (and its segmented
+    // index calculation) after every successful hash-table probe.
+    Value* findValue(Key key) {
+        if(slots.empty())return nullptr;
+        auto i=std::hash<Key>{}(key)&(slots.size()-1);
+        while(slots[i].indexPlusOne) {
+            if(slots[i].key==key)return &entries[slots[i].indexPlusOne-1].second;
+            i=(i+1)&(slots.size()-1);
+        }
+        return nullptr;
+    }
     std::pair<iterator,bool> emplace(Key key, const Value& value) {
         if(slots.empty())reserve(1);
         auto i=std::hash<Key>{}(key)&(slots.size()-1);

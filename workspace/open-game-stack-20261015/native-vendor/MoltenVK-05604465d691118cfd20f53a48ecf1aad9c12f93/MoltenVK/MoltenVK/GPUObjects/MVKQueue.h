@@ -179,9 +179,11 @@ public:
 	uint64_t value;
 	VkPipelineStageFlags2 stageMask;
 	uint32_t deviceIndex;
+	bool hostWaitSatisfied = false;
 
 	void encodeWait(id<MTLCommandBuffer> mtlCmdBuff);
 	void encodeSignal(id<MTLCommandBuffer> mtlCmdBuff);
+	void gateUnsignaledTimelineWaitOnHost();
 	MVKSemaphoreSubmitInfo(const VkSemaphoreSubmitInfo& semaphoreSubmitInfo);
 	MVKSemaphoreSubmitInfo(const VkSemaphore semaphore, VkPipelineStageFlags stageMask);
 	MVKSemaphoreSubmitInfo(const MVKSemaphoreSubmitInfo& other);

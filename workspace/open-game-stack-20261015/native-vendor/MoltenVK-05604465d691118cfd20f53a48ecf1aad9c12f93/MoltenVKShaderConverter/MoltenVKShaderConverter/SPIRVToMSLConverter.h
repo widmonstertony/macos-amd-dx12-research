@@ -45,6 +45,10 @@ namespace mvk {
 		uint32_t numTessControlPoints = 0;
 		bool shouldFlipVertexY = true;
 		bool shouldFixupClipSpace = false;
+		// Give every stage in a Metal mesh pipeline a stable name derived from
+		// its complete generated MSL. This avoids long-lived AMD Metal compiler
+		// entry-point namespace collisions between otherwise separate libraries.
+		bool uniqueEntryPointName = false;
 
 		/**
 		 * Returns whether the specified options match this one.

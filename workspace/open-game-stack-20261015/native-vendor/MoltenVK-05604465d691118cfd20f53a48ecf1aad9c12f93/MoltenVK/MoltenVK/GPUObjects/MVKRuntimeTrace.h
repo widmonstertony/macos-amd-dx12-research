@@ -6,6 +6,10 @@
 #include <objc/runtime.h>
 #include <CommonCrypto/CommonDigest.h>
 #include "MVKMeshLinkDifferential.h"
+static inline bool mvkRuntimeEnvFlagEnabled(const char* name) {
+    const char* value = getenv(name);
+    return value && !strcmp(value, "1");
+}
 static inline bool mvkGPUTimeoutTraceEnabled() {
     static const bool enabled = [] { const char* v = getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v, "1"); }();
     return enabled;
@@ -55,8 +59,9 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
         ![kind isEqualToString:@"compute-failure"] &&
         ![kind isEqualToString:@"slow-compute"] &&
         !([kind isEqualToString:@"gpu-timestamps"] && getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH")) &&
-        !([kind isEqualToString:@"render-archive"] && getenv("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
-        !([kind isEqualToString:@"compute-archive"] && getenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
+        !([kind isEqualToString:@"geometry-draw"] && getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH")) &&
+        !([kind isEqualToString:@"render-archive"] && mvkRuntimeEnvFlagEnabled("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&
+        !([kind isEqualToString:@"compute-archive"] && mvkRuntimeEnvFlagEnabled("MVK_AMD_COMPUTE_ARCHIVE_TRACE")) &&
         !([kind isEqualToString:@"present-progress"] && getenv("MVK_AMD_QUEUE_TIMING") && !strcmp(getenv("MVK_AMD_QUEUE_TIMING"), "1")) &&
         !(mvkGPUFailureTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"queue-config"])) &&
         !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"present-progress"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"] ||

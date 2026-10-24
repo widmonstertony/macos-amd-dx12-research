@@ -8,28 +8,52 @@ inline bool mvkGPUTimestampArmed() {
     static const MVKTimedTraceArm arm(getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH"));
     return arm.enabled();
 }
+inline const char* mvkGPUCounterPipelineLabel() {
+    const char* selected=getenv("MVK_AMD_GPU_COUNTER_PIPELINE_LABEL");
+    if(selected&&selected[0])return selected;
+    return getenv("MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL");
+}
 inline std::atomic<unsigned>& mvkGPUTimestampInFlight() { static std::atomic<unsigned> n{0}; return n; }
+inline bool mvkAllocateGPUTimestampBuffer(NSMutableDictionary* record, id<MTLDevice> device) {
+    if (record[@"gpuCounterBuffer"] || !device || !mvkGPUTimestampArmed()) return record[@"gpuCounterBuffer"] != nil;
+    auto& n=mvkGPUTimestampInFlight();
+    if(n.fetch_add(1)>=64) { n.fetch_sub(1); return false; }
+    if (![device supportsCounterSampling:MTLCounterSamplingPointAtDrawBoundary] ||
+        ![device supportsCounterSampling:MTLCounterSamplingPointAtDispatchBoundary]) { n.fetch_sub(1);return false; }
+    id<MTLCounterSet>set=nil;
+    for(id<MTLCounterSet>s in device.counterSets)if([s.name isEqualToString:MTLCommonCounterSetTimestamp]){set=s;break;}
+    if(!set){n.fetch_sub(1);return false;}
+    auto desc=[MTLCounterSampleBufferDescriptor new];desc.counterSet=set;desc.storageMode=MTLStorageModeShared;desc.sampleCount=128;
+    NSError* error=nil;auto buffer=[device newCounterSampleBufferWithDescriptor:desc error:&error];[desc release];
+    if(!buffer){n.fetch_sub(1);return false;}
+    record[@"gpuCounterBuffer"]=buffer;[buffer release];record[@"gpuCounterEvents"]=[NSMutableArray array];
+    return true;
+}
 inline void mvkBeginGPUTimestamps(NSMutableDictionary* record, id<MTLCommandBuffer> cb, uint32_t family) {
     if (family != 0 || !mvkGPUTimestampArmed()) return;
-    auto& n=mvkGPUTimestampInFlight();
-    if(n.fetch_add(1)>=64) { n.fetch_sub(1); return; }
-    id<MTLDevice>d=cb.commandQueue.device;
-    if (![d supportsCounterSampling:MTLCounterSamplingPointAtDrawBoundary] ||
-        ![d supportsCounterSampling:MTLCounterSamplingPointAtDispatchBoundary]) { n.fetch_sub(1);return; }
-    id<MTLCounterSet>set=nil;
-    for(id<MTLCounterSet>s in d.counterSets)if([s.name isEqualToString:MTLCommonCounterSetTimestamp]){set=s;break;}
-    if(!set){n.fetch_sub(1);return;}
-    auto desc=[MTLCounterSampleBufferDescriptor new];desc.counterSet=set;desc.storageMode=MTLStorageModeShared;desc.sampleCount=128;
-    NSError* error=nil;auto buffer=[d newCounterSampleBufferWithDescriptor:desc error:&error];[desc release];
-    if(!buffer){n.fetch_sub(1);return;}
-    record[@"gpuCounterBuffer"]=buffer;[buffer release];record[@"gpuCounterEvents"]=[NSMutableArray array];
+    const char* selected=mvkGPUCounterPipelineLabel();
+    if(selected&&selected[0]) {
+        // A busy game can have more than 64 ordinary command buffers in flight
+        // before the selected mesh pipeline is reached. Reserve the bounded
+        // counter budget for the command buffer that actually contains it.
+        record[@"gpuCounterLazyGeometryLabel"]=@(selected);
+        return;
+    }
+    mvkAllocateGPUTimestampBuffer(record, cb.commandQueue.device);
 }
 inline void mvkSampleGPUTimestamp(NSMutableDictionary* record, id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
-    if(!record[@"gpuCounterBuffer"])return;
+    if(!record[@"gpuCounterBuffer"]){
+        NSString* selected=record[@"gpuCounterLazyGeometryLabel"];
+        if(!selected||![kind containsString:@"pipeline"]||
+           (! [selected isEqualToString:@"*"] && ![label containsString:selected]))return;
+        if(!mvkAllocateGPUTimestampBuffer(record,encoder.device))return;
+        record[@"gpuCounterSelectedAt"] = label ?: @"";
+    }
     bool render=[encoder respondsToSelector:@selector(setRenderPipelineState:)];
     bool compute=[encoder respondsToSelector:@selector(setComputePipelineState:)];
     if(!render&&!compute)return;
-    if(![kind containsString:@"pipeline"]&&![kind isEqualToString:@"encoder-end"])return;
+    if(![kind containsString:@"pipeline"]&&![kind isEqualToString:@"encoder-end"]&&
+       ![kind isEqualToString:@"geometry-tail"])return;
     @synchronized(record){
         NSMutableArray* rows=record[@"gpuCounterEvents"];
         if(rows.count>=128){record[@"gpuCountersTruncated"]=@YES;return;}

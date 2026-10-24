@@ -691,7 +691,8 @@ static void executeBindOps(id<MTLCommandEncoder> encoder,
 		     op.opcode == MVKDescriptorBindOperationCode::UseTextureWithLiveCheck)) {
 			// This snapshot contains identities, not a liveness decision. Preserve
 			// the normal encoder-scoped validation, retention and usage upgrades.
-			auto resources = set->resourceUseCache->resources(src, count, stride);
+			auto resources = mvkEncoder.getState().mtlShared()._useResource.descriptorSnapshot(
+			    set->resourceUseCache, src, count, stride);
 			MVKLiveList& list = op.opcode == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck ?
 			    mvkEncoder.getDevice()->getLiveResources().buffers : mvkEncoder.getDevice()->getLiveResources().textures;
 			mvkEncoder.getState().mtlShared()._useResource.addLiveSnapshot(resources, list, encoder, binder.useResource, useResourceStage, target);
@@ -1066,8 +1067,9 @@ static bool isCompatible(MVKUseResourceHelper::ResourceInfo current, MVKUseResou
 void MVKUseResourceHelper::supersedePending(id<MTLResource> resource, ResourceInfo& info) {
     if (info.pendingBatch != pendingBatchGeneration) return;
     auto& pending = entries[info.stages].get(info.write);
-    if (info.pendingIndex < pending.size() && pending[info.pendingIndex] == resource) {
-        pending[info.pendingIndex] = nil;
+    if (info.pendingIndex < pending.size() && pending.resources[info.pendingIndex] == resource) {
+        pending.resources[info.pendingIndex] = nil;
+        pending.heaps[info.pendingIndex] = nil;
         if (resourceUseStats) ++statsQueuedSuperseded;
     }
     info.pendingBatch = 0;
@@ -1075,7 +1077,12 @@ void MVKUseResourceHelper::supersedePending(id<MTLResource> resource, ResourceIn
 void MVKUseResourceHelper::queuePending(id<MTLResource> resource, ResourceInfo& info) {
     auto& pending = entries[info.stages].get(info.write);
     size_t index = pending.size();
-    pending.push_back(resource);
+	if (batchArgumentHeaps && !info.write && !info.heapKnown) {
+		info.heap = resource.heap;
+		info.heapKnown = true;
+		if (resourceUseStats) ++statsHeapQueries;
+	}
+	pending.push_back(resource, info.heap);
     info.pendingIndex = index;
     info.pendingBatch = pendingBatchGeneration;
 }
@@ -1086,7 +1093,7 @@ void MVKUseResourceHelper::finishPendingBatch() {
     }
 }
 
-void MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages stage, bool write) {
+MVKUseResourceHelper::ResourceInfo* MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages stage, bool write) {
 	ResourceInfo info { stage, write, true, false, encoderGeneration };
 	auto res = used.emplace(resource, info);
 	ResourceInfo& stored = res.first->second;
@@ -1096,8 +1103,12 @@ void MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages 
 		// stage/usage bookkeeping. Preserve that owned reference while starting
 		// the resource's declarations for the new Metal encoder.
 		bool liveRetained = stored.liveRetained;
+		id<MTLHeap> retainedHeap = liveRetained ? stored.heap : nil;
+		bool retainedHeapKnown = liveRetained && stored.heapKnown;
 		stored = info;
 		stored.liveRetained = liveRetained;
+		stored.heap = retainedHeap;
+		stored.heapKnown = retainedHeapKnown;
 	}
 	if (fresh || !isCompatible(stored, info)) {
 		if (!fresh) {
@@ -1108,6 +1119,7 @@ void MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages 
 		}
         queuePending(resource, stored);
 	}
+	return &stored;
 }
 
 // Snapshot handles are admitted only after validation and an owned retain.
@@ -1128,7 +1140,13 @@ void MVKUseResourceHelper::addRetainedSnapshotResource(const RetainedSnapshotRes
     }
     ResourceInfo info{stage,write,true,true,encoderGeneration};
     bool fresh = stored.generation != encoderGeneration;
-    if (fresh) stored = info;
+    if (fresh) {
+		id<MTLHeap> retainedHeap = stored.heap;
+		bool retainedHeapKnown = stored.heapKnown;
+		stored = info;
+		stored.heap = retainedHeap;
+		stored.heapKnown = retainedHeapKnown;
+	}
     if (fresh || !isCompatible(stored,info)) {
         if (!fresh) {
             supersedePending(record.resource,stored);
@@ -1138,6 +1156,35 @@ void MVKUseResourceHelper::addRetainedSnapshotResource(const RetainedSnapshotRes
         }
         queuePending(record.resource,stored);
     }
+}
+
+MVKUseResourceHelper::SharedRetainedReadBatch
+MVKUseResourceHelper::buildRetainedReadBatch(const std::shared_ptr<RetainedSnapshot>& live) {
+    if (!live || live->empty()) return nullptr;
+    auto batch = std::make_shared<RetainedReadBatch>();
+    batch->records = *live;
+    return batch;
+}
+
+MVKDescriptorUseCache::Snapshot MVKUseResourceHelper::descriptorSnapshot(
+    MVKDescriptorUseCache* cache, const char* src, uint32_t count, size_t stride) {
+    for (auto& entry : cachedDescriptorSnapshots) {
+        if (entry.cache != cache || entry.src != src || entry.count != count || entry.stride != stride) continue;
+        if (entry.reuse.canReuse()) { if (resourceUseStats) ++statsDescriptorSnapshotFastHits; return entry.snapshot; }
+        if (resourceUseStats) ++statsDescriptorSnapshotMisses;
+        auto updated = cache->versionedResources(src, count, stride);
+        entry.snapshot = std::move(updated.snapshot);
+        entry.reuse = std::move(updated.reuse);
+        return entry.snapshot;
+    }
+    if (resourceUseStats) ++statsDescriptorSnapshotMisses;
+    auto updated = cache->versionedResources(src, count, stride);
+    // Descriptor-set layouts make this key set stable and small. Bound only
+    // CPU metadata; immutable snapshots already owned by declaredSnapshots
+    // remain valid if this direct lookup table is reset.
+    if (cachedDescriptorSnapshots.size() >= 512) cachedDescriptorSnapshots.clear();
+    cachedDescriptorSnapshots.push_back({cache, src, count, stride, std::move(updated.reuse), updated.snapshot});
+    return updated.snapshot;
 }
 
 void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
@@ -1165,7 +1212,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
                 if (resourceUseStats) ++statsRegistrationQueries;
                 uint64_t observed = additions;
                 bool validate = list.registrationRequiresValidation(entry.additions, [&](id resource) {
-                    return std::find(snapshot->begin(), snapshot->end(), resource) != snapshot->end();
+                    return snapshot->contains(resource);
                 }, observed);
                 if (validate) break;
                 entry.additions = additions = observed;
@@ -1185,7 +1232,23 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
                 // helper still owns. Each new encoder still receives all its
                 // stage/access declarations through the normal helper path.
                 if (resourceUseStats) { ++statsSnapshotFilterHits; statsSnapshotWordsSkipped+=snapshot->size()-entry.liveSnapshot->size(); }
-                for (const auto& record : *entry.liveSnapshot) addRetainedSnapshotResource(record,encoder,func,stage,write);
+                if (!write && batchLiveResources && entry.readBatch) {
+                    // Retained snapshots often overlap heavily.  Reuse their
+                    // stable ResourceInfo nodes so addRetainedSnapshotResource
+                    // can suppress resources already declared for this Metal
+                    // encoder/stage.  Appending raw identities here caused the
+                    // game to submit millions of duplicate useResources
+                    // entries to the AMD driver every few seconds.
+                    for (const auto& record : entry.readBatch->records)
+                        addRetainedSnapshotResource(record,encoder,func,stage,false);
+                    if (resourceUseStats) {
+                        ++statsSnapshotBulkFastHits;
+                        statsSnapshotBulkResources += entry.readBatch->records.size();
+                    }
+                } else {
+                    for (const auto& record : *entry.liveSnapshot)
+                        addRetainedSnapshotResource(record,encoder,func,stage,write);
+                }
                 if (entry.generation != encoderGeneration) entry.readStages = entry.writeStages = 0;
                 entry.readStages |= stageMask;
                 if (write) entry.writeStages |= stageMask;
@@ -1203,7 +1266,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         uint64_t observed = additions;
         if (resourceUseStats) ++statsRegistrationQueries;
         bool validate = list.registrationRequiresValidation(deltaPrior->additions, [&](id resource) {
-            return std::find(snapshot->begin(),snapshot->end(),resource) != snapshot->end();
+            return snapshot->contains(resource);
         }, observed);
         if (validate) deltaPrior = nullptr;
         else {
@@ -1228,7 +1291,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         }
         for (id<MTLResource> resource : snapshot->added)
             if (addImmediateLive(resource,list,encoder,func,stage,write))
-                live->push_back({resource,&used.find(resource)->second});
+                live->push_back({resource,used.findValue(resource)});
         if (resourceUseStats) {
             ++statsSnapshotDeltaHits;
             statsSnapshotDeltaReused += snapshot->size()-snapshot->added.size();
@@ -1237,6 +1300,13 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
     } else {
         if (resourceUseStats) statsSnapshotColdWords += snapshot->size();
         auto lease = crossEncoderSnapshotReuse ? list.retainedSnapshot(snapshot) : nullptr;
+        // A real 5600M crossover control shows that the fixed partitioning and
+        // ordering cost wins only for larger descriptor tables. Small tables
+        // stay on the direct path; otherwise a one-resource snapshot pays for
+        // 256 shard counters and a temporary ordering allocation.
+        static constexpr size_t kShardedLiveValidationMinimum = 128;
+        if (!lease && snapshot->size() >= kShardedLiveValidationMinimum)
+            lease = list.retainedSnapshotOnce(snapshot);
         if (lease) {
             if (std::find(retainedSnapshotLeases.begin(),retainedSnapshotLeases.end(),lease)==retainedSnapshotLeases.end())
                 retainedSnapshotLeases.push_back(lease);
@@ -1250,7 +1320,7 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
         } else {
             for (id<MTLResource> resource : *snapshot) {
                 bool valid = addImmediateLive(resource,list,encoder,func,stage,write);
-                if (valid && live) live->push_back({resource,&used.find(resource)->second});
+                if (valid && live) live->push_back({resource,used.findValue(resource)});
             }
         }
     }
@@ -1269,7 +1339,8 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
                 readStages |= prior->readStages;
                 writeStages |= prior->writeStages;
             }
-            DeclaredSnapshot updated{std::move(snapshot),&list,readStages,writeStages,additions,encoderGeneration,std::move(live)};
+            auto readBatch = buildRetainedReadBatch(live);
+            DeclaredSnapshot updated{std::move(snapshot),&list,readStages,writeStages,additions,encoderGeneration,std::move(live),std::move(readBatch)};
             if (prior) *prior=std::move(updated); else declaredSnapshots.push_back(std::move(updated));
             snapshotLiveIdentities=snapshotLiveIdentities-previous+incoming;
         }
@@ -1281,6 +1352,11 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     struct Totals {
         uint64_t registrationQueries=0, registrationUnrelated=0, calls=0, lookups=0, retainedHits=0, absentHits=0, liveFound=0, snapshotCalls=0, snapshotSkips=0, snapshotWordsSkipped=0, snapshotFilterHits=0, resets=0, capClears=0, maxUsed=0;
         uint64_t snapshotDeltaHits=0, snapshotDeltaReused=0, snapshotColdWords=0, snapshotCacheClears=0, queuedSuperseded=0;
+        uint64_t descriptorSnapshotFastHits=0, descriptorSnapshotMisses=0;
+        uint64_t snapshotBulkFastHits=0, snapshotBulkResources=0;
+        uint64_t descriptorWriteRanges=0, descriptorUnchangedWriteRanges=0, descriptorChangedWriteRanges=0;
+		uint64_t bindCalls=0, inputRead=0, inputReadWrite=0;
+		uint64_t preciseRead=0, preciseReadWrite=0, collapsedRead=0, heapDeclarations=0, heapQueries=0;
         double start=0;
     };
     static std::mutex lock;
@@ -1296,17 +1372,50 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     statsSnapshotCalls=statsSnapshotSkips=statsSnapshotWordsSkipped=statsSnapshotFilterHits=0;
     total.snapshotDeltaHits+=statsSnapshotDeltaHits;total.snapshotDeltaReused+=statsSnapshotDeltaReused;total.snapshotColdWords+=statsSnapshotColdWords;total.snapshotCacheClears+=statsSnapshotCacheClears;
     statsSnapshotDeltaHits=statsSnapshotDeltaReused=statsSnapshotColdWords=statsSnapshotCacheClears=0;
+    total.descriptorSnapshotFastHits+=statsDescriptorSnapshotFastHits;
+    total.descriptorSnapshotMisses+=statsDescriptorSnapshotMisses;
+    statsDescriptorSnapshotFastHits=statsDescriptorSnapshotMisses=0;
+    total.snapshotBulkFastHits+=statsSnapshotBulkFastHits;
+    total.snapshotBulkResources+=statsSnapshotBulkResources;
+    statsSnapshotBulkFastHits=statsSnapshotBulkResources=0;
+    auto descriptorWriteStats = MVKDescriptorUseCache::takeWriteStats();
+    total.descriptorWriteRanges += descriptorWriteStats.ranges;
+    total.descriptorUnchangedWriteRanges += descriptorWriteStats.unchangedRanges;
+    total.descriptorChangedWriteRanges += descriptorWriteStats.changedRanges;
     total.queuedSuperseded+=statsQueuedSuperseded;statsQueuedSuperseded=0;
+	total.bindCalls+=statsBindCalls; total.inputRead+=statsInputRead; total.inputReadWrite+=statsInputReadWrite;
+	total.preciseRead+=statsPreciseRead; total.preciseReadWrite+=statsPreciseReadWrite;
+	total.collapsedRead+=statsCollapsedRead; total.heapDeclarations+=statsHeapDeclarations; total.heapQueries+=statsHeapQueries;
+	statsBindCalls=statsInputRead=statsInputReadWrite=0;
+	statsPreciseRead=statsPreciseReadWrite=statsCollapsedRead=statsHeapDeclarations=statsHeapQueries=0;
     total.retainedHits+=statsRetainedHits; total.absentHits+=statsAbsentHits; total.liveFound+=statsLiveFound;
     total.resets+=encoderReset; total.capClears+=encoderReset && used.size()>8192;
     total.maxUsed=std::max(total.maxUsed,uint64_t(used.size()));
     statsCalls=statsLookups=statsRetainedHits=statsAbsentHits=statsLiveFound=0;
     if (now-total.start<5) return;
+    auto sharedSnapshotStats = MVKLiveList::takeSharedSnapshotStats();
     const char* directory=getenv("MVK_CONFIG_SHADER_DUMP_DIR");
     if (directory) {
+        static unsigned sharedRecords = 0;
+        char sharedPath[4096];
+        int sharedLength = snprintf(sharedPath,sizeof(sharedPath),"%s/shared-snapshot-stats-%d.jsonl",directory,getpid());
+        if (sharedLength>0 && static_cast<size_t>(sharedLength)<sizeof(sharedPath) && sharedRecords<1024) {
+            if (FILE* sharedFile=fopen(sharedPath,"a")) {
+                fprintf(sharedFile,"{\"time\":%.6f,\"wallSeconds\":%.6f,\"hits\":%llu,\"fullBuilds\":%llu,\"deltaBuilds\":%llu,\"evictions\":%llu,\"relatedFallbacks\":%llu,\"publishedEntries\":%llu,\"publishedResources\":%llu}\n",
+                        now,now-total.start,
+                        (unsigned long long)sharedSnapshotStats.hits,
+                        (unsigned long long)sharedSnapshotStats.fullBuilds,
+                        (unsigned long long)sharedSnapshotStats.deltaBuilds,
+                        (unsigned long long)sharedSnapshotStats.evictions,
+                        (unsigned long long)sharedSnapshotStats.relatedFallbacks,
+                        (unsigned long long)sharedSnapshotStats.publishedEntries,
+                        (unsigned long long)sharedSnapshotStats.publishedResources);
+                fclose(sharedFile); ++sharedRecords;
+            }
+        }
         char path[4096];snprintf(path,sizeof(path),"%s/resource-use-%d.jsonl",directory,getpid());
-        char line[2048];
-        snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"registrationQueries\":%llu,\"registrationUnrelated\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"snapshotDeltaHits\":%llu,\"snapshotDeltaReused\":%llu,\"snapshotColdWords\":%llu,\"snapshotCacheClears\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu,\"queuedSuperseded\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.registrationQueries,(unsigned long long)total.registrationUnrelated,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.snapshotDeltaHits,(unsigned long long)total.snapshotDeltaReused,(unsigned long long)total.snapshotColdWords,(unsigned long long)total.snapshotCacheClears,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed,(unsigned long long)total.queuedSuperseded);
+        char line[4096];
+		snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"registrationQueries\":%llu,\"registrationUnrelated\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"snapshotDeltaHits\":%llu,\"snapshotDeltaReused\":%llu,\"snapshotColdWords\":%llu,\"snapshotCacheClears\":%llu,\"descriptorSnapshotFastHits\":%llu,\"descriptorSnapshotMisses\":%llu,\"snapshotBulkFastHits\":%llu,\"snapshotBulkResources\":%llu,\"descriptorWriteRanges\":%llu,\"descriptorUnchangedWriteRanges\":%llu,\"descriptorChangedWriteRanges\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu,\"queuedSuperseded\":%llu,\"bindCalls\":%llu,\"inputRead\":%llu,\"inputReadWrite\":%llu,\"preciseRead\":%llu,\"preciseReadWrite\":%llu,\"collapsedRead\":%llu,\"heapDeclarations\":%llu,\"heapQueries\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.registrationQueries,(unsigned long long)total.registrationUnrelated,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.snapshotDeltaHits,(unsigned long long)total.snapshotDeltaReused,(unsigned long long)total.snapshotColdWords,(unsigned long long)total.snapshotCacheClears,(unsigned long long)total.descriptorSnapshotFastHits,(unsigned long long)total.descriptorSnapshotMisses,(unsigned long long)total.snapshotBulkFastHits,(unsigned long long)total.snapshotBulkResources,(unsigned long long)total.descriptorWriteRanges,(unsigned long long)total.descriptorUnchangedWriteRanges,(unsigned long long)total.descriptorChangedWriteRanges,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed,(unsigned long long)total.queuedSuperseded,(unsigned long long)total.bindCalls,(unsigned long long)total.inputRead,(unsigned long long)total.inputReadWrite,(unsigned long long)total.preciseRead,(unsigned long long)total.preciseReadWrite,(unsigned long long)total.collapsedRead,(unsigned long long)total.heapDeclarations,(unsigned long long)total.heapQueries);
         if (records < 1024) {
             FILE* file=fopen(path,"a");
             if(file) { fputs(line,file); fclose(file); ++records; }
@@ -1378,14 +1487,14 @@ void MVKUseResourceHelper::resetForEncoder() {
 
 bool MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
 	if (resourceUseStats) ++statsCalls;
-	auto recordValidatedResource = [&](bool alreadyRetained) {
+	auto recordValidatedResource = [&](bool alreadyRetained) -> ResourceInfo* {
 		if (batchLiveResources) {
 			// MVKLiveList only protects the object during the lookup. Hold a
 			// temporary reference until bindAndReset emits the batched call.
 			if (!alreadyRetained) pendingBatchLiveResources.push_back([resource retain]);
-			add(resource, stage, write);
+				return add(resource, stage, write);
 		} else {
-			addImmediate(resource, enc, func, stage, write);
+				return addImmediate(resource, enc, func, stage, write);
 		}
 	};
 	RecentLiveResource* recent = nullptr;
@@ -1410,22 +1519,22 @@ bool MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 		generationBeforeLookup = liveList.additionGeneration(resource);
 	}
 	if (cacheLiveResources) {
-		auto it = used.find(resource);
-		if (it != used.end() && it->second.liveRetained &&
-		    (it->second.generation == encoderGeneration || crossEncoderLiveCache)) {
+			ResourceInfo* retained = used.findValue(resource);
+			if (retained && retained->liveRetained &&
+			    (retained->generation == encoderGeneration || crossEncoderLiveCache)) {
 			// Metal resource-use declarations belong to an individual encoder.
 			// A retained object lets us skip the serialized live-list lookup across
 			// encoder transitions, but it does not let the next encoder inherit the
 			// previous encoder's useResource/useHeap declaration.  Treat the first
 			// use in every generation as a declaration even when access and stages
 			// are otherwise compatible.
-			bool needsEncoderDeclaration = it->second.generation != encoderGeneration;
+				bool needsEncoderDeclaration = retained->generation != encoderGeneration;
 			if(resourceUseStats) ++statsRetainedHits;
-			if (recent) *recent = {resource, &liveList, &it->second, 0};
+				if (recent) *recent = {resource, &liveList, retained, 0};
 			if (traceLiveCache) ++liveReuseCount;
 			// Holding the Metal object prevents pointer reuse (ABA) even if its
 			// Vulkan wrapper was removed from the live list in the meantime.
-			if (needsEncoderDeclaration || !isCompatible(it->second, ResourceInfo{stage, write, false}))
+				if (needsEncoderDeclaration || !isCompatible(*retained, ResourceInfo{stage, write, false}))
 				recordValidatedResource(true);
 			return true;
 		}
@@ -1450,9 +1559,9 @@ bool MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 		if (cacheLiveResources) {
 			// The live-list guard retains it until this owned reference is taken.
 			retainedLiveResources.push_back([resource retain]);
-			recordValidatedResource(true);
-			used.find(resource)->second.liveRetained = true;
-			if (recent) *recent = {resource, &liveList, &used.find(resource)->second, 0};
+				ResourceInfo* stored = recordValidatedResource(true);
+				stored->liveRetained = true;
+				if (recent) *recent = {resource, &liveList, stored, 0};
 		} else recordValidatedResource(false);
         return true;
 	} else {
@@ -1469,7 +1578,7 @@ bool MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 	}
 }
 
-void MVKUseResourceHelper::addImmediate(id<MTLResource> resource, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
+MVKUseResourceHelper::ResourceInfo* MVKUseResourceHelper::addImmediate(id<MTLResource> resource, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
 	ResourceInfo info { stage, write, false, false, encoderGeneration };
 	auto res = used.emplace(resource, info);
 	ResourceInfo& stored = res.first->second;
@@ -1489,9 +1598,11 @@ void MVKUseResourceHelper::addImmediate(id<MTLResource> resource, id<MTLCommandE
 		else
 			func(enc, resource, write ? MTLResourceUsageReadWrite : MTLResourceUsageRead, stored.stages);
 	}
+	return &stored;
 }
 
 void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> encoder) {
+	if (resourceUseStats) ++statsBindCalls;
 	// If a resource is used multiple times on different stages, it may appear in multiple lists.
 	// As long as the iteration order hits stages that combine multiple render stages after the stages it combines,
 	// this should be OK, as the last useResource will be the one for the most comprehensive list of stages.
@@ -1499,9 +1610,10 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 		MVKResourceUsageStages stages = static_cast<MVKResourceUsageStages>(i);
 		MTLRenderStages mtlStages = getMTLStages(stages);
 		Entry& entry = entries[stages];
-        entry.read.erase(std::remove(entry.read.begin(), entry.read.end(), nil), entry.read.end());
-        entry.readWrite.erase(std::remove(entry.readWrite.begin(), entry.readWrite.end(), nil), entry.readWrite.end());
-		MVKSmallVector<id<MTLHeap>> heaps;
+        entry.read.removeNilResources();
+        entry.readWrite.removeNilResources();
+		if (resourceUseStats) { statsInputRead += entry.read.size(); statsInputReadWrite += entry.readWrite.size(); }
+		MVKSmallVector<id<MTLHeap>> declaredHeaps;
 		if (batchArgumentHeaps) {
 			// A large D3D12 bindless table can contain thousands of resources
 			// suballocated from only a few Vulkan allocations. Metal permits all
@@ -1511,28 +1623,45 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 			// useHeaps declares read access only. Writable children stay in readWrite.
 		// Reuse CPU capacity only; every Metal encoder still gets its declarations.
 			heapCounts.reset();
-			for (id<MTLResource> resource : entry.read) {
-				id<MTLHeap> heap = resource.heap;
+			for (id<MTLHeap> heap : entry.read.heaps) {
 				if (heap) heapCounts.add(heap);
 			}
 			uint32_t collapsedResources = 0;
-			heapCounts.each([&](id<MTLHeap> heap, uint32_t count) { if (count >= heapBatchThreshold) { heaps.push_back(heap); collapsedResources += count; } });
-			if (!heaps.empty()) {
-				auto keepPrecise = [&](id<MTLResource> resource) {
-					id<MTLHeap> heap = resource.heap;
-					return !heap || heapCounts.count(heap) < heapBatchThreshold;
-				};
-				entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
-				[encoder useHeaps:heaps.data() count:heaps.size() stages:mtlStages];
-				if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS graphics resources=%u heaps=%zu stage=%u\n", collapsedResources, heaps.size(), i);
+			heapCounts.each([&](id<MTLHeap> heap, uint32_t count) {
+				if (count >= heapBatchThreshold) {
+					if (std::find(declaredHeaps.begin(), declaredHeaps.end(), heap) == declaredHeaps.end()) declaredHeaps.push_back(heap);
+					collapsedResources += count;
+				}
+			});
+			if (!declaredHeaps.empty()) {
+				size_t output = 0;
+				for (size_t input = 0; input < entry.read.size(); ++input) {
+					id<MTLHeap> heap = entry.read.heaps[input];
+					if (heap && heapCounts.count(heap) >= heapBatchThreshold) continue;
+					entry.read.resources[output] = entry.read.resources[input];
+					entry.read.heaps[output] = heap;
+					++output;
+				}
+				entry.read.resources.resize(output);
+				entry.read.heaps.resize(output);
+				[encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size() stages:mtlStages];
+				if (resourceUseStats) { statsCollapsedRead += collapsedResources; statsHeapDeclarations += declaredHeaps.size(); }
+				if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS graphics resources=%u heaps=%zu stage=%u\n", collapsedResources, declaredHeaps.size(), i);
 			}
 		}
+		if (!entry.retainedSnapshotReads.empty()) {
+			if (resourceUseStats) statsPreciseRead += entry.retainedSnapshotReads.size();
+			[encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead stages:mtlStages];
+			entry.retainedSnapshotReads.clear();
+		}
 		if (!entry.read.empty()) {
-			[encoder useResources:entry.read.data() count:entry.read.size() usage:MTLResourceUsageRead stages:mtlStages];
+			if (resourceUseStats) statsPreciseRead += entry.read.size();
+			[encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead stages:mtlStages];
 			entry.read.clear();
 		}
 		if (!entry.readWrite.empty()) {
-			[encoder useResources:entry.readWrite.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite stages:mtlStages];
+			if (resourceUseStats) statsPreciseReadWrite += entry.readWrite.size();
+			[encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite stages:mtlStages];
 			entry.readWrite.clear();
 		}
 	}
@@ -1540,42 +1669,62 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 	releasePendingBatchLiveResources();
 }
 void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> encoder) {
+	if (resourceUseStats) ++statsBindCalls;
 	Entry& entry = entries[MVKResourceUsageStages::Compute];
-    entry.read.erase(std::remove(entry.read.begin(), entry.read.end(), nil), entry.read.end());
-    entry.readWrite.erase(std::remove(entry.readWrite.begin(), entry.readWrite.end(), nil), entry.readWrite.end());
-	MVKSmallVector<id<MTLHeap>> heaps;
+    entry.read.removeNilResources();
+    entry.readWrite.removeNilResources();
+	if (resourceUseStats) { statsInputRead += entry.read.size(); statsInputReadWrite += entry.readWrite.size(); }
+	MVKSmallVector<id<MTLHeap>> declaredHeaps;
 	if (batchArgumentHeaps) {
 		// useHeaps declares read access only. Writable children stay in readWrite.
 		// Reuse CPU capacity only; every Metal encoder still gets its declarations.
 			heapCounts.reset();
-		for (id<MTLResource> resource : entry.read) {
-			id<MTLHeap> heap = resource.heap;
+		for (id<MTLHeap> heap : entry.read.heaps) {
 			if (heap) heapCounts.add(heap);
 		}
 		uint32_t collapsedResources = 0;
-		heapCounts.each([&](id<MTLHeap> heap, uint32_t count) { if (count >= heapBatchThreshold) { heaps.push_back(heap); collapsedResources += count; } });
-		if (!heaps.empty()) {
-			auto keepPrecise = [&](id<MTLResource> resource) {
-				id<MTLHeap> heap = resource.heap;
-				return !heap || heapCounts.count(heap) < heapBatchThreshold;
-			};
-			entry.read.erase(std::remove_if(entry.read.begin(), entry.read.end(), [&](id<MTLResource> r) { return !keepPrecise(r); }), entry.read.end());
-			[encoder useHeaps:heaps.data() count:heaps.size()];
-			if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS compute resources=%u heaps=%zu\n", collapsedResources, heaps.size());
+		heapCounts.each([&](id<MTLHeap> heap, uint32_t count) {
+			if (count >= heapBatchThreshold) {
+				if (std::find(declaredHeaps.begin(), declaredHeaps.end(), heap) == declaredHeaps.end()) declaredHeaps.push_back(heap);
+				collapsedResources += count;
+			}
+		});
+		if (!declaredHeaps.empty()) {
+			size_t output = 0;
+			for (size_t input = 0; input < entry.read.size(); ++input) {
+				id<MTLHeap> heap = entry.read.heaps[input];
+				if (heap && heapCounts.count(heap) >= heapBatchThreshold) continue;
+				entry.read.resources[output] = entry.read.resources[input];
+				entry.read.heaps[output] = heap;
+				++output;
+			}
+			entry.read.resources.resize(output);
+			entry.read.heaps.resize(output);
+			[encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size()];
+			if (resourceUseStats) { statsCollapsedRead += collapsedResources; statsHeapDeclarations += declaredHeaps.size(); }
+			if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS compute resources=%u heaps=%zu\n", collapsedResources, declaredHeaps.size());
 		}
 	}
+	if (!entry.retainedSnapshotReads.empty()) {
+		if (resourceUseStats) statsPreciseRead += entry.retainedSnapshotReads.size();
+		[encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead];
+		entry.retainedSnapshotReads.clear();
+	}
 	if (!entry.read.empty()) {
-		[encoder useResources:entry.read.data() count:entry.read.size() usage:MTLResourceUsageRead];
+		if (resourceUseStats) statsPreciseRead += entry.read.size();
+		[encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead];
 		entry.read.clear();
 	}
 	if (!entry.readWrite.empty()) {
-		[encoder useResources:entry.readWrite.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite];
+		if (resourceUseStats) statsPreciseReadWrite += entry.readWrite.size();
+		[encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite];
 		entry.readWrite.clear();
 	}
 	for (uint32_t i = 1; i < std::size(entries.elements); i++) {
 		// Compute should never fill any but the first set
 		assert(entries.elements[i].read.empty());
 		assert(entries.elements[i].readWrite.empty());
+		assert(entries.elements[i].retainedSnapshotReads.empty());
 	}
     finishPendingBatch();
 	releasePendingBatchLiveResources();
@@ -2116,8 +2265,9 @@ void MVKMetalGraphicsCommandEncoderState::prepareDraw(
 		if (mtlPipeline != _pipeline) {
 			_pipeline = mtlPipeline;
 			[encoder setRenderPipelineState:mtlPipeline];
-            mvkRecordEncoderWork(encoder, @"graphics-pipeline", mtlPipeline.label);
-            if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:mtlPipeline.label ?: @"unlabelled-pipeline"];
+            NSString* traceLabel = mvkPipelineTraceLabel(mtlPipeline);
+            mvkRecordEncoderWork(encoder, @"graphics-pipeline", traceLabel);
+            if (mvkGPUTimeoutTraceEnabled()) [encoder insertDebugSignpost:traceLabel.length ? traceLabel : @"unlabelled-pipeline"];
 		}
 	}
 

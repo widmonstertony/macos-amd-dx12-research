@@ -340,6 +340,7 @@ MVKShaderLibrary* MVKShaderLibraryCache::getShaderLibrary(SPIRVToMSLConversionCo
 														  MVKShaderModule* shaderModule, MVKPipeline* pipeline,
 														  bool* pWasAdded, VkPipelineCreationFeedback* pShaderFeedback,
 														  uint64_t startTime) {
+	lock_guard<mutex> lock(_accessLock);
 	bool wasAdded = false;
 	MVKShaderLibrary* shLib = findShaderLibrary(pShaderConfig, pShaderFeedback, startTime);
 	if ( !shLib && !pipeline->shouldFailOnPipelineCompileRequired() ) {
@@ -401,6 +402,8 @@ MVKShaderLibrary* MVKShaderLibraryCache::addShaderLibrary(const SPIRVToMSLConver
 // Merge another shader library cache with this one. Handle null input.
 void MVKShaderLibraryCache::merge(MVKShaderLibraryCache* other) {
 	if ( !other ) { return; }
+	if (other == this) { return; }
+	scoped_lock lock(_accessLock, other->_accessLock);
 	for (auto& otherPair : other->_shaderLibraries) {
 		if ( !findShaderLibrary(&otherPair.first) ) {
 			_shaderLibraries.emplace_back(otherPair.first, new MVKShaderLibrary(*otherPair.second));

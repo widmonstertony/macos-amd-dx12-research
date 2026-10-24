@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <functional>
@@ -166,25 +167,39 @@ int main(int argc, char **argv) {
     // Override only this owned launcher's child environment AFTER the vendor
     // setup. Installed Tencent launcher, engine, Sky and global settings stay
     // unchanged. Original GPTK/Apple binaries are loaded, never patched.
-    const char *backend=getenv("YYB_RESEARCH_OPEN_ROOT");
-    if (!backend || !*backend) return 78;
-    const std::filesystem::path root=std::filesystem::canonical(backend);
-    if (!std::filesystem::exists(root/"backend/wine/x86_64-windows/d3d12.dll") ||
-        !std::filesystem::exists(root/"build/moltenvk/MoltenVK/libMoltenVK.1.4.2.dylib")) return 79;
-    setenv("GFX_BACKEND_PATH",(root/"backend/wine").string().c_str(),1);
     const std::string originalContents="/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents";
-    const std::string paths=(root/"backend/wine").string()+":"+originalContents+"/SharedSupport/wine/lib/wine";
+    const char *deployedMode = getenv("YYB_RESEARCH_USE_DEPLOYED_CANDIDATE");
+    const bool useDeployedCandidate = deployedMode && !strcmp(deployedMode, "1");
+    std::filesystem::path root;
+    if (useDeployedCandidate) {
+        const std::filesystem::path proxy("/private/tmp/mvk-guard-proxy-select/libMoltenVK.dylib");
+        const std::filesystem::path windowModule("/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-leaf-select/winemac.so");
+        if (!std::filesystem::exists(proxy) || !std::filesystem::exists(windowModule)) return 79;
+        setenv("GFX_BACKEND_PATH",(originalContents+"/Frameworks/render/dxvk/wine").c_str(),1);
+    } else {
+        const char *backend=getenv("YYB_RESEARCH_OPEN_ROOT");
+        if (!backend || !*backend) return 78;
+        root=std::filesystem::canonical(backend);
+        if (!std::filesystem::exists(root/"backend/wine/x86_64-windows/d3d12.dll") ||
+            !std::filesystem::exists(root/"build/moltenvk/MoltenVK/libMoltenVK.1.4.2.dylib")) return 79;
+        setenv("GFX_BACKEND_PATH",(root/"backend/wine").string().c_str(),1);
+    }
+    const std::string paths=(useDeployedCandidate ? originalContents+"/SharedSupport/wine/lib/wine" :
+                             (root/"backend/wine").string()+":"+originalContents+"/SharedSupport/wine/lib/wine");
     setenv("WINEPREFIX","/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine/wine",1);
     setenv("YYB_NTDLL_PATH",(originalContents+"/SharedSupport/wine/lib/wine/x86_64-unix/ntdll.so").c_str(),1);
     setenv("WINESERVER",(originalContents+"/MacOS/wineserver").c_str(),1);
     setenv("WINELOADER","/Users/tonytan/Library/Application Support/YYBIntelLauncher/wine-loader",1);
     setenv("WINEDLLPATH",paths.c_str(),1);
-    setenv("WINEDLLOVERRIDES","d3d12,d3d12core,dxgi=n,b",1);
-    const std::string nativePaths=(root/"build/moltenvk/MoltenVK").string()+":/usr/local/opt/vulkan-loader/lib:"+vendorFrameworks;
+    if (!useDeployedCandidate) setenv("WINEDLLOVERRIDES","d3d12,d3d12core,dxgi=n,b",1);
+    const std::string nativePaths=useDeployedCandidate ?
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-leaf-select:/private/tmp/mvk-guard-proxy-select" :
+        (root/"build/moltenvk/MoltenVK").string()+":/usr/local/opt/vulkan-loader/lib:"+vendorFrameworks;
     setenv("DYLD_LIBRARY_PATH",nativePaths.c_str(),1);
     setenv("DYLD_FALLBACK_LIBRARY_PATH",vendorFrameworks.c_str(),1);
     setenv("WINEDEBUG","-all,err+all,+loaddll",1);
-    fprintf(stderr,"OWN_STEAM_OPEN_BACKEND=%s; installed Tencent engine and original prefix; no closed binary or game shader substitution\n",root.string().c_str());
+    fprintf(stderr,"OWN_STEAM_OPEN_BACKEND=%s; installed Tencent engine and original prefix; no closed binary or game shader substitution\n",
+            useDeployedCandidate ? "/private/tmp/mvk-guard-proxy-select" : root.string().c_str());
 
     std::vector<std::string> args;
     for (int i = 2; i < argc; ++i) args.emplace_back(argv[i]);

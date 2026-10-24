@@ -429,7 +429,48 @@ void MVKQueue::destroyExecQueue() {
 #pragma mark MVKQueueSubmission
 
 void MVKSemaphoreSubmitInfo::encodeWait(id<MTLCommandBuffer> mtlCmdBuff) {
-	if (_semaphore) { _semaphore->encodeWait(mtlCmdBuff, value); }
+	// A timeline wait that completed through the host notification path has
+	// already established the required ordering. Do not enqueue the same wait
+	// into Metal: on the Intel-era AMD driver, an otherwise-satisfied shared
+	// event wait can still sit at the head of a native queue and block the queue
+	// that produces the next value.
+	if (_semaphore && !hostWaitSatisfied) { _semaphore->encodeWait(mtlCmdBuff, value); }
+}
+
+// The AMD macOS driver can watchdog a Metal queue that contains an unsatisfied
+// MTLSharedEvent wait while another native queue is still producing the value.
+// Keep Vulkan queue submission asynchronous and preserve per-queue FIFO order,
+// but do not put that unsatisfied timeline wait into the native GPU scheduler.
+// Once the value is visible on the host, the normal encoded wait remains in the
+// command buffer and is immediately satisfied.
+void MVKSemaphoreSubmitInfo::gateUnsignaledTimelineWaitOnHost() {
+	// Submission values distinguish the Vulkan timeline path here. Binary
+	// semaphore submit records carry zero and therefore return immediately. Do
+	// not depend on a late environment lookup or the concrete semaphore wrapper:
+	// the game can import a shared-event-backed timeline through a base wrapper,
+	// which made the earlier type check skip a real unsatisfied wait.
+	hostWaitSatisfied = false;
+	if (!_semaphore || value == 0 || _semaphore->getSemaphoreType() != VK_SEMAPHORE_TYPE_TIMELINE) { return; }
+	id<MTLSharedEvent> event = _semaphore->getMTLSharedEvent();
+	if (!event || event.signaledValue >= value) { return; }
+
+	// MTLSharedEvent::waitUntilSignaledValue() returned before the requested
+	// value was visible in the Stellar Blade workload even with an effectively
+	// infinite timeout. Use MoltenVK's own listener-backed Vulkan timeline wait,
+	// which is also the implementation used by vkWaitSemaphores(). Other VkQueue
+	// executors remain runnable, so the producer queue can make progress.
+	VkSemaphore vkSemaphore = (VkSemaphore)_semaphore;
+	VkSemaphoreWaitInfo waitInfo = {
+		VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+		nullptr,
+		0,
+		1,
+		&vkSemaphore,
+		&value,
+	};
+	if (mvkWaitSemaphores(_semaphore->getDevice(), &waitInfo, UINT64_MAX) == VK_SUCCESS) {
+		hostWaitSatisfied = true;
+	}
 }
 
 void MVKSemaphoreSubmitInfo::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff) {
@@ -457,7 +498,8 @@ MVKSemaphoreSubmitInfo::MVKSemaphoreSubmitInfo(const MVKSemaphoreSubmitInfo& oth
 	_semaphore(other._semaphore),
 	value(other.value),
 	stageMask(other.stageMask),
-	deviceIndex(other.deviceIndex) {
+	deviceIndex(other.deviceIndex),
+	hostWaitSatisfied(other.hostWaitSatisfied) {
 		if (_semaphore) { _semaphore->retain(); }
 }
 
@@ -470,6 +512,7 @@ MVKSemaphoreSubmitInfo& MVKSemaphoreSubmitInfo::operator=(const MVKSemaphoreSubm
 	value = other.value;
 	stageMask = other.stageMask;
 	deviceIndex = other.deviceIndex;
+	hostWaitSatisfied = other.hostWaitSatisfied;
 	return *this;
 }
 
@@ -527,6 +570,11 @@ MVKQueueSubmission::~MVKQueueSubmission() {
 VkResult MVKQueueCommandBufferSubmission::execute() {
 
 	_queue->_submissionCaptureScope->beginScope();
+
+	// This gate is only enabled together with asynchronous queue submission.
+	// Each VkQueue owns a serial dispatch queue, so waiting here preserves Vulkan
+	// queue order while other queues remain free to produce the required value.
+	for (auto& ws : _waitSemaphores) { ws.gateUnsignaledTimelineWaitOnHost(); }
 
 	// If using encoded semaphore waiting, do so now.
 	for (auto& ws : _waitSemaphores) { ws.encodeWait(getActiveMTLCommandBuffer()); }
@@ -732,7 +780,25 @@ template <size_t N>
 void MVKQueueFullCommandBufferSubmission<N>::submitCommandBuffers() {
 	uint64_t startTime = getPerformanceTimestamp();
 
-	for (auto& cbInfo : _cmdBuffers) { cbInfo.commandBuffer->submit(this, &_encodingContext); }
+	// A Vulkan queue submit may contain several command buffers. MoltenVK normally
+	// coalesces them into one Metal command buffer. On the affected AMD driver a
+	// large D3D12 frame can then contain many independent shadow/cubemap encoders
+	// and exceed the driver's per-command-buffer watchdog even though every
+	// encoder completes successfully. Keep the Vulkan ordering and semaphore
+	// scope, but allow a native commit at the already-safe Vulkan command-buffer
+	// boundary. commitActiveMTLCommandBuffer(false) is the same path used when a
+	// prefilled command buffer forces an intermediate commit; queue order carries
+	// the work dependency and the final buffer alone signals submission completion.
+	static const bool splitVulkanCommandBuffers = [] {
+		const char* value = getenv("MVK_AMD_SPLIT_VULKAN_COMMAND_BUFFERS");
+		return value && !strcmp(value, "1");
+	}();
+	for (size_t idx = 0; idx < _cmdBuffers.size(); ++idx) {
+		_cmdBuffers[idx].commandBuffer->submit(this, &_encodingContext);
+		if (splitVulkanCommandBuffers && idx + 1 < _cmdBuffers.size()) {
+			commitActiveMTLCommandBuffer(false);
+		}
+	}
 
 	addPerformanceInterval(getPerformanceStats().queue.submitCommandBuffers, startTime);
 }
@@ -783,6 +849,13 @@ VkResult MVKQueuePresentSurfaceSubmission::execute() {
 	// Although testing could not determine which objects were being lost, queue present MTLCommandBuffers
 	// are used only once per frame, and retain so few objects, that blanket retention is still performant.
 	id<MTLCommandBuffer> mtlCmdBuff = _queue->getMTLCommandBuffer(kMVKCommandUseQueuePresent, true);
+
+	// Present submissions run on the queue's same serial host executor as ordinary
+	// submissions. Apply the AMD cross-queue timeline gate here too, before an
+	// unsatisfied MTLSharedEvent wait reaches the native GPU scheduler. Without
+	// this, leaving an in-game menu can make the present queue wait for work on a
+	// different Metal queue and trigger the AMD driver's five-second watchdog.
+	for (auto& ws : _waitSemaphores) { ws.gateUnsignaledTimelineWaitOnHost(); }
 
 	for (auto& ws : _waitSemaphores) {
 		ws.encodeWait(mtlCmdBuff);	// Encoded semaphore waits

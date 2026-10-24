@@ -1,0 +1,36 @@
+{
+  "timeUTC": "2026-10-24T03:48:03.426384+00:00",
+  "gamePID": 81671,
+  "profile": "listener-gated-timeline-v12-candidate-20261023",
+  "result": "not playable",
+  "verifiedNativePresentationFPSBeforeFailure": 6.508950738452137,
+  "physicalFootprintGiBObserved": 7.6,
+  "timeout": {
+    "evidence": "evidence/listener-gated-timeline-v12-candidate-20261023/msl/trace-gpu-timeout-81671-0.json",
+    "queueFamily": 0,
+    "queueIndex": 0,
+    "nativeStatus": 5,
+    "gpuDurationMilliseconds": 6343.7277730117785,
+    "encoderCount": 23,
+    "renderEncoderCount": 22,
+    "computeEncoderCount": 1,
+    "allEncoderStates": "completed",
+    "eventDependenciesOnFailingBuffer": 0,
+    "interpretation": "A graphics command buffer exceeded the AMD macOS GPU watchdog after 6.34 seconds. This is distinct from the earlier unsatisfied cross-queue timeline wait; exact draw/dispatch attribution was unavailable because bounded work tracing was not armed."
+  },
+  "v12FixStillValidated": {
+    "oldCrossQueueUnsignaledWaitPatternPresent": false,
+    "listenerBackedHostGateControlsPassed": true,
+    "note": "The first v12 timeout appeared only after shader compilation/menu transition and contained no unsatisfied event on the failing buffer."
+  },
+  "nextDiagnostic": {
+    "profile": "listener-gated-timeline-v13-worktrace-20261023",
+    "gamePID": 97472,
+    "normalLicensedSteam": true,
+    "sameCandidateSHA256": "11e1412231c0f6ad8d8e8d05414f0a50b56072da4b2a31b1bc09df918caf1781",
+    "deployedProxySHA256": "145c0febc0e1800fb5beaec2053995f6849697c2074380f0ba1463fe1e905202",
+    "armedWorkTraceMaximumSeconds": 30,
+    "currentStage": "shader compilation",
+    "purpose": "Capture the exact draw/dispatch sequence in a reproducing watchdog before changing command-buffer segmentation or shaders."
+  }
+}

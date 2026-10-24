@@ -10,7 +10,10 @@ import launch_stellar_deferred_proxy as qualified
 root=qualified.ROOT;out=root/'evidence'/('steam-game-seh-'+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ'));out.mkdir();guard_record=out/'guard-proxy.trace'
 rows=qualified.process_rows();assert not any('SB-Win64-Shipping.exe' in c for _,_,c in rows)
 assert not any('sky.exe' in c.lower() or 'skylauncher' in c.lower() for _,_,c in rows)
-steam=[(pid,c) for pid,_,c in rows if c.casefold()==str(qualified.STEAM).casefold()];assert len(steam)==1
+# Wine exposes the live client as C:/.../steam.exe after startup.  Match the
+# same process identity used by the normal game launcher instead of requiring
+# the initial Unix path to remain in `comm`.
+steam=[(pid,c) for pid,_,c in rows if qualified.is_original_steam_process(c)];assert len(steam)==1
 old_pid,old_comm=steam[0]
 tree=ast.parse((root/'tools/launch_stellar_deferred_proxy.py').read_text());main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='main');update=next(n for n in main.body if isinstance(n,ast.Expr) and isinstance(n.value,ast.Call) and isinstance(n.value.func,ast.Attribute) and isinstance(n.value.func.value,ast.Name) and n.value.func.value.id=='env' and n.value.func.attr=='update')
 env={k:v for k,v in os.environ.items() if not k.startswith(('DYLD_','WINE','YYB_','VK_','VKD3D_','DXVK_','MVK_','SteamAppId','SteamGameId'))}
@@ -29,7 +32,7 @@ else:
  for _ in range(10):
   if not any(pid==old_pid for pid,_,_ in qualified.process_rows()):break
   time.sleep(1)
-assert not any(c.casefold()==str(qualified.STEAM).casefold() for _,_,c in qualified.process_rows()),'Original Steam did not stop; no duplicate will be launched'
+assert not any(qualified.is_original_steam_process(c) for _,_,c in qualified.process_rows()),'Original Steam did not stop; no duplicate will be launched'
 client_env=dict(env)
 # Tencent's native launcher owns the Cocoa event pump and prepares its Wine
 # internals itself. Standalone wine-loader cannot cold-start the Steam UI.
@@ -38,7 +41,7 @@ for name in ['WINEPREFIX','WINELOADER','WINESERVER','WINEDLLPATH','WINEDLLOVERRI
 with (out/'client.stdout').open('w') as so,(out/'client.stderr').open('w') as se:child=subprocess.Popen([str(qualified.CONTENTS/'MacOS/winelauncher'),str(qualified.STEAM)],cwd=qualified.STEAM.parent,env=client_env,stdin=subprocess.DEVNULL,stdout=so,stderr=se,start_new_session=True)
 record['clientPID']=child.pid
 for _ in range(60):
- found=[pid for pid,_,c in qualified.process_rows() if c.casefold()==str(qualified.STEAM).casefold()]
+ found=[pid for pid,_,c in qualified.process_rows() if qualified.is_original_steam_process(c)]
  if found:
   record['newSteamPIDs']=found
   time.sleep(20)

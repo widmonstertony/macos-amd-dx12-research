@@ -72,10 +72,17 @@ def main() -> int:
         MVK_AMD_BINARY_ARCHIVE_FLUSH_INTERVAL="64",
         MVK_AMD_BINARY_ARCHIVE_MAX_BYTES=str(256 * 1024 * 1024),
     )
+    # /private/tmp is routinely cleared by a reboot.  Keep the probe binaries
+    # in the workspace as the durable source and use the temporary mirror only
+    # when it exists.  These are owned pixel/readback fixtures, never game
+    # executables or Steam components.
+    probe_root = Path("/private/tmp/yyb-probe-app")
+    if not (probe_root / "d3d12_probe.exe").is_file():
+        probe_root = ROOT / "probe-app"
     probes = {
-        "device": (Path("/private/tmp/yyb-probe-app/d3d12_probe.exe"), "copy_smoke.result=PASS"),
-        "compute": (Path("/private/tmp/yyb-probe-app/d3d12_compute_probe.exe"), "compute.result=PASS"),
-        "present": (Path("/private/tmp/yyb-probe-app/d3d12_presentation_probe.exe"), "presentation.gpu_api_result=PASS"),
+        "device": (probe_root / "d3d12_probe.exe", "copy_smoke.result=PASS"),
+        "compute": (probe_root / "d3d12_compute_probe.exe", "compute.result=PASS"),
+        "present": (probe_root / "d3d12_presentation_probe.exe", "presentation.gpu_api_result=PASS"),
     }
     summary = {
         "timeUTC": datetime.datetime.now(datetime.timezone.utc).isoformat(),

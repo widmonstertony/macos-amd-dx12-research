@@ -19,10 +19,14 @@ def main():
     ap.add_argument('--shaders', type=Path, required=True)
     ap.add_argument('--shared-live-snapshots',action='store_true')
     ap.add_argument('--safe-math', action='store_true')
+    ap.add_argument('--normal-mesh-libraries', action='store_true')
+    ap.add_argument('--sharded-shader-cache-locks', action='store_true')
     ap.add_argument('--sync-mesh-libraries', action='store_true')
     ap.add_argument('--sync-mesh-pipelines', action='store_true')
     ap.add_argument('--mesh-link-differential', action='store_true')
     ap.add_argument('--parameter-readback', action='store_true')
+    ap.add_argument('--geometry-draw-trace-label',
+                    help='Timed metadata-only geometry draw trace selector; use * for owned probes')
     ap.add_argument('--probe-binary',type=Path,default=ROOT/'build/probes/geometry_specialization_gpu')
     args = ap.parse_args()
     lib, shaders = args.library.resolve(), args.shaders.resolve()
@@ -44,6 +48,10 @@ def main():
                MVK_CONFIG_SHADER_DUMP_DIR=str(out / 'msl'),
                MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES='1', MVK_AMD_FRESH_MESH_LIBRARIES='1',
                MVK_AMD_SERIALIZE_PIPELINE_LINK='1')
+    if args.normal_mesh_libraries:
+        env.pop('MVK_AMD_FRESH_MESH_LIBRARIES', None)
+    if args.sharded_shader_cache_locks:
+        env['MVK_AMD_SHARDED_SHADER_CACHE_LOCKS'] = '1'
     if args.shared_live_snapshots:
         env.update(MVK_AMD_SHARED_LIVE_SNAPSHOTS="1",MVK_AMD_ENCODER_LIVE_CACHE="1",MVK_AMD_CROSS_ENCODER_LIVE_CACHE="1",MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE="1",MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE="1",MVK_AMD_BATCH_LIVE_USE_RESOURCE="1")
     if args.safe_math:
@@ -57,6 +65,12 @@ def main():
         env['MVK_AMD_LINK_DIFFERENTIAL_CAPTURE'] = '1'
     if args.parameter_readback:
         env['MVK_OWNED_GEOMETRY_PARAMETER_READBACK'] = '1'
+    if args.geometry_draw_trace_label:
+        assert len(args.geometry_draw_trace_label) <= 128
+        arm = out / 'gpu-counter.arm'
+        arm.touch()
+        env['MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH'] = str(arm)
+        env['MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL'] = args.geometry_draw_trace_label
     probe=args.probe_binary.resolve()
     assert probe.is_relative_to(ROOT/'build/probes') and probe.is_file()
     command = [str(probe), str(shaders), str(out / 'output.json')]
@@ -67,10 +81,17 @@ def main():
     result = json.loads((out / 'output.json').read_text()) if (out / 'output.json').exists() else {}
     row = {'command': command, 'exitCode': p.returncode, 'elapsedSeconds': time.monotonic() - start,
            'candidateSHA256': hashlib.sha256(lib.read_bytes()).hexdigest(), 'result': result,
-           'failedMeshReplayEnabled': False, 'freshMeshLibraries': True, 'safeMeshLibraries': args.safe_math, 'syncMeshLibraries': args.sync_mesh_libraries, 'syncMeshPipelines': args.sync_mesh_pipelines, 'meshLinkDifferential': args.mesh_link_differential,
+           'failedMeshReplayEnabled': False, 'freshMeshLibraries': not args.normal_mesh_libraries, 'safeMeshLibraries': args.safe_math, 'syncMeshLibraries': args.sync_mesh_libraries, 'syncMeshPipelines': args.sync_mesh_pipelines, 'meshLinkDifferential': args.mesh_link_differential,
            'metalValidationEnabled': 'Metal API Validation Enabled' in p.stderr}
+    row['shardedShaderCacheLocks'] = args.sharded_shader_cache_locks
     row['passed'] = p.returncode == 0 and result.get('passed', False)
     row['parameterReadback'] = args.parameter_readback
+    row['geometryDrawTraceLabel'] = args.geometry_draw_trace_label
+    geometry_traces = sorted((out / 'msl').glob('trace-geometry-draw-*.json'))
+    row['geometryDrawTraceFiles'] = [str(p.relative_to(ROOT)) for p in geometry_traces]
+    if args.geometry_draw_trace_label:
+        row['geometryDrawTracePassed'] = bool(geometry_traces)
+        row['passed'] = row['passed'] and row['geometryDrawTracePassed']
     row['sharedLiveSnapshots'] = args.shared_live_snapshots
     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')
     print(json.dumps(row))

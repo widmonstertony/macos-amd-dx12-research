@@ -13,6 +13,10 @@
 inline bool mvkEncoderWorkTraceEnabled() {
     static const bool enabled = [] { const char* v=getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v,"1"); }();
     if (enabled) return true;
+    // Geometry/GPU-counter diagnostics are timed by the same external arm.
+    // Keeping the work ring inactive before arming avoids changing normal game
+    // CPU load and prevents menu/preload traffic from obscuring the target.
+    if (mvkGPUTimestampArmed()) return true;
     static const MVKTimedTraceArm arm(getenv("MVK_AMD_GPU_WORK_TRACE_ARM_PATH"));
     return arm.enabled();
 }
@@ -22,6 +26,13 @@ inline bool mvkDependencyTraceEnabled() {
 }
 inline const void* mvkDependencyKey() { return sel_registerName("mvkQueueDependenciesV1"); }
 inline const void* mvkEncodedWorkKey() { return sel_registerName("mvkEncodedWorkRingV1"); }
+inline const void* mvkPipelineTraceLabelKey() { return sel_registerName("mvkPipelineTraceLabelV1"); }
+inline NSString* mvkPipelineTraceLabel(id pipeline) {
+    if (!pipeline) return @"";
+    NSString* label = objc_getAssociatedObject(pipeline, mvkPipelineTraceLabelKey());
+    if (!label && [pipeline respondsToSelector:@selector(label)]) label = [pipeline label];
+    return label ?: @"";
+}
 struct MVKPendingDependencyRecords {
     std::mutex lock;
     NSMutableDictionary* records = [NSMutableDictionary new];
@@ -67,7 +78,11 @@ inline void mvkAssociateEncoderTrace(id<MTLCommandBuffer> cb, id<MTLCommandEncod
         NSMutableData* data = record[@"workBuffer"];
         if (!data) { data = mvkNewEncodedWorkRing(); record[@"workBuffer"] = data; }
         objc_setAssociatedObject(encoder, mvkEncodedWorkKey(), data, OBJC_ASSOCIATION_RETAIN);
-        if(record[@"gpuCounterBuffer"])objc_setAssociatedObject(encoder, sel_registerName("mvkGPUCounterRecordV1"), record, OBJC_ASSOCIATION_RETAIN);
+        // Keep the lightweight record association even before a counter buffer
+        // exists.  Selected-pipeline tracing allocates lazily from the first
+        // matching pipeline event; requiring a buffer here made that event
+        // unreachable for encoders created before the match.
+        if(mvkGPUTimestampArmed())objc_setAssociatedObject(encoder, sel_registerName("mvkGPUCounterRecordV1"), record, OBJC_ASSOCIATION_RETAIN);
     }
 }
 inline void mvkRecordEncoderWorkImpl(id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {

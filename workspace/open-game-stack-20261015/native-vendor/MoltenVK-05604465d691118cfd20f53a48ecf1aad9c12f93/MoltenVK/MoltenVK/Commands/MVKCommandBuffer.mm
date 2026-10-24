@@ -844,6 +844,44 @@ void MVKCommandEncoder::beginMetalRenderPass(MVKCommandUse cmdUse) {
         }
     }
 
+	// Capture the actual attachment geometry and load/store contract before the
+	// encoder is created. A GPU timeout can occur while Metal finishes an empty
+	// render encoder (tile load/store or a resource hazard), in which case draw
+	// metadata alone incorrectly points at the following compute pipeline.
+	NSString* renderTraceLabel = @"render";
+	if (mvkEncoderWorkTraceEnabled()) {
+		NSMutableString* trace = [NSMutableString stringWithFormat:@"render;rt=%lux%lux%lu",
+			(unsigned long)mtlRPDesc.renderTargetWidth,
+			(unsigned long)mtlRPDesc.renderTargetHeight,
+			(unsigned long)mtlRPDesc.renderTargetArrayLength];
+		for (NSUInteger i = 0; i < 8; ++i) {
+			MTLRenderPassColorAttachmentDescriptor* att = mtlRPDesc.colorAttachments[i];
+			id<MTLTexture> tex = att.texture;
+			if (!tex) { continue; }
+			[trace appendFormat:@";c%lu=%lux%lux%lu,m%lu,s%lu,d%lu,f%lu,n%lu,l%lu,o%lu,r%u",
+				(unsigned long)i, (unsigned long)tex.width, (unsigned long)tex.height,
+				(unsigned long)tex.arrayLength, (unsigned long)att.level,
+				(unsigned long)att.slice, (unsigned long)att.depthPlane,
+				(unsigned long)tex.pixelFormat, (unsigned long)tex.sampleCount,
+				(unsigned long)att.loadAction, (unsigned long)att.storeAction,
+				att.resolveTexture != nil];
+		}
+		auto appendDepthStencil = [&](NSString* name, MTLRenderPassAttachmentDescriptor* att) {
+			id<MTLTexture> tex = att.texture;
+			if (!tex) { return; }
+			[trace appendFormat:@";%@=%lux%lux%lu,m%lu,s%lu,d%lu,f%lu,n%lu,l%lu,o%lu,r%u",
+				name, (unsigned long)tex.width, (unsigned long)tex.height,
+				(unsigned long)tex.arrayLength, (unsigned long)att.level,
+				(unsigned long)att.slice, (unsigned long)att.depthPlane,
+				(unsigned long)tex.pixelFormat, (unsigned long)tex.sampleCount,
+				(unsigned long)att.loadAction, (unsigned long)att.storeAction,
+				att.resolveTexture != nil];
+		};
+		appendDepthStencil(@"z", mtlRPDesc.depthAttachment);
+		appendDepthStencil(@"s", mtlRPDesc.stencilAttachment);
+		renderTraceLabel = trace;
+	}
+
 	// If programmable sample positions are supported, set them into the render pass descriptor.
 	// If no custom sample positions are established, size will be zero,
 	// and Metal will default to using default sample postions.
@@ -854,7 +892,7 @@ void MVKCommandEncoder::beginMetalRenderPass(MVKCommandUse cmdUse) {
 
     _mtlRenderEncoder = [_mtlCmdBuffer renderCommandEncoderWithDescriptor: mtlRPDesc];
     mvkAssociateEncoderTrace(_mtlCmdBuffer, _mtlRenderEncoder);
-    mvkRecordEncoderWork(_mtlRenderEncoder, @"encoder-begin", @"render");
+    mvkRecordEncoderWork(_mtlRenderEncoder, @"encoder-begin", renderTraceLabel);
 	retainIfImmediatelyEncoding(_mtlRenderEncoder);
 	_cmdBuffer->setMetalObjectLabel(_mtlRenderEncoder, getMTLRenderCommandEncoderName(cmdUse));
 	getState().beginGraphicsEncoding(getSampleCount());

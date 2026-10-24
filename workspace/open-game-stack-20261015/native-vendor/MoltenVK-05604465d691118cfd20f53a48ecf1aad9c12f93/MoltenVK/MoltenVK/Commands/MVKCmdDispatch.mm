@@ -22,6 +22,7 @@
 #include "MVKBuffer.h"
 #include "MVKPipeline.h"
 #include "MVKFoundation.h"
+#include "MVKQueueDependencyTrace.h"
 #include "mvk_datatypes.hpp"
 
 
@@ -48,6 +49,20 @@ void MVKCmdDispatch::encode(MVKCommandEncoder* cmdEncoder) {
 	cmdEncoder->finalizeDispatchState();	// Ensure all updated state has been submitted to Metal
 	id<MTLComputeCommandEncoder> mtlEncoder = cmdEncoder->getMTLComputeEncoder(kMVKCommandUseDispatch);
 	auto* pipeline = cmdEncoder->getComputePipeline();
+	if (mvkEncoderWorkTraceEnabled()) {
+		auto& bits = cmdEncoder->getMtlCompute()._exists;
+		uint32_t buffers = 0, textures = 0, samplers = 0, sets = 0;
+		for (auto word : bits.buffers.setBitsList()) for (auto bit : word) { (void)bit; ++buffers; }
+		for (auto word : bits.textures.setBitsList()) for (auto bit : word) { (void)bit; ++textures; }
+		for (auto word : bits.samplers.setBitsList()) for (auto bit : word) { (void)bit; ++samplers; }
+		for (auto word : bits.descriptorSetData.setBitsList()) for (auto bit : word) { (void)bit; ++sets; }
+		MTLSize threads = pipeline->getThreadgroupSize();
+		mvkRecordEncoderWorkImpl(mtlEncoder, @"dispatch", [NSString stringWithFormat:
+			@"pipeline=%@;groups=%ux%ux%u;threads=%lux%lux%lu;buffers=%u;textures=%u;samplers=%u;sets=%u",
+			cmdEncoder->getMtlCompute()._pipeline.label ?: @"", _groupCountX, _groupCountY, _groupCountZ,
+			(unsigned long)threads.width, (unsigned long)threads.height, (unsigned long)threads.depth,
+			buffers, textures, samplers, sets]);
+	}
 	if (pipeline->allowsDispatchBase()) {
 		// We'll use the stage-input region to pass the base along to the shader.
 		// Hopefully Metal won't complain that we didn't set up a stage-input descriptor.

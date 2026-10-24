@@ -1,0 +1,50 @@
+{
+  "timeUTC": "2026-10-24T03:45:45.402520+00:00",
+  "diskFreeBytesAtLaunch": 15896285184,
+  "normalLicensedSteamRequest": true,
+  "existingSteamPID": 13197,
+  "clientPID": 97460,
+  "privateCrashState": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/stellar-crash-report-state",
+  "proxySHA256": "145c0febc0e1800fb5beaec2053995f6849697c2074380f0ba1463fe1e905202",
+  "candidateSHA256": "cd6ada9048ff9df2eb67f7a188027cd7668da0bc8c1bb9c2c42f344af4eb7065",
+  "assetGuardProfile": "/private/tmp/mvk-guard-proxy/tencent-normal-original-guard.sb",
+  "assetGuardProfileSHA256": "b779e41cbf24284c9baba9bb4b03cfaf8653df4a94c7afe50e0741e669a85b0e",
+  "assetGuardProfileRepaired": false,
+  "command": [
+    "/Users/tonytan/Library/Application Support/YYBIntelLauncher/wine-loader",
+    "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine/wine/drive_c/Program Files (x86)/Steam/Steam.exe",
+    "-applaunch",
+    "3489700",
+    "-dx12"
+  ],
+  "observed": {
+    "97472": {
+      "pid": 97472,
+      "ppid": 1,
+      "comm": "/Users/tonytan/Library/Application Support/com.tencent.yybmac.wine.engine/links/SB-Win64-Shipping.exe",
+      "mappings": [
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/winemac-lockfix-leaf-select/winemac.so",
+        "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/stellar-overlay/SB/Binaries/Win64/dxgi.dll",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/ntdll.so",
+        "/Users/tonytan/Library/Application Support/YYBIntelLauncher/.runtime/wine-engine.app/Contents/SharedSupport/wine/lib/wine/x86_64-unix/win32u.so",
+        "/private/tmp/mvk-guard-proxy/libMoltenVKGuard.dylib",
+        "/private/tmp/mvk-guard-proxy/libQualifiedCandidateReexport.dylib"
+      ],
+      "candidateMapped": true,
+      "proxyMapped": true,
+      "fixedWindowModuleMapped": true,
+      "originalWriteDenied": true
+    }
+  },
+  "verified": true,
+  "gameOnlyExceptionLogging": false,
+  "gameOnlyExceptionLoggingRequested": false,
+  "gameOnlyExceptionLoggingVerified": false,
+  "verificationScope": "candidate/window module mappings and original asset write protection only",
+  "graphicsInitializationVerified": false,
+  "diskBudgetMonitor": {
+    "pid": 97497,
+    "maximumSeconds": 900,
+    "minimumReserveBytes": 3221225472
+  }
+}

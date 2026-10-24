@@ -21,10 +21,34 @@ PREFIX = Path.home() / "Library/Application Support/com.tencent.yybmac.wine.engi
 STEAM = PREFIX / "drive_c/Program Files (x86)/Steam/Steam.exe"
 PROOF = ROOT / "evidence/pending-native-binary-archive-signed.json"
 ORIGINAL = Path("/Volumes/Applications/Program Files (x86)/Steam/steamapps/common/StellarBlade/SB.exe")
+GUARD_SOURCE = ROOT / "tencent-normal-original-guard.sb"
+GUARD_RUNTIME = Path("/private/tmp/mvk-guard-proxy/tencent-normal-original-guard.sb")
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def ensure_guard_profile() -> tuple[str, bool]:
+    """Restore the owned late-guard profile if a /private/tmp cleanup removed it.
+
+    The proxy intentionally exits before D3D12 initialization when this profile
+    is unavailable.  Candidate deployment previously copied the two dylibs but
+    could omit this third runtime input, which looked like an unexplained game
+    crash.  Only the private research runtime is repaired here; installed game
+    files and the Tencent prefix are never changed.
+    """
+    assert GUARD_SOURCE.is_file() and 0 < GUARD_SOURCE.stat().st_size <= 65536
+    expected = sha256(GUARD_SOURCE)
+    repaired = not GUARD_RUNTIME.is_file() or sha256(GUARD_RUNTIME) != expected
+    if repaired:
+        GUARD_RUNTIME.parent.mkdir(parents=True, exist_ok=True)
+        temporary = GUARD_RUNTIME.with_name(GUARD_RUNTIME.name + ".next")
+        shutil.copy2(GUARD_SOURCE, temporary)
+        temporary.chmod(0o444)
+        os.replace(temporary, GUARD_RUNTIME)
+    assert sha256(GUARD_RUNTIME) == expected
+    return expected, repaired
 
 
 def process_rows() -> list[tuple[int, int, str]]:
@@ -36,12 +60,20 @@ def process_rows() -> list[tuple[int, int, str]]:
     return rows
 
 
+def is_original_steam_process(comm: str) -> bool:
+    """Match the same original Steam process before and after Wine renames it."""
+    normalized = comm.replace("\\", "/").casefold()
+    return (normalized == str(STEAM).replace("\\", "/").casefold() or
+            normalized == "c:/program files (x86)/steam/steam.exe")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--proof", type=Path, default=PROOF)
     parser.add_argument("--game-exception-log", action="store_true",
                         help="Request game-scoped Wine diagnostics; Tencent may override WINEDEBUG")
     args = parser.parse_args()
+    guard_sha256, guard_repaired = ensure_guard_profile()
     proof_path = args.proof.resolve()
     assert proof_path.is_relative_to(ROOT / "evidence"), "Owned qualification proof required"
     proof = json.loads(proof_path.read_text())
@@ -53,7 +85,17 @@ def main() -> int:
     assert sha256(proxy) == deferred["proxySHA256"]
     assert sha256(candidate) == deferred["candidateSHA256"]
     rows = process_rows()
-    steam_rows = [(pid, ppid, comm) for pid, ppid, comm in rows if comm.casefold() == str(STEAM).casefold()]
+    steam_rows = [(pid, ppid, comm) for pid, ppid, comm in rows if is_original_steam_process(comm)]
+    # Tencent keeps the native winelauncher process named after the full
+    # Steam.exe path while Wine exposes the actual Windows client as a
+    # C:/.../steam.exe process.  Both belong to the same client session; use
+    # the inner Windows process when it is present instead of treating the
+    # launcher as a second Steam instance.
+    inner_steam_rows = [row for row in steam_rows
+                        if row[2].replace("\\", "/").casefold() ==
+                        "c:/program files (x86)/steam/steam.exe"]
+    if inner_steam_rows:
+        steam_rows = inner_steam_rows
     assert len(steam_rows) == 1, "Expected one running original Steam client"
     assert not any("SB-Win64-Shipping.exe" in comm or "/StellarBlade/SB.exe" in comm for _, _, comm in rows), "Game already running"
     disk_free_at_launch = shutil.disk_usage(ROOT).free
@@ -88,8 +130,19 @@ def main() -> int:
         MVK_AMD_CROSS_ENCODER_LIVE_CACHE="1",
         MVK_CONFIG_USE_MTLHEAP="2", MVK_AMD_BATCH_LIVE_USE_RESOURCE="1", MVK_AMD_BATCH_ARGUMENT_HEAPS="1",
         MVK_AMD_ARGUMENT_HEAP_THRESHOLD="2",
-        MVK_AMD_BINARY_ARCHIVE_PATH=str(ROOT / "build/game-metal-binary-cache/compute-bounded-v2.metalar"),
-        MVK_AMD_RENDER_BINARY_ARCHIVE_PATH=str(ROOT / "build/game-metal-binary-cache/render-bounded-v2.metalar"),
+        # The monolithic compute-bounded-v2 archive is an inactive, compressed
+        # recovery artifact.  The current runtime uses independent per-pipeline
+        # archives so a single opaque Metal archive cannot pin several GiB or
+        # serialize every pipeline worker behind one driver operation.
+        MVK_AMD_COMPUTE_ARCHIVE_DIR=str(ROOT / "build/game-metal-binary-cache/compute-shards-v3"),
+        MVK_AMD_RENDER_ARCHIVE_DIR=str(ROOT / "build/game-metal-binary-cache/render-shards-v1"),
+        MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE="1",
+        MVK_AMD_RENDER_ARCHIVE_REHYDRATE="1",
+        MVK_AMD_SHARDED_SHADER_CACHE_LOCKS="1",
+        MVK_AMD_DESCRIPTOR_WRITE_SHARDS="1",
+        MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES="1",
+        MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS="0",
+        MVK_AMD_CPU_GATE_UNSIGNALED_TIMELINE_WAITS="1",
         MVK_AMD_BINARY_ARCHIVE_FLUSH_INTERVAL="64", MVK_AMD_BINARY_ARCHIVE_MAX_BYTES=str(256 * 1024 * 1024),
         VKD3D_SHADER_CACHE_PATH="Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\open-game-stack-20261015\\build\\private-shader-cache",
         VKD3D_LOG_FILE="Z:" + str(out / "vkd3d-game.log").replace("/Users/tonytan", "").replace("/", "\\"),
@@ -107,6 +160,8 @@ def main() -> int:
         "diskFreeBytesAtLaunch": disk_free_at_launch, "normalLicensedSteamRequest": True, "existingSteamPID": steam_rows[0][0], "clientPID": client.pid,
         "privateCrashState": str(ROOT / "build/stellar-crash-report-state"),
         "proxySHA256": deferred["proxySHA256"], "candidateSHA256": deferred["candidateSHA256"],
+        "assetGuardProfile": str(GUARD_RUNTIME), "assetGuardProfileSHA256": guard_sha256,
+        "assetGuardProfileRepaired": guard_repaired,
         "command": command, "observed": {}, "verified": False,
         "gameOnlyExceptionLogging": args.game_exception_log,
         "gameOnlyExceptionLoggingRequested": args.game_exception_log,

@@ -209,6 +209,10 @@ protected:
 	void merge(MVKShaderLibraryCache* other);
 
 	MVKVulkanAPIDeviceObject* _owner;
+	// Pipeline-cache map access is protected separately by MVKPipelineCache.
+	// Serialize variants belonging to one SPIR-V module without blocking
+	// compilation of unrelated modules.
+	std::mutex _accessLock;
 	MVKSmallVector<std::pair<mvk::SPIRVToMSLConversionConfiguration, MVKShaderLibrary*>> _shaderLibraries;
 };
 

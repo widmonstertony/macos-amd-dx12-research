@@ -1,0 +1,35 @@
+{
+  "path": "artifacts/runtime-watchdog-v13-20261023.tar.gz",
+  "bytes": 1897632,
+  "sha256": "a7defedadf640b47363ff6bed2dcd342e2dd853e8d59cd66a526921ee1252514",
+  "gamePlayable": false,
+  "purpose": "Open-source recovery of the bounded work-trace diagnostic candidate",
+  "containsAppStoreWineBinary": false,
+  "files": [
+    {
+      "path": "macos-amd-dx12-watchdog-v13-20261023/README.md",
+      "bytes": 814,
+      "sha256": "354580a7a4a36d0f59350c584053ece55f50e79b891c47f235f3916bd298ab43"
+    },
+    {
+      "path": "macos-amd-dx12-watchdog-v13-20261023/config/game-trial-config.h",
+      "bytes": 3681,
+      "sha256": "0e9dd32069000aabbdae07c34afd9137f96404bd233c643673f27cc8f65bc4fd"
+    },
+    {
+      "path": "macos-amd-dx12-watchdog-v13-20261023/lib/libCandidate.dylib",
+      "bytes": 6076008,
+      "sha256": "11e1412231c0f6ad8d8e8d05414f0a50b56072da4b2a31b1bc09df918caf1781"
+    },
+    {
+      "path": "macos-amd-dx12-watchdog-v13-20261023/lib/libDiagnosticProxy.dylib",
+      "bytes": 36480,
+      "sha256": "40633458420d29b42f3cc2c308ac4faf932d3732b47d3b89ba6768c961e7cadb"
+    },
+    {
+      "path": "macos-amd-dx12-watchdog-v13-20261023/manifest.json",
+      "bytes": 1120,
+      "sha256": "4072a8406f41be7765f2c50fd615c92757eb5c85f72f7c5a667ada8d07834ddc"
+    }
+  ]
+}

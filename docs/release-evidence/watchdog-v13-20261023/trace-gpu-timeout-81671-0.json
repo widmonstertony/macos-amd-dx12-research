@@ -1,0 +1,996 @@
+{
+  "label" : "vkQueueSubmit MTLCommandBuffer on Queue 0-0",
+  "perEncoderWorkTraceEnabled" : false,
+  "snapshotBeforeDeviceLossMark" : true,
+  "time" : 814506109.40286195,
+  "queueFamily" : 0,
+  "error" : "Caused GPU Timeout Error (00000002:kIOAccelCommandBufferCallbackErrorTimeout)",
+  "GPUEndTime" : 84111.31718801301,
+  "errorCode" : 2,
+  "encoders" : [
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdDispatch ComputeEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    },
+    {
+      "label" : "vkCmdBeginRendering RenderEncoder",
+      "state" : 1,
+      "stateName" : "completed",
+      "signposts" : [
+        "Encoding waits"
+      ]
+    }
+  ],
+  "dependencies" : {
+    "logicalQueue" : "0x7fc0dacc0460",
+    "createdTime" : 814506103.024845,
+    "submission" : 3475115,
+    "gpuTimestamps" : {
+      "enabled" : false
+    },
+    "logicalDevice" : "0x7fc098030000",
+    "workCount" : 0,
+    "workEvents" : [
+
+    ],
+    "phases" : [
+      {
+        "phase" : "enqueueRequested",
+        "nativeStatus" : 0,
+        "order" : 3475116,
+        "time" : 814506103.02486205
+      },
+      {
+        "phase" : "commitRequested",
+        "nativeStatus" : 1,
+        "order" : 3475121,
+        "time" : 814506103.05561197
+      },
+      {
+        "phase" : "scheduled",
+        "nativeStatus" : 3,
+        "order" : 3475125,
+        "time" : 814506103.05960095
+      },
+      {
+        "phase" : "completed",
+        "nativeStatus" : 5,
+        "order" : 3475199,
+        "time" : 814506109.402812
+      }
+    ],
+    "queueFamily" : 0,
+    "truncatedEvents" : 0,
+    "truncatedWorkEvents" : 0,
+    "nativeQueue" : "0x7fc07a5e9ca0",
+    "queueIndex" : 0,
+    "events" : [
+
+    ]
+  },
+  "GPUStartTime" : 84104.973460239999,
+  "queueIndex" : 0,
+  "status" : 5,
+  "pendingQueueDependencies" : [
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.58126402,
+      "submission" : 3475166,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475167,
+          "time" : 814506103.58128297
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475172,
+          "time" : 814506103.583776
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475175,
+          "time" : 814506103.58460701
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0daebfc30",
+      "createdTime" : 814506103.59474695,
+      "submission" : 3475184,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475185,
+          "time" : 814506103.59477198
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475186,
+          "time" : 814506103.59479201
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475187,
+          "time" : 814506103.59488499
+        }
+      ],
+      "queueFamily" : 3,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc0daebfe10",
+      "queueIndex" : 0,
+      "events" : [
+        {
+          "operation" : "signal",
+          "event" : "0x7fc069f0dd40",
+          "encodeTime" : 814506103.59478402,
+          "requestedValue" : 253,
+          "kind" : "timeline",
+          "valueAtEncode" : 252,
+          "valueAtObservation" : 253
+        }
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0daebfc30",
+      "createdTime" : 814506109.40098703,
+      "submission" : 3475196,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475197,
+          "time" : 814506109.40101802
+        }
+      ],
+      "queueFamily" : 3,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc0daebfe10",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.58385801,
+      "submission" : 3475173,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475174,
+          "time" : 814506103.58388102
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475176,
+          "time" : 814506103.59042501
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475182,
+          "time" : 814506103.59103501
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.57077599,
+      "submission" : 3475138,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475139,
+          "time" : 814506103.57081199
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475140,
+          "time" : 814506103.57082701
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475144,
+          "time" : 814506103.57107496
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.59060895,
+      "submission" : 3475180,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475181,
+          "time" : 814506103.59062397
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475188,
+          "time" : 814506103.59513605
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475192,
+          "time" : 814506103.59627295
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.024845,
+      "submission" : 3475115,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475116,
+          "time" : 814506103.02486205
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475121,
+          "time" : 814506103.05561197
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475125,
+          "time" : 814506103.05960095
+        },
+        {
+          "phase" : "completed",
+          "nativeStatus" : 5,
+          "order" : 3475199,
+          "time" : 814506109.402812
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.56703401,
+      "submission" : 3475127,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475128,
+          "time" : 814506103.56706297
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475129,
+          "time" : 814506103.56708205
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475132,
+          "time" : 814506103.56721997
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.57209396,
+      "submission" : 3475145,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475150,
+          "time" : 814506103.57462299
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+        {
+          "operation" : "signal",
+          "event" : "0x7fc0df212df0",
+          "encodeTime" : 814506103.57212102,
+          "requestedValue" : 1693,
+          "kind" : "binary-deferred",
+          "valueAtEncode" : 1692,
+          "valueAtObservation" : 1693
+        }
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.05577505,
+      "submission" : 3475122,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475123,
+          "time" : 814506103.05580103
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475124,
+          "time" : 814506103.05622101
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475126,
+          "time" : 814506103.05962503
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+        {
+          "operation" : "signal",
+          "event" : "0x7fc06a068db0",
+          "encodeTime" : 814506103.05620599,
+          "requestedValue" : 187620,
+          "kind" : "timeline",
+          "valueAtEncode" : 187619,
+          "valueAtObservation" : 187621
+        }
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.56729805,
+      "submission" : 3475134,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475135,
+          "time" : 814506103.56732297
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475137,
+          "time" : 814506103.57062101
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475143,
+          "time" : 814506103.57105994
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.57771003,
+      "submission" : 3475152,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475153,
+          "time" : 814506103.57773399
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475164,
+          "time" : 814506103.58111298
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475168,
+          "time" : 814506103.58184099
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc07a4b7520",
+      "createdTime" : 814506109.40083504,
+      "submission" : 3475194,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475195,
+          "time" : 814506109.40087497
+        }
+      ],
+      "queueFamily" : 2,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc0d9fcfa60",
+      "queueIndex" : 0,
+      "events" : [
+        {
+          "operation" : "wait",
+          "event" : "0x7fc07a5eca60",
+          "encodeTime" : 814506109.40088403,
+          "requestedValue" : 82,
+          "kind" : "timeline",
+          "valueAtEncode" : 82,
+          "valueAtObservation" : 82
+        }
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.57093799,
+      "submission" : 3475141,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475142,
+          "time" : 814506103.57096303
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475146,
+          "time" : 814506103.57346499
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475149,
+          "time" : 814506103.57458699
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.57354999,
+      "submission" : 3475147,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475148,
+          "time" : 814506103.57357204
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475151,
+          "time" : 814506103.57761395
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475154,
+          "time" : 814506103.57854199
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.590523,
+      "submission" : 3475177,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475178,
+          "time" : 814506103.59054601
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475179,
+          "time" : 814506103.59055698
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475183,
+          "time" : 814506103.59105897
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.59522295,
+      "submission" : 3475189,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475190,
+          "time" : 814506103.595245
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475191,
+          "time" : 814506103.59558594
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475193,
+          "time" : 814506103.59633195
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+        {
+          "operation" : "signal",
+          "event" : "0x7fc06a068db0",
+          "encodeTime" : 814506103.595577,
+          "requestedValue" : 187621,
+          "kind" : "timeline",
+          "valueAtEncode" : 187619,
+          "valueAtObservation" : 187621
+        }
+      ]
+    },
+    {
+      "logicalQueue" : "0x7fc0dacc0460",
+      "createdTime" : 814506103.56718099,
+      "submission" : 3475130,
+      "gpuTimestamps" : {
+        "enabled" : false
+      },
+      "logicalDevice" : "0x7fc098030000",
+      "workCount" : 0,
+      "workEvents" : [
+
+      ],
+      "phases" : [
+        {
+          "phase" : "enqueueRequested",
+          "nativeStatus" : 0,
+          "order" : 3475131,
+          "time" : 814506103.56720996
+        },
+        {
+          "phase" : "commitRequested",
+          "nativeStatus" : 1,
+          "order" : 3475133,
+          "time" : 814506103.56722105
+        },
+        {
+          "phase" : "scheduled",
+          "nativeStatus" : 3,
+          "order" : 3475136,
+          "time" : 814506103.56733596
+        }
+      ],
+      "queueFamily" : 0,
+      "truncatedEvents" : 0,
+      "truncatedWorkEvents" : 0,
+      "nativeQueue" : "0x7fc07a5e9ca0",
+      "queueIndex" : 0,
+      "events" : [
+
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "timeUTC": "2026-10-24T03:45:45.071468+00:00",
+  "qualified": true,
+  "nativeRegressionPassed": true,
+  "originalTencentDevicePassed": true,
+  "originalTencentComputePassed": true,
+  "originalTencentPresentationPassed": true,
+  "originalTencentFullGUIHostPassed": false,
+  "deferredGameGuardPassed": true,
+  "qualificationComposition": "Same v12 candidate and real Radeon GPU controls; only the game proxy adds a 30-second externally armed bounded per-encoder work ring for diagnosing the verified 6.34-second queue-0 watchdog. Normal behavior is unchanged while unarmed.",
+  "gamePlayable": false,
+  "optimization": "v12 listener gate plus bounded externally armed work attribution; diagnostic profile only",
+  "GPUControls": [
+    "evidence/listener-gated-timeline-v12-forward-gpu-20261023/run.json",
+    "evidence/listener-gated-timeline-v12-reverse-gpu-20261023/run.json",
+    "evidence/listener-gated-timeline-v12-ping-pong-gpu-20261023/run.json",
+    "evidence/listener-gated-timeline-v12-resource-controls-20261023/run.json"
+  ],
+  "priorOriginalTencentWineBaseline": "evidence/private-cache-wine-20261023T232123Z/run.json",
+  "deployment": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/listener-gated-timeline-v13-worktrace-20261023-deployment.json",
+  "deferredRuntime": {
+    "qualification": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261023T232123Z/run.json",
+    "candidate": "/private/tmp/mvk-guard-proxy/libQualifiedCandidateReexport.dylib",
+    "candidateSHA256": "cd6ada9048ff9df2eb67f7a188027cd7668da0bc8c1bb9c2c42f344af4eb7065",
+    "proxy": "/private/tmp/mvk-guard-proxy/libMoltenVKGuard.dylib",
+    "proxySHA256": "145c0febc0e1800fb5beaec2053995f6849697c2074380f0ba1463fe1e905202",
+    "devicePassed": true,
+    "computePassed": true,
+    "presentationPassed": true
+  }
+}

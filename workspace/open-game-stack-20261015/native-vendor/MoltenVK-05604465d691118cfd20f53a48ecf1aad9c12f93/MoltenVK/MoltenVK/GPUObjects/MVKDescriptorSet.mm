@@ -1411,7 +1411,7 @@ static void writeDescriptorSetCPUBufferDispatch(
 	}
 }
 
-static std::unique_lock<std::mutex> invalidateDescriptorUseCache(
+static MVKDescriptorUseCache::WriteGuard invalidateDescriptorUseCache(
     const MVKDescriptorSet* set, const MVKDescriptorBinding* binding, uint32_t start, uint32_t count) {
     if (!set->resourceUseCache) return {};
     uint32_t available = binding->isVariable() ? set->variableDescriptorCount : binding->descriptorCount;
@@ -1428,9 +1428,16 @@ static void writeDescriptorSetBinding(
 	const void* src, MVKDescriptorUpdateSourceType type, size_t stride,
 	uint32_t start, uint32_t count)
 {
-	auto cacheWrite = invalidateDescriptorUseCache(set, binding, start, count);
 	char* cpuBuffer = set->cpuBuffer + binding->cpuOffset;
-	writeDescriptorSetCPUBufferDispatch(layout, *binding, cpuBuffer, src, stride, type, start, count);
+	{
+		// The use cache reads only the CPU descriptor table. Keep its data-range
+		// guard across that write, then release it before the substantially more
+		// expensive Metal argument-buffer encoding below. Holding the guard over
+		// both phases serialized independent Vulkan descriptor updates in games
+		// that fan them out across worker threads.
+		auto cacheWrite = invalidateDescriptorUseCache(set, binding, start, count);
+		writeDescriptorSetCPUBufferDispatch(layout, *binding, cpuBuffer, src, stride, type, start, count);
+	}
 	switch (layout->argBufMode()) {
 		case MVKArgumentBufferMode::Off:
 			break; // No GPU buffer
@@ -1482,15 +1489,20 @@ static void copyDescriptorSetBinding(
 	const MVKDescriptorBinding* dstBinding, const MVKDescriptorSet* dstSet, id<MTLArgumentEncoder> dstEnc,
 	uint32_t srcArrayElement, uint32_t dstArrayElement, uint32_t count)
 {
-	auto cacheWrite = invalidateDescriptorUseCache(dstSet, dstBinding, dstArrayElement, count);
 	assert(srcBinding->cpuLayout == dstBinding->cpuLayout);
 	assert(srcBinding->gpuLayout == dstBinding->gpuLayout);
 	MVKDescriptorCPULayout cpu = srcBinding->cpuLayout;
-	if (cpu != MVKDescriptorCPULayout::None) {
-		size_t stride = descriptorCPUSize(cpu);
-		char* src = srcSet->cpuBuffer + srcBinding->cpuOffset + srcArrayElement * stride;
-		char* dst = dstSet->cpuBuffer + dstBinding->cpuOffset + dstArrayElement * stride;
-		memcpy(dst, src, count * stride);
+	{
+		// As in direct writes, cache synchronization protects the CPU table and
+		// its dirty metadata. The following argument-buffer copy does not feed
+		// MVKDescriptorUseCache and must not extend this critical section.
+		auto cacheWrite = invalidateDescriptorUseCache(dstSet, dstBinding, dstArrayElement, count);
+		if (cpu != MVKDescriptorCPULayout::None) {
+			size_t stride = descriptorCPUSize(cpu);
+			char* src = srcSet->cpuBuffer + srcBinding->cpuOffset + srcArrayElement * stride;
+			char* dst = dstSet->cpuBuffer + dstBinding->cpuOffset + dstArrayElement * stride;
+			memcpy(dst, src, count * stride);
+		}
 	}
 	MVKDescriptorGPULayout gpu = srcBinding->gpuLayout;
 	MVKArgumentBufferMode argBufMode = dstLayout->argBufMode();

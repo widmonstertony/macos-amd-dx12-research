@@ -233,10 +233,33 @@ struct MVKUseResourceHelper {
 	MVKUseResourceHelper(const MVKUseResourceHelper&) = delete;
 	MVKUseResourceHelper& operator=(const MVKUseResourceHelper&) = delete;
 	~MVKUseResourceHelper() { releaseLiveResources(); }
+	struct PendingResources {
+		MVKSmallVector<id<MTLResource>> resources;
+		MVKSmallVector<id<MTLHeap>> heaps;
+		size_t size() const { return resources.size(); }
+		bool empty() const { return resources.empty(); }
+		void push_back(id<MTLResource> resource, id<MTLHeap> heap) {
+			resources.push_back(resource);
+			heaps.push_back(heap);
+		}
+		void clear() { resources.clear(); heaps.clear(); }
+		void removeNilResources() {
+			size_t output = 0;
+			for (size_t input = 0; input < resources.size(); ++input) {
+				if (!resources[input]) continue;
+				resources[output] = resources[input];
+				heaps[output] = heaps[input];
+				++output;
+			}
+			resources.resize(output);
+			heaps.resize(output);
+		}
+	};
 	struct Entry {
-		MVKSmallVector<id<MTLResource>> read;
-		MVKSmallVector<id<MTLResource>> readWrite;
-		MVKSmallVector<id<MTLResource>>& get(bool write) { return write ? readWrite : read; }
+		PendingResources read;
+		PendingResources readWrite;
+		MVKSmallVector<id<MTLResource>> retainedSnapshotReads;
+		PendingResources& get(bool write) { return write ? readWrite : read; }
 	};
 	struct ResourceInfo {
 		MVKResourceUsageStages stages;
@@ -246,6 +269,12 @@ struct MVKUseResourceHelper {
 		uint64_t generation = 0;
         uint64_t pendingBatch = 0;
         size_t pendingIndex = 0;
+		// A retained Metal resource keeps its heap identity stable. Cache that
+		// identity with the owned resource instead of sending millions of
+		// repeated Objective-C `heap` messages while rebuilding encoder-local
+		// declarations. Non-retained entries refresh this at each generation.
+		id<MTLHeap> heap = nil;
+		bool heapKnown = false;
 	};
 	struct RecentLiveResource {
 		id<MTLResource> resource = nil;
@@ -270,11 +299,32 @@ struct MVKUseResourceHelper {
     std::unordered_map<id<MTLResource>, AbsentLiveResource> absentLiveResources;
     bool descriptorSnapshotReuse = false;
     bool crossEncoderSnapshotReuse = false;
+    struct CachedDescriptorSnapshot {
+        MVKDescriptorUseCache* cache;
+        const char* src;
+        uint32_t count;
+        size_t stride;
+        MVKDescriptorUseCache::SnapshotReuseToken reuse;
+        MVKDescriptorUseCache::Snapshot snapshot;
+    };
+    std::vector<CachedDescriptorSnapshot> cachedDescriptorSnapshots;
+    MVKDescriptorUseCache::Snapshot descriptorSnapshot(MVKDescriptorUseCache* cache,
+                                                       const char* src, uint32_t count, size_t stride);
     struct RetainedSnapshotResource {
         id<MTLResource> resource;
         ResourceInfo* info; // Stable deque node; helper owns the Metal reference.
     };
     using RetainedSnapshot = std::vector<RetainedSnapshotResource>;
+    struct RetainedReadBatch {
+        // Keep the stable ResourceInfo node with each retained object.  A
+        // shared snapshot can overlap many other snapshots in the same Metal
+        // encoder; replaying raw resource identities would bypass the
+        // encoder-generation/stage deduplication and send every overlap to
+        // the native driver again.
+        std::vector<RetainedSnapshotResource> records;
+    };
+    using SharedRetainedReadBatch = std::shared_ptr<RetainedReadBatch>;
+    SharedRetainedReadBatch buildRetainedReadBatch(const std::shared_ptr<RetainedSnapshot>& live);
     void addRetainedSnapshotResource(const RetainedSnapshotResource& record,
                                     id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
                                     MVKResourceUsageStages stage, bool write);
@@ -286,16 +336,25 @@ struct MVKUseResourceHelper {
         uint64_t additions;
         uint64_t generation;
         std::shared_ptr<RetainedSnapshot> liveSnapshot;
+        SharedRetainedReadBatch readBatch;
     };
     size_t snapshotLiveIdentities = 0;
     std::vector<DeclaredSnapshot> declaredSnapshots;
     uint64_t statsRegistrationQueries=0, statsRegistrationUnrelated=0;
     uint64_t statsSnapshotCalls=0, statsSnapshotSkips=0, statsSnapshotWordsSkipped=0, statsSnapshotFilterHits=0;
     uint64_t statsSnapshotDeltaHits=0, statsSnapshotDeltaReused=0, statsSnapshotColdWords=0, statsSnapshotCacheClears=0;
+    uint64_t statsDescriptorSnapshotFastHits=0, statsDescriptorSnapshotMisses=0;
+    uint64_t statsSnapshotBulkFastHits=0, statsSnapshotBulkResources=0;
     void addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                          id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
                          MVKResourceUsageStages stage, bool write);
 	uint64_t statsCalls=0, statsLookups=0, statsRetainedHits=0, statsAbsentHits=0, statsLiveFound=0;
+	// Counts the resource declarations that survive helper-side deduplication
+	// and are actually submitted to Metal.  The high-level call counters above
+	// cannot distinguish CPU replay cost from AMD driver declaration cost.
+	uint64_t statsBindCalls=0, statsInputRead=0, statsInputReadWrite=0;
+	uint64_t statsPreciseRead=0, statsPreciseReadWrite=0;
+	uint64_t statsCollapsedRead=0, statsHeapDeclarations=0, statsHeapQueries=0;
 	void publishResourceUseStats(bool encoderReset);
     uint64_t pendingBatchGeneration = 1;
     uint64_t statsQueuedSuperseded = 0;
@@ -316,13 +375,13 @@ struct MVKUseResourceHelper {
 	/** Reuse a validated object only while this helper owns a retained reference. */
 	bool addImmediateLive(id<MTLResource> resource, MVKLiveList& liveList, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write);
 	/** Add a resource to the list of resources to use. */
-	void add(id<MTLResource> resource, MVKResourceUsageStages stage, bool write);
+	ResourceInfo* add(id<MTLResource> resource, MVKResourceUsageStages stage, bool write);
 	/**
 	 * Immediately use the given resource.
 	 * A live resource is retained by MVKLiveList while this call executes, so
 	 * resource destruction does not require holding the live-list lock here.
 	 */
-	void addImmediate(id<MTLResource> resource, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write);
+	ResourceInfo* addImmediate(id<MTLResource> resource, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write);
 	void bindAndResetGraphics(id<MTLRenderCommandEncoder> encoder);
 	void bindAndResetCompute(id<MTLComputeCommandEncoder> encoder);
 };

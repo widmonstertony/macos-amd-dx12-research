@@ -3777,11 +3777,15 @@ MVKLiveList::MVKLiveList() {
     if (value && !strcmp(value, "1")) _registrationLog.reset(new MVKRegistrationLog<id>());
 }
 
-MVKLiveList::Group* MVKLiveList::getGroup(id object) {
+size_t MVKLiveList::getGroupIndex(id object) {
 	static constexpr size_t GOLDEN_RATIO = 0x9e3779b97f4a7c16ull;
 	size_t idx = reinterpret_cast<size_t>(object) * GOLDEN_RATIO;
 	idx >>= sizeof(size_t) * CHAR_BIT - GROUP_BITS;
-	return &groups[idx];
+		return idx;
+	}
+
+MVKLiveList::Group* MVKLiveList::getGroup(id object) {
+		return &groups[getGroupIndex(object)];
 }
 
 void MVKLiveList::add(id object) {
@@ -3792,6 +3796,23 @@ void MVKLiveList::add(id object) {
 	group->additions.fetch_add(1, std::memory_order_release);
 	if (_registrationLog) _registrationLog->append(object);
 	else _allAdditions.fetch_add(1, std::memory_order_release);
+}
+
+void MVKLiveList::indexSnapshotEntry(const SnapshotEntry& entry) {
+    const auto* key = entry.key.get();
+    for (id<MTLResource> resource : *entry.lease) _snapshotReverse[resource].insert(key);
+}
+
+MVKLiveList::SnapshotIterator MVKLiveList::eraseSnapshotEntry(SnapshotIterator it) {
+    const auto* key = it->key.get();
+    for (id<MTLResource> resource : *it->lease) {
+        auto reverse = _snapshotReverse.find(resource);
+        if (reverse == _snapshotReverse.end()) continue;
+        reverse->second.erase(key);
+        if (reverse->second.empty()) _snapshotReverse.erase(reverse);
+    }
+    _snapshotResources -= it->lease->size();
+    return _snapshotEntries.erase(it);
 }
 
 void MVKLiveList::remove(id object) {
@@ -3807,52 +3828,138 @@ void MVKLiveList::remove(id object) {
     }
     if (removed && _snapshotCacheEnabled) {
         // Never acquire the snapshot lock while holding a registry shard.
-        // Prompt eviction avoids pinning unloaded assets in a cache entry.
+        // The reverse index names only leases which own this identity.  It
+        // avoids walking every resource in every cached descriptor table when
+        // the cache is large enough to cover the game's multi-frame working
+        // set.
         std::lock_guard<std::mutex> guard(_snapshotLock);
-        _snapshotEntries.clear(); _snapshotResources = 0;
+        auto reverse = _snapshotReverse.find(object);
+        if (reverse == _snapshotReverse.end()) return;
+        auto victims = reverse->second;
+        for (auto it = _snapshotEntries.begin(); it != _snapshotEntries.end();) {
+            if (victims.count(it->key.get())) it = eraseSnapshotEntry(it);
+            else ++it;
+        }
     }
 }
 
 MVKLiveList::SnapshotLease MVKLiveList::retainedSnapshot(MVKDescriptorUseCache::Snapshot snapshot) {
     if (!_snapshotCacheEnabled) return {};
     std::lock_guard<std::mutex> guard(_snapshotLock);
-    for (auto it=_snapshotEntries.begin();it!=_snapshotEntries.end();) {
-        if (it->key.expired()) { _snapshotResources-=it->lease->size(); it=_snapshotEntries.erase(it); }
-        else ++it;
-    }
-    uint64_t before = _mutations.load(std::memory_order_acquire);
-    for (const auto& entry : _snapshotEntries) {
-        if (entry.mutation==before && entry.key.lock()==snapshot) {
+    uint64_t before = additionGeneration();
+    for (auto& entry : _snapshotEntries) {
+        if (entry.key==snapshot) {
+            if (entry.additions != before) {
+                uint64_t observed = before;
+                bool related = registrationRequiresValidation(entry.additions, [&](id resource) {
+                    return snapshot->contains(resource);
+                }, observed);
+                if (related) break;
+                entry.additions = before = observed;
+            }
             if (snapshotCacheHits.fetch_add(1,std::memory_order_relaxed)==0) {
                 // Bounded proof of actual cache use, not an advertised feature bit.
                 if (const char* dir=getenv("MVK_CONFIG_SHADER_DUMP_DIR")) {
                     char path[4096];int n=snprintf(path,sizeof(path),"%s/shared-live-snapshot-hit-%d.json",dir,getpid());
                     if (n>0 && size_t(n)<sizeof(path)) if (FILE* f=fopen(path,"w")) {
-                        fprintf(f,"{\"pid\":%d,\"cacheHitObserved\":true,\"resources\":%zu,\"mutation\":%llu}\n",getpid(),entry.lease->size(),(unsigned long long)before);
+                        fprintf(f,"{\"pid\":%d,\"cacheHitObserved\":true,\"resources\":%zu,\"additions\":%llu}\n",getpid(),entry.lease->size(),(unsigned long long)before);
                         fclose(f);
                     }
                 }
             }
+            _globalSnapshotHits.fetch_add(1, std::memory_order_relaxed);
             return entry.lease;
         }
     }
-    auto retained = std::make_shared<RetainedSnapshot>();
-    for (id<MTLResource> resource : *snapshot) {
-        if (auto live=isLive(resource)) retained->push_back([resource retain]);
+    SnapshotLease parentLease;
+    auto previous = snapshot->previous.lock();
+    if (previous) {
+        for (auto& entry : _snapshotEntries) {
+            if (entry.key != previous) continue;
+            uint64_t observed = before;
+            bool related = registrationRequiresValidation(entry.additions, [&](id resource) {
+                return snapshot->contains(resource);
+            }, observed);
+            if (!related) { parentLease = entry.lease; before = observed; }
+            else _globalSnapshotRelatedFallbacks.fetch_add(1, std::memory_order_relaxed);
+            break;
+        }
     }
-    snapshotCacheBuilds.fetch_add(1,std::memory_order_relaxed);
-    // Concurrent mutation makes this a one-use owned observation. A later
-    // query must validate again instead of publishing a mixed registry view.
-    if (_mutations.load(std::memory_order_acquire)!=before || retained->size()>16384) return retained;
+    auto retained = std::make_shared<RetainedSnapshot>();
+    if (parentLease) {
+        retained->reserve(parentLease->size() + snapshot->added.size());
+        for (id<MTLResource> resource : *parentLease) {
+            if (std::find(snapshot->removed.begin(), snapshot->removed.end(), resource) == snapshot->removed.end())
+                retained->push_back([resource retain]);
+        }
+        for (id<MTLResource> resource : snapshot->added) {
+            if (auto live = isLive(resource)) retained->push_back([resource retain]);
+        }
+        snapshotDeltaBuilds.fetch_add(1, std::memory_order_relaxed);
+        _globalSnapshotDeltaBuilds.fetch_add(1, std::memory_order_relaxed);
+    } else {
+        for (id<MTLResource> resource : *snapshot) {
+            if (auto live=isLive(resource)) retained->push_back([resource retain]);
+        }
+        snapshotCacheBuilds.fetch_add(1,std::memory_order_relaxed);
+        _globalSnapshotFullBuilds.fetch_add(1, std::memory_order_relaxed);
+    }
+    // Publish only when no registration relevant to this snapshot raced the
+    // validation. Unrelated additions can be advanced exactly by the bounded
+    // registration log; removals evict matching leases under _snapshotLock.
+    uint64_t observed = before;
+    bool relatedAddition = registrationRequiresValidation(before, [&](id resource) {
+        return snapshot->contains(resource);
+    }, observed);
+    if (relatedAddition) _globalSnapshotRelatedFallbacks.fetch_add(1, std::memory_order_relaxed);
+    if (relatedAddition || retained->size()>65536) return retained;
+    before = observed;
     for (auto it=_snapshotEntries.begin();it!=_snapshotEntries.end();) {
-        if (it->key.lock()==snapshot) { _snapshotResources-=it->lease->size(); it=_snapshotEntries.erase(it); }
+        if (it->key==snapshot) it=eraseSnapshotEntry(it);
         else ++it;
     }
-    if (_snapshotEntries.size()>=16 || _snapshotResources+retained->size()>16384) {
-        _snapshotEntries.clear(); _snapshotResources=0;
+    static constexpr size_t kSnapshotEntryLimit = 1024;
+    static constexpr size_t kSnapshotResourceLimit = 1024 * 1024;
+    while (!_snapshotEntries.empty() &&
+           (_snapshotEntries.size()>=kSnapshotEntryLimit ||
+            _snapshotResources+retained->size()>kSnapshotResourceLimit)) {
+        eraseSnapshotEntry(_snapshotEntries.begin());
+        _globalSnapshotEvictions.fetch_add(1, std::memory_order_relaxed);
     }
     _snapshotResources+=retained->size();
     _snapshotEntries.push_back({snapshot,before,retained});
+    indexSnapshotEntry(_snapshotEntries.back());
+    _globalSnapshotPublishedEntries.fetch_add(1, std::memory_order_relaxed);
+    _globalSnapshotPublishedResources.fetch_add(retained->size(), std::memory_order_relaxed);
+    return retained;
+}
+
+MVKLiveList::SnapshotLease MVKLiveList::retainedSnapshotOnce(MVKDescriptorUseCache::Snapshot snapshot) {
+    auto retained = std::make_shared<RetainedSnapshot>();
+    if (!snapshot || snapshot->empty()) return retained;
+
+    constexpr size_t groupCount = 1 << GROUP_BITS;
+    size_t counts[groupCount] = {};
+    for (id<MTLResource> resource : *snapshot) ++counts[getGroupIndex(resource)];
+
+    size_t offsets[groupCount + 1] = {};
+    for (size_t idx = 0; idx < groupCount; ++idx) offsets[idx + 1] = offsets[idx] + counts[idx];
+    size_t cursors[groupCount];
+    memcpy(cursors, offsets, sizeof(cursors));
+    std::vector<id<MTLResource>> ordered(snapshot->size());
+    for (id<MTLResource> resource : *snapshot) ordered[cursors[getGroupIndex(resource)]++] = resource;
+
+    retained->reserve(snapshot->size());
+    for (size_t idx = 0; idx < groupCount; ++idx) {
+        if (!counts[idx]) continue;
+        Group& group = groups[idx];
+        std::lock_guard<Lock> guard(group.lock);
+        for (size_t pos = offsets[idx]; pos < offsets[idx + 1]; ++pos) {
+            id<MTLResource> resource = ordered[pos];
+            if (group.entries.find(resource) != group.entries.end())
+                retained->push_back([resource retain]);
+        }
+    }
     return retained;
 }
 

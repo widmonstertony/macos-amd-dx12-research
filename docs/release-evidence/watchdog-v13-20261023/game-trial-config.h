@@ -1,0 +1,51 @@
+// Game-only qualified submission profile. Original asset guard remains unchanged.
+static void append_record(const char *message);
+static void mvk_apply_game_trial_config(void) {
+    unsetenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL");
+    setenv("MVK_AMD_SERIALIZE_PIPELINE_LINK", "1", 1);
+    unsetenv("MVK_AMD_FRESH_MESH_LIBRARIES");
+    unsetenv("MVK_AMD_SAFE_MESH_LIBRARIES");
+    unsetenv("MVK_AMD_SYNC_MESH_LIBRARIES");
+    setenv("MVK_AMD_SYNC_MESH_PIPELINES", "1", 1);
+    unsetenv("MVK_AMD_LINK_DIFFERENTIAL_CAPTURE");
+    unsetenv("MVK_AMD_REPLAY_FAILED_MESH");
+    setenv("MVK_AMD_RENDER_ARCHIVE_DIR", "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/game-metal-binary-cache/render-shards-v1", 1);
+    unsetenv("MVK_AMD_RENDER_ARCHIVE_TRACE");
+    setenv("MVK_AMD_RENDER_ARCHIVE_REHYDRATE", "1", 1);
+    unsetenv("MVK_AMD_RENDER_ARCHIVE_REQUIRE_HIT");
+
+    setenv("MVK_AMD_CPU_GATE_UNSIGNALED_TIMELINE_WAITS", "1", 1);
+    setenv("MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES", "1", 1);
+    setenv("MVK_CONFIG_USE_MTLHEAP", "2", 1);
+    setenv("MVK_AMD_BATCH_LIVE_USE_RESOURCE", "1", 1);
+    setenv("MVK_AMD_BATCH_ARGUMENT_HEAPS", "1", 1);
+    setenv("MVK_AMD_GPU_TIMEOUT_TRACE", "0", 1);
+    setenv("MVK_AMD_SHARED_LIVE_SNAPSHOTS", "1", 1);
+    setenv("MVK_AMD_REGISTRATION_DELTA_CACHE", "1", 1);
+    setenv("MVK_AMD_QUEUE_FAILURE_CONTEXT", "1", 1);
+    setenv("MVK_AMD_RESOURCE_USE_STATS", "1", 1);
+    setenv("MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE", "1", 1);
+    setenv("MVK_AMD_NEGATIVE_LIVE_CACHE", "0", 1);
+    setenv("MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE", "1", 1);
+    setenv("MVK_AMD_SPLIT_VULKAN_COMMAND_BUFFERS", "1", 1);
+    setenv("MVK_AMD_SHARDED_SHADER_CACHE_LOCKS", "1", 1);
+    setenv("MVK_AMD_DESCRIPTOR_WRITE_SHARDS", "1", 1);
+    setenv("MVK_AMD_GPU_WORK_TRACE_ARM_PATH", "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/listener-gated-timeline-v13-worktrace-20261023/gpu-work-trace.arm", 1);
+    setenv("MVK_AMD_QUEUE_TIMING", "1", 1);
+    setenv("MVK_AMD_EFFECTIVE_CONFIG_PATH", "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/listener-gated-timeline-v13-worktrace-20261023/effective-config.json", 1);
+    setenv("MVK_AMD_ENCODER_LIVE_CACHE", "1", 1);
+    setenv("MVK_AMD_CROSS_ENCODER_LIVE_CACHE", "1", 1);
+    setenv("MVK_AMD_LIVE_LOOKUP_FAST_CACHE", "1", 1);
+    setenv("MVK_AMD_DESCRIPTOR_USE_CACHE", "1", 1);
+    setenv("MVK_AMD_ARGUMENT_HEAP_THRESHOLD", "2", 1);
+    setenv("MVK_AMD_RUNTIME_TRACE", "1", 1);
+    setenv("MVK_AMD_RUNTIME_REPLAY_ONLY", "1", 1);
+    setenv("MVK_CONFIG_SHADER_DUMP_DIR", "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/listener-gated-timeline-v13-worktrace-20261023/msl", 1);
+    setenv("MVK_AMD_COMPUTE_ARCHIVE_DIR", "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/game-metal-binary-cache/compute-shards-v3", 1);
+    unsetenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE");
+    setenv("MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE", "1", 1);
+    setenv("VKD3D_DEBUG", "info", 1);
+    setenv("VKD3D_LOG_FILE", "Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\open-game-stack-20261015\\evidence\\effective-submission-profile-20261020\\vkd3d-game.log", 1);
+    setenv("YYB_OPEN_GUARD_RECORD", "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/listener-gated-timeline-v13-worktrace-20261023/guard-proxy.trace", 1);
+    append_record("step=effective-submission-profile-ready encoderLive=1 crossEncoderLive=1 heapThreshold=2 argumentHeaps=1 queueTiming=1 fullWorkTrace=0");
+}

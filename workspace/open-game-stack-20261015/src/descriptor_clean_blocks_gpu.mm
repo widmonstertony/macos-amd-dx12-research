@@ -21,13 +21,16 @@ int main(int argc,const char**argv){@autoreleasepool{try{
    if(pass==6)slots[0]=input;
    if(pass==7)std::swap(slots[0],slots.back());
   }
-  auto snapshot=cache.resources((const char*)slots.data(),slots.size(),sizeof(id));if(pass==1||pass==3)need(snapshot==previous,"unchanged full write lost snapshot identity");previous=snapshot;
+  auto snapshot=cache.resources((const char*)slots.data(),slots.size(),sizeof(id));
+  if(pass==1||pass==3||pass==7)need(snapshot==previous,"unchanged large identity set lost snapshot identity");
+  if(pass==2){auto parent=snapshot->previous.lock();need(parent==previous,"large changed range lost predecessor");need(snapshot->added.size()==1&&snapshot->added[0]==next,"large changed range lost added identity");need(snapshot->removed.size()==1&&snapshot->removed[0]==input,"large changed range lost removed identity");}
+  previous=snapshot;
   h.resetForEncoder();id<MTLCommandBuffer>cb=[queue commandBuffer];id<MTLComputeCommandEncoder>enc=[cb computeCommandEncoder];h.addLiveSnapshot(snapshot,list,enc,immediate,MVKResourceUsageStages::Compute,true);
   id<MTLBuffer>active=pass<2?input:pass==2?next:pass==3?late:pass==4?other:pass==5?next:input;auto found=h.used.find(active);need(found!=h.used.end()&&found->second.generation==h.encoderGeneration&&found->second.write,"required encoder-local write declaration missing");
   if(pass==4){auto old=h.used.find(next);need(old==h.used.end()||old->second.generation!=h.encoderGeneration,"removed identity declared in new encoder");}
   h.bindAndResetCompute(enc);[ae setBuffer:active offset:0 atIndex:0];[enc setComputePipelineState:pipeline];[enc setBuffer:table offset:0 atIndex:0];[enc setBuffer:output offset:0 atIndex:1];[enc setBytes:&pass length:4 atIndex:2];[enc dispatchThreadgroups:MTLSizeMake(1,1,1) threadsPerThreadgroup:MTLSizeMake(1,1,1)];[enc endEncoding];[cb commit];[cb waitUntilCompleted];need(cb.status==MTLCommandBufferStatusCompleted,"GPU command failed");
  }
  unsigned mismatches=0;uint32_t expected[]={100,101,200,300,400,201,102,103};for(unsigned i=0;i<8;i++)if(((uint32_t*)output.contents)[i]!=expected[i])++mismatches;if(*(uint32_t*)input.contents!=104)++mismatches;if(*(uint32_t*)next.contents!=202)++mismatches;if(*(uint32_t*)late.contents!=301)++mismatches;if(*(uint32_t*)other.contents!=401)++mismatches;
- std::ofstream report(argv[1]);report<<"{\"passed\":"<<(mismatches?"false":"true")<<",\"descriptorSlots\":500000,\"GPUWordsChecked\":12,\"mismatches\":"<<mismatches<<",\"fullRangeInvalidations\":8,\"changedEdgesAndMiddleChecked\":true,\"lateRegistrationChecked\":true,\"removedIdentityChecked\":true,\"encoderWriteDeclarationsChecked\":true}\n";
+ std::ofstream report(argv[1]);report<<"{\"passed\":"<<(mismatches?"false":"true")<<",\"descriptorSlots\":500000,\"GPUWordsChecked\":12,\"mismatches\":"<<mismatches<<",\"fullRangeInvalidations\":8,\"largeRangeDeltaChecked\":true,\"largeRangeSetStableReuseChecked\":true,\"changedEdgesAndMiddleChecked\":true,\"lateRegistrationChecked\":true,\"removedIdentityChecked\":true,\"encoderWriteDeclarationsChecked\":true}\n";
  list.remove(input);list.remove(next);list.remove(late);list.remove(other);[queue release];[input release];[next release];[late release];[other release];[output release];[table release];[ae release];[pipeline release];[fn release];[lib release];return mismatches?5:0;
  }catch(const std::exception&e){fprintf(stderr,"ERROR %s\n",e.what());return 2;}}}

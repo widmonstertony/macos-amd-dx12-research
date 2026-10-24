@@ -49,11 +49,17 @@ def main():
     parser.add_argument('--descriptor-snapshot-reuse',action='store_true')
     parser.add_argument('--cross-encoder-snapshot-reuse',action='store_true')
     parser.add_argument('--registration-delta-cache',action='store_true')
+    parser.add_argument('--sharded-shader-cache-locks',action='store_true')
+    parser.add_argument('--descriptor-write-shards',action='store_true')
     parser.add_argument('--negative-live-cache',action='store_true')
     parser.add_argument('--batch-argument-heaps', action='store_true')
     parser.add_argument('--argument-heap-threshold', type=int, default=16)
     parser.add_argument('--gpu-counter-trace',action='store_true',help='Qualify timed native GPU counter collection on owned probes')
+    parser.add_argument('--probe-timeout', type=int, default=40,
+                        help='Per-probe timeout in seconds (10..180) for bounded diagnostics')
     args = parser.parse_args()
+    if not 10 <= args.probe_timeout <= 180:
+        parser.error('--probe-timeout must be between 10 and 180 seconds')
     if args.compute_only and args.descriptor_only:
         parser.error('Select either compute-only or descriptor-only')
     d3d12_directory = args.d3d12_directory.resolve() if args.d3d12_directory else None
@@ -91,7 +97,10 @@ def main():
         env.update(MVK_AMD_COMPUTE_ARCHIVE_DIR=str(shard_directory),
                    MVK_AMD_COMPUTE_ARCHIVE_TRACE='1')
     if args.gpu_timeout_trace:env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
-    if args.specialized_queues:env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
+    if args.specialized_queues:
+        env['MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES']='1'
+        env['MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS']='0'
+        env['MVK_AMD_CPU_GATE_UNSIGNALED_TIMELINE_WAITS']='1'
     if args.use_mtl_heap:env['MVK_CONFIG_USE_MTLHEAP']='2'
     if args.cross_encoder_live_cache:
         env['MVK_AMD_ENCODER_LIVE_CACHE']='1'
@@ -100,6 +109,8 @@ def main():
     if args.negative_live_cache:env['MVK_AMD_NEGATIVE_LIVE_CACHE']='1'
     if args.cross_encoder_snapshot_reuse:env['MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE']='1'
     if args.registration_delta_cache:env['MVK_AMD_REGISTRATION_DELTA_CACHE']='1'
+    if args.sharded_shader_cache_locks:env['MVK_AMD_SHARDED_SHADER_CACHE_LOCKS']='1'
+    if args.descriptor_write_shards:env['MVK_AMD_DESCRIPTOR_WRITE_SHARDS']='1'
     if args.batch_argument_heaps:
         if not args.use_mtl_heap:parser.error('--batch-argument-heaps requires --use-mtl-heap')
         if args.argument_heap_threshold < 1:parser.error('--argument-heap-threshold must be at least 1')
@@ -138,13 +149,15 @@ def main():
     candidate = private / "libCandidate.dylib"
     proxy = private / "libProbeGuard.dylib"
     shared = Path("/private/tmp/mvk-guard-proxy/libQualifiedCandidateReexport.dylib")
-    shared_before = digest(shared)
+    shared_before = digest(shared) if shared.is_file() else None
     result = {"timeLocal": datetime.datetime.now().astimezone().isoformat(),
               "candidateSHA256": digest(candidate), "proxySHA256": digest(proxy),
               "liveGameLibrariesChanged": False, "sharedLiveSnapshots": args.shared_live_snapshots, "gpuTimeoutTrace": args.gpu_timeout_trace,
               "specializedQueues": args.specialized_queues, "useMTLHeap": args.use_mtl_heap,
               "crossEncoderLiveCache": args.cross_encoder_live_cache,
               "registrationDeltaCache": args.registration_delta_cache,
+              "shardedShaderCacheLocks": args.sharded_shader_cache_locks,
+              "descriptorWriteShards": args.descriptor_write_shards,
               "qualificationScope": "compute-only" if args.compute_only else "compute-and-presentation",
               "batchArgumentHeaps": args.batch_argument_heaps,
               "argumentHeapThreshold": args.argument_heap_threshold, "results": {}}
@@ -167,15 +180,19 @@ def main():
     result['descriptorFixture'] = 'src/d3d12_descriptor_validation_control.cpp' if args.descriptor_only else None
     if args.descriptor_only:
         result['qualificationScope'] = 'descriptor-UAV-compute-readback-only'
+    probe_source = Path('/private/tmp/yyb-probe-app')
+    if not (probe_source / 'd3d12_compute_probe.exe').is_file():
+        probe_source = ROOT / 'probe-app'
+    result['ownedProbeSource'] = str(probe_source)
     for name, filename, marker in probes:
         d = out / name
         d.mkdir()
         (d / "msl").mkdir()
         executable = d / filename
-        source = (ROOT / 'build/descriptor-validation-control.exe') if args.descriptor_only else Path('/private/tmp/yyb-probe-app') / filename
+        source = (ROOT / 'build/descriptor-validation-control.exe') if args.descriptor_only else probe_source / filename
         shutil.copy2(source, executable)
         for dll in ("d3d12.dll", "d3d12core.dll", "dxgi.dll"):
-            dll_source = d3d12_directory / dll if d3d12_directory and dll != 'dxgi.dll' else Path('/private/tmp/yyb-probe-app') / dll
+            dll_source = d3d12_directory / dll if d3d12_directory and dll != 'dxgi.dll' else probe_source / dll
             shutil.copy2(dll_source, d / dll)
         run_env = env | {"YYB_OPEN_GUARD_FORCE": "1",
                          "YYB_OPEN_GUARD_RECORD": str(d / "guard.trace"),
@@ -197,7 +214,7 @@ def main():
                                  start_new_session=True)
             timed_out = False
             try:
-                code = p.wait(timeout=40)
+                code = p.wait(timeout=args.probe_timeout)
             except subprocess.TimeoutExpired:
                 timed_out = True
                 # Stop this owned probe only; never stop a shared service.
@@ -250,7 +267,10 @@ def main():
         print(json.dumps({name: {k:v for k,v in entry.items() if k!="computeArchiveRecords"}}), flush=True)
         if not entry["passed"]:
             break
-    result["sharedGameCandidateUnchanged"] = digest(shared) == shared_before
+    shared_after = digest(shared) if shared.is_file() else None
+    result["sharedGameCandidateBefore"] = shared_before
+    result["sharedGameCandidateAfter"] = shared_after
+    result["sharedGameCandidateUnchanged"] = shared_after == shared_before
     result["passed"] = (len(result["results"]) == len(probes)
                         and all(v["passed"] for v in result["results"].values())
                         and result["sharedGameCandidateUnchanged"])

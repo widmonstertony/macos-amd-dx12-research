@@ -8,6 +8,7 @@
 #include <new>
 #include <type_traits>
 #include <cassert>
+#include <vector>
 
 struct MVKEncodedWorkEvent {
     uint64_t index;
@@ -19,11 +20,15 @@ struct MVKEncodedWorkEvent {
 struct MVKEncodedWorkRing {
     os_unfair_lock lock;
     uint64_t count;
-    MVKEncodedWorkEvent events[64];
+    // Timed diagnostics only. A UE menu transition can encode more than one
+    // hundred pipeline and encoder boundaries into the command buffer that
+    // later trips the GPU watchdog. Keep that complete frame locally so a
+    // failure snapshot does not discard the expensive middle encoder.
+    MVKEncodedWorkEvent events[1024];
 };
 
 inline size_t mvkEncodedWorkSlot(uint64_t index) {
-    return index < 16 ? size_t(index) : 16 + size_t((index - 16) % 48);
+    return index < 64 ? size_t(index) : 64 + size_t((index - 64) % 960);
 }
 inline NSMutableData* mvkNewEncodedWorkRing() {
     static_assert(std::is_trivially_destructible<MVKEncodedWorkRing>::value, "Data owner must not need a C++ destructor");
@@ -54,12 +59,16 @@ inline NSDictionary* mvkSnapshotEncodedWork(NSMutableData* data) {
     auto* ring = static_cast<MVKEncodedWorkRing*>(data.mutableBytes);
     // Copy bounded bytes under the ring lock. Foundation allocations happen
     // afterwards, only when an actual failure snapshot is requested.
-    MVKEncodedWorkEvent copy[64];
+    // Metal completion queues have a small worker stack (520 KiB on the
+    // affected Intel macOS host). Each event is more than 560 bytes, so the
+    // full diagnostic ring must never be copied to that stack.
+    std::vector<MVKEncodedWorkEvent> copy;
     os_unfair_lock_lock(&ring->lock);
     uint64_t count = ring->count;
-    size_t size = size_t(std::min<uint64_t>(count, 64));
+    size_t size = size_t(std::min<uint64_t>(count, 1024));
+    copy.resize(size);
     for (size_t i = 0; i < size; ++i) {
-        uint64_t index = i < 16 || count <= 64 ? i : count - 48 + i - 16;
+        uint64_t index = i < 64 || count <= 1024 ? i : count - 960 + i - 64;
         copy[i] = ring->events[mvkEncodedWorkSlot(index)];
     }
     os_unfair_lock_unlock(&ring->lock);
@@ -72,5 +81,5 @@ inline NSDictionary* mvkSnapshotEncodedWork(NSMutableData* data) {
             @"encoder":[NSString stringWithFormat:@"%p",reinterpret_cast<void*>(event.encoder)],
             @"kind":[NSString stringWithUTF8String:event.kind] ?: @"", @"label":label}];
     }
-    return @{@"workEvents":events, @"workCount":@(count), @"truncatedWorkEvents":@(count > 64 ? count - 64 : 0)};
+    return @{@"workEvents":events, @"workCount":@(count), @"truncatedWorkEvents":@(count > 1024 ? count - 1024 : 0)};
 }

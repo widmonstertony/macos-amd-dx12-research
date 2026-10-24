@@ -18,6 +18,7 @@ template<class Cache> double run(unsigned count,size_t stride,unsigned mode){
   auto old=snapshot;
   {auto guard=cache.beginWrite(bytes.data(),bytes.size());
    if(mode==1)slot(count/2)=key(2049+(p&1));
+   if(mode==3){slot(0)=key(2049+(p&1));slot(count-1)=key(2051+(p&1));}
    if(mode==2)for(unsigned i=0;i<count;i++)slot(i)=key((i+p)%4096);
    if(stride>8)bytes[8]^=1;
   }
@@ -26,8 +27,10 @@ template<class Cache> double run(unsigned count,size_t stride,unsigned mode){
  }
  double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();std::set<id<MTLResource>>truth;for(unsigned i=0;i<count;i++)if(slot(i))truth.insert(slot(i));if(std::set<id<MTLResource>>(snapshot->begin(),snapshot->end())!=truth)throw std::runtime_error("slot oracle mismatch");return ms;
 }
-int main(){try{unsigned row=0;puts("{\"GPUWorkSubmitted\":false,\"pairedSameProcess\":true,\"cases\":[");
- for(size_t stride:{8,16,24})for(unsigned count:{4096,65536,500000})for(unsigned mode:{0,1,2}){
+int main(int argc,char** argv){try{
+ bool focused=argc==2&&!strcmp(argv[1],"--focused");if(argc>1&&!focused)throw std::runtime_error("expected --focused or no arguments");unsigned row=0;puts("{\"GPUWorkSubmitted\":false,\"pairedSameProcess\":true,\"cases\":[");
+ for(size_t stride:{8,16,24})for(unsigned count:{4096,65536,500000})for(unsigned mode:{0,1,2,3}){
+  if(focused&&(stride!=8||count!=500000))continue;
   double before[5],after[5];for(unsigned pair=0;pair<5;pair++){if(pair&1){after[pair]=run<MVKDescriptorUseCache>(count,stride,mode);before[pair]=run<BaselineDescriptorUseCache>(count,stride,mode);}else{before[pair]=run<BaselineDescriptorUseCache>(count,stride,mode);after[pair]=run<MVKDescriptorUseCache>(count,stride,mode);}}
   auto a=std::vector<double>(before,before+5),z=std::vector<double>(after,after+5);std::sort(a.begin(),a.end());std::sort(z.begin(),z.end());printf("%s{\"stride\":%zu,\"slots\":%u,\"mode\":%u,\"beforeMedianMS\":%.6f,\"afterMedianMS\":%.6f,\"speedup\":%.6f}",row++?",":"",stride,count,mode,a[2],z[2],a[2]/z[2]);fflush(stdout);
  }

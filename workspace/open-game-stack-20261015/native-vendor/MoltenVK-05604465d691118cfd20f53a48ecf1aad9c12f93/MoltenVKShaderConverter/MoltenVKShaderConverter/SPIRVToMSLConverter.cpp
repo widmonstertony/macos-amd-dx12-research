@@ -54,7 +54,38 @@ MVK_PUBLIC_SYMBOL bool SPIRVToMSLConversionOptions::matches(const SPIRVToMSLConv
 	if (numTessControlPoints != other.numTessControlPoints) { return false; }
 	if (shouldFlipVertexY != other.shouldFlipVertexY) { return false; }
 	if (shouldFixupClipSpace != other.shouldFixupClipSpace) { return false; }
+	if (uniqueEntryPointName != other.uniqueEntryPointName) { return false; }
 	return true;
+}
+
+static uint64_t mvkStableMSLHash(const string& source) {
+	uint64_t hash = 1469598103934665603ull;
+	for (unsigned char byte : source) {
+		hash ^= byte;
+		hash *= 1099511628211ull;
+	}
+	return hash;
+}
+
+static void mvkReplaceIdentifier(string& source, const string& oldName, const string& newName) {
+	if (oldName.empty() || oldName == newName) { return; }
+	auto isIdentifier = [](char value) {
+		unsigned char c = static_cast<unsigned char>(value);
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+		       (c >= '0' && c <= '9') || c == '_';
+	};
+	size_t offset = 0;
+	while ((offset = source.find(oldName, offset)) != string::npos) {
+		bool left = offset == 0 || !isIdentifier(source[offset - 1]);
+		size_t end = offset + oldName.size();
+		bool right = end == source.size() || !isIdentifier(source[end]);
+		if (left && right) {
+			source.replace(offset, oldName.size(), newName);
+			offset += newName.size();
+		} else {
+			offset = end;
+		}
+	}
 }
 
 MVK_PUBLIC_SYMBOL string SPIRVToMSLConversionOptions::printMSLVersion(uint32_t mslVersion, bool includePatch) {
@@ -356,6 +387,15 @@ MVK_PUBLIC_SYMBOL bool SPIRVToMSLConverter::convert(SPIRVToMSLConversionConfigur
 	// Populate the shader conversion results with info from the compilation run,
 	// and mark which vertex attributes and resource bindings are used by the shader
 	populateEntryPoint(pMSLCompiler, shaderConfig.options, conversionResult.resultInfo.entryPoint);
+	if (shaderConfig.options.uniqueEntryPointName && pMSLCompiler && !conversionResult.msl.empty()) {
+		string oldName = conversionResult.resultInfo.entryPoint.mtlFunctionName;
+		char generated[80];
+		snprintf(generated, sizeof(generated), "mvk_mesh_%016llx_%u",
+		         (unsigned long long)mvkStableMSLHash(conversionResult.msl),
+		         (unsigned)shaderConfig.options.entryPointStage);
+		mvkReplaceIdentifier(conversionResult.msl, oldName, generated);
+		conversionResult.resultInfo.entryPoint.mtlFunctionName = generated;
+	}
 	// If the compiler cannot compile with fast math, clear the fast math flags
 	if (pMSLCompiler && !pMSLCompiler->can_compile_with_fast_math()) {
 		conversionResult.resultInfo.entryPoint.fpFastMathFlags = 0;

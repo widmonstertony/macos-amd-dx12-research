@@ -1,0 +1,48 @@
+{
+  "device" : "AMD Radeon Pro 5600M",
+  "centerPixelBGRA" : [
+    0,
+    0,
+    255,
+    255
+  ],
+  "timestampTrace" : {
+    "capacity" : 512,
+    "withBarrier" : false,
+    "enabled" : true,
+    "CPUResolveSucceeded" : true,
+    "truncated" : false,
+    "samples" : [
+      {
+        "label" : "all-draw-control",
+        "kind" : "graphics-pipeline",
+        "timestamp" : 91081324503400,
+        "valid" : true,
+        "encoder" : "0x7fb22a81b400",
+        "index" : 0
+      },
+      {
+        "label" : "pipeline=all-draw-control;vertices=3;instances=1",
+        "kind" : "draw",
+        "timestamp" : 91081324503520,
+        "valid" : true,
+        "encoder" : "0x7fb22a81b400",
+        "index" : 1
+      },
+      {
+        "label" : "all-draw-control",
+        "kind" : "encoder-end",
+        "timestamp" : 91081324504800,
+        "valid" : true,
+        "encoder" : "0x7fb22a81b400",
+        "index" : 2
+      }
+    ],
+    "nativeCompleted" : true,
+    "allDraws" : true
+  },
+  "passed" : true,
+  "counterBudgetReleased" : true,
+  "allDrawCountersVerified" : true,
+  "GPUOutputVerified" : true
+}

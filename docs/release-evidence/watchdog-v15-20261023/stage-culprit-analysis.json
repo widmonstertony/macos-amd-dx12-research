@@ -1,0 +1,59 @@
+{
+  "timeUTC": "2026-10-24T05:28:59.000615+00:00",
+  "trace": "evidence/v15-e587-attack-fault-counters-20261023/trace-gpu-timeout-75424-1.json",
+  "gamePID": 75424,
+  "queueFamily": 0,
+  "queueIndex": 0,
+  "gpuDurationMilliseconds": 7208.928724998259,
+  "encoderCount": 24,
+  "renderEncoderCount": 23,
+  "computeEncoderCount": 1,
+  "workEventCount": 304,
+  "counterSampleCount": 53,
+  "positiveCounterSamples": 20,
+  "exactFaultStageZeroBased": 13,
+  "exactFaultStageHuman": 14,
+  "faultEncoder": "0x7ff14f3b8e00",
+  "lastReachedCounter": {
+    "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+    "kind": "graphics-pipeline",
+    "timestamp": 89955271816120,
+    "valid": true,
+    "encoder": "0x7ff14f3b8e00",
+    "index": 19
+  },
+  "firstUnreachedCounter": {
+    "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_94c37176d82593a6_4",
+    "kind": "graphics-pipeline",
+    "timestamp": 0,
+    "valid": true,
+    "encoder": "0x7ff14f3b8e00",
+    "index": 20
+  },
+  "workBetweenCounters": [
+    {
+      "encoder": "0x7ff14f3b8e00",
+      "label": "mode=direct-indexed;pipeline=obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4;elements=61365;instances=1;buffers=15;textures=0;samplers=0;sets=4;vertexBuffers=7;vertexBytes=1892236;index=0x7ff15b461450;indexOffset=1048576;indexSize=316266",
+      "kind": "draw",
+      "time": 814511906.141353,
+      "index": 233
+    }
+  ],
+  "exactDraw": {
+    "encoder": "0x7ff14f3b8e00",
+    "label": "mode=direct-indexed;pipeline=obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4;elements=61365;instances=1;buffers=15;textures=0;samplers=0;sets=4;vertexBuffers=7;vertexBytes=1892236;index=0x7ff15b461450;indexOffset=1048576;indexSize=316266",
+    "kind": "draw",
+    "time": 814511906.141353,
+    "index": 233
+  },
+  "finding": "GPU reached the aa294 graphics-pipeline boundary and did not reach the following 94c boundary. Exactly one direct indexed draw is encoded between them: 61,365 indices, one instance, 15 buffers, four descriptor sets, seven vertex buffers, 1,892,236 vertex bytes.",
+  "crossRunInterpretation": {
+    "priorV14Boundary": "stage 12 stopped between e587 and aa294 with two candidate draws",
+    "currentV15Boundary": "stage 13 stopped between aa294 and 94c with one exact draw",
+    "conclusion": "The latest reproducing fault is exactly localized, but the boundary moved across runs. Treat this as evidence for state/submission-dependent failure rather than proof that one immutable shader is always defective."
+  },
+  "gamePlayable": false,
+  "cacheDeleted": false,
+  "originalSteamPreserved": true,
+  "next": "Enable a bounded one-command-buffer all-draw timestamp mode (512 samples) and reproduce once to determine whether the exact failing draw is stable. If stable, capture its bound resources and shader inputs; if it moves again, implement safe intra-Vulkan-command-buffer segmentation at encoder boundaries."
+}

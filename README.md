@@ -4,13 +4,13 @@
 
 面向 Intel Mac / AMD GPU 的开源 D3D12 → Vulkan → Metal 兼容研究，以正版 Windows Steam《剑星》为主要复现案例。欢迎协助着色器转换、GPU 同步、缓存、Wine 窗口与性能分析。
 
-> **实验项目，尚未可玩。** 最新游戏已进入正常画面，但约为 6.5 FPS；随后单个 Metal command buffer 执行 6.34 秒并触发 AMD GPU watchdog。下载包是开发者测试包，**不是能让所有 Mac 直接玩《剑星》的成品**。探针通过不代表游戏兼容、FSR3 或其他 DX12 游戏可用。
+> **实验项目，尚未可玩。** 最新游戏已进入正常画面，但约为 6 FPS；一次真实故障已精确到第 14 个 encoder 中唯一的 61,365-index draw。单个 Metal command buffer 仍会运行 7.21 秒并触发 AMD GPU watchdog。下载包是开发者测试包，**不是能让所有 Mac 直接玩《剑星》的成品**。探针通过不代表游戏兼容、FSR3 或其他 DX12 游戏可用。
 
 最新源码、精确候选哈希与实测限制见 [2026-10-23 检查点](docs/CHECKPOINT-2026-10-23.md) 和 [完整研究状态](docs/STATE.md)。公开下载包仍是实验基线，尚不承诺《剑星》可玩。
 
 ## 下载与测试
 
-[实验版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.1.0-experimental) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)
+[最新诊断版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)
 
 实验包包含可移动目录的研究运行库、原生 GPU 读回探针、环境检查和校验工具。不包含游戏、Steam、应用宝 / Apple 引擎、存档或登录状态。探针独立运行；游戏集成仍需要正版游戏和兼容 Wine 环境，目前不提供一键游戏安装器。
 
@@ -49,9 +49,9 @@ flowchart LR
 | 计算 / 图形保护探针 | 有 GPU 读回及像素核对 | 完整 DX12 / Robustness2 合规 |
 | 计算归档 | 独立 Wine 探针 33 次严格命中 | 游戏不再重复编译 |
 | 正常 Steam 启动和场景进入 | 曾达到；帧率和画面异常 | 《剑星》已稳定可玩 |
-| 最新游戏完整回放 | 约 6.5 FPS；一个含 23 个 encoder 的图形 command buffer 运行 6.34 秒后 watchdog | 已确定具体 draw/dispatch 或可安全分段位置 |
+| 最新游戏故障回放 | 约 6 FPS；24-encoder command buffer 在第 14 个 encoder 的 61,365-index draw 后 watchdog | 该 draw 是所有运行中固定根因，或安全分段已完成 |
 
-详细事实见 [最新检查点](docs/CHECKPOINT-2026-10-23.md)。当前优先任务是通过 30 秒有界逐绘制记录，在 23 个 encoder 中定位具体 draw/dispatch，然后按证据修复着色器、资源绑定或 command-buffer 内分段。不能仅修改 feature bit 或只验证 device 创建。
+详细事实见 [最新检查点](docs/CHECKPOINT-2026-10-23.md)。v16 已加入一次性 512 样本全 draw GPU 时间戳，用下一次正常 Steam 故障验证故障 draw 是否稳定，再按证据修复资源/着色器或 command-buffer 内分段。不能仅修改 feature bit 或只验证 device 创建。
 
 ## 源码、构建和恢复
 

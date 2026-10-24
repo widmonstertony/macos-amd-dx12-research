@@ -1,0 +1,53 @@
+--- a/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKGPUTimestampTrace.h
++++ b/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKGPUTimestampTrace.h
+@@ -13,6 +13,10 @@
+     if(selected&&selected[0])return selected;
+     return getenv("MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL");
+ }
++inline bool mvkGPUCounterAllDraws() {
++    const char* enabled = getenv("MVK_AMD_GPU_COUNTER_ALL_DRAWS");
++    return enabled && enabled[0] && strcmp(enabled, "0");
++}
+ inline std::atomic<unsigned>& mvkGPUTimestampInFlight() { static std::atomic<unsigned> n{0}; return n; }
+ inline bool mvkAllocateGPUTimestampBuffer(NSMutableDictionary* record, id<MTLDevice> device) {
+     if (record[@"gpuCounterBuffer"] || !device || !mvkGPUTimestampArmed()) return record[@"gpuCounterBuffer"] != nil;
+@@ -23,10 +27,13 @@
+     id<MTLCounterSet>set=nil;
+     for(id<MTLCounterSet>s in device.counterSets)if([s.name isEqualToString:MTLCommonCounterSetTimestamp]){set=s;break;}
+     if(!set){n.fetch_sub(1);return false;}
+-    auto desc=[MTLCounterSampleBufferDescriptor new];desc.counterSet=set;desc.storageMode=MTLStorageModeShared;desc.sampleCount=128;
++    const NSUInteger sampleCapacity = mvkGPUCounterAllDraws() ? 512 : 128;
++    auto desc=[MTLCounterSampleBufferDescriptor new];desc.counterSet=set;desc.storageMode=MTLStorageModeShared;desc.sampleCount=sampleCapacity;
+     NSError* error=nil;auto buffer=[device newCounterSampleBufferWithDescriptor:desc error:&error];[desc release];
+     if(!buffer){n.fetch_sub(1);return false;}
+     record[@"gpuCounterBuffer"]=buffer;[buffer release];record[@"gpuCounterEvents"]=[NSMutableArray array];
++    record[@"gpuCounterCapacity"]=@(sampleCapacity);
++    record[@"gpuCounterAllDraws"]=@(mvkGPUCounterAllDraws());
+     return true;
+ }
+ inline void mvkBeginGPUTimestamps(NSMutableDictionary* record, id<MTLCommandBuffer> cb, uint32_t family) {
+@@ -52,11 +59,13 @@
+     bool render=[encoder respondsToSelector:@selector(setRenderPipelineState:)];
+     bool compute=[encoder respondsToSelector:@selector(setComputePipelineState:)];
+     if(!render&&!compute)return;
++    const bool selectedDraw = mvkGPUCounterAllDraws() && [kind isEqualToString:@"draw"];
+     if(![kind containsString:@"pipeline"]&&![kind isEqualToString:@"encoder-end"]&&
+-       ![kind isEqualToString:@"geometry-tail"])return;
++       ![kind isEqualToString:@"geometry-tail"]&&!selectedDraw)return;
+     @synchronized(record){
+         NSMutableArray* rows=record[@"gpuCounterEvents"];
+-        if(rows.count>=128){record[@"gpuCountersTruncated"]=@YES;return;}
++        const NSUInteger capacity=[record[@"gpuCounterCapacity"] unsignedIntegerValue];
++        if(rows.count>=capacity){record[@"gpuCountersTruncated"]=@YES;return;}
+         NSUInteger index=rows.count;
+         // Both public render/compute protocols have this identical selector.
+         [(id<MTLComputeCommandEncoder>)encoder sampleCountersInBuffer:record[@"gpuCounterBuffer"] atSampleIndex:index withBarrier:NO];
+@@ -74,7 +83,7 @@
+         bool resolved=data.length==events.count*sizeof(MTLCounterResultTimestamp)&&data!=nil;
+         auto values=(const MTLCounterResultTimestamp*)data.bytes;
+         for(NSUInteger i=0;i<events.count;++i){auto row=[events[i]mutableCopy];if(resolved){row[@"timestamp"]=@(values[i].timestamp);row[@"valid"]=@(values[i].timestamp!=MTLCounterErrorValue);}else row[@"valid"]=(id)[NSNull null];[rows addObject:row];[row release];}
+-        return @{@"enabled":@YES,@"nativeCompleted":@(completed),@"CPUResolveSucceeded":@(resolved),@"truncated":record[@"gpuCountersTruncated"]?:@NO,@"withBarrier":@NO,@"samples":rows};
++        return @{@"enabled":@YES,@"nativeCompleted":@(completed),@"CPUResolveSucceeded":@(resolved),@"truncated":record[@"gpuCountersTruncated"]?:@NO,@"withBarrier":@NO,@"allDraws":record[@"gpuCounterAllDraws"]?:@NO,@"capacity":record[@"gpuCounterCapacity"]?:@0,@"samples":rows};
+     }
+ }
+ inline void mvkEndGPUTimestamps(NSDictionary* record){if(record[@"gpuCounterBuffer"])mvkGPUTimestampInFlight().fetch_sub(1);}

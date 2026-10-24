@@ -1,0 +1,251 @@
+{
+  "source": "evidence/v14-loading-fault-counters-20261023/trace-gpu-timeout-44555-303.json",
+  "queueFamily": 0,
+  "queueIndex": 0,
+  "gpuDurationSeconds": 6.402971408009762,
+  "encoderCount": 22,
+  "gpuTimestampEnabled": true,
+  "gpuTimestampCPUResolveSucceeded": true,
+  "sampleCount": 118,
+  "workEventCount": 250,
+  "truncatedWorkEvents": 0,
+  "stageReachability": [
+    {
+      "stageIndex": 0,
+      "encoder": "0x7f819de13200",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 4,
+      "positiveTimestampCount": 4,
+      "firstSampleIndex": 0,
+      "lastPositiveSampleIndex": 3
+    },
+    {
+      "stageIndex": 1,
+      "encoder": "0x7f819de04000",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l1,o4,r0",
+      "sampleCount": 7,
+      "positiveTimestampCount": 7,
+      "firstSampleIndex": 4,
+      "lastPositiveSampleIndex": 10
+    },
+    {
+      "stageIndex": 2,
+      "encoder": "0x7f81bc8a0c00",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 5,
+      "positiveTimestampCount": 5,
+      "firstSampleIndex": 11,
+      "lastPositiveSampleIndex": 15
+    },
+    {
+      "stageIndex": 3,
+      "encoder": "0x7f81bc9d2200",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 10,
+      "positiveTimestampCount": 10,
+      "firstSampleIndex": 16,
+      "lastPositiveSampleIndex": 25
+    },
+    {
+      "stageIndex": 4,
+      "encoder": "0x7f81bc9dfa00",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 10,
+      "positiveTimestampCount": 10,
+      "firstSampleIndex": 26,
+      "lastPositiveSampleIndex": 35
+    },
+    {
+      "stageIndex": 5,
+      "encoder": "0x7f81bd87c200",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 10,
+      "positiveTimestampCount": 10,
+      "firstSampleIndex": 36,
+      "lastPositiveSampleIndex": 45
+    },
+    {
+      "stageIndex": 6,
+      "encoder": "0x7f81987f3e00",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 2,
+      "positiveTimestampCount": 2,
+      "firstSampleIndex": 46,
+      "lastPositiveSampleIndex": 47
+    },
+    {
+      "stageIndex": 7,
+      "encoder": "0x7f81bd885200",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 10,
+      "positiveTimestampCount": 10,
+      "firstSampleIndex": 48,
+      "lastPositiveSampleIndex": 57
+    },
+    {
+      "stageIndex": 8,
+      "encoder": "0x7f81bd89fe00",
+      "label": "render;rt=1024x1024x1;z=1024x1024x1,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 10,
+      "positiveTimestampCount": 10,
+      "firstSampleIndex": 58,
+      "lastPositiveSampleIndex": 67
+    },
+    {
+      "stageIndex": 9,
+      "encoder": "0x7f81bd8ad600",
+      "label": "render;rt=512x512x6;z=512x512x6,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 9,
+      "positiveTimestampCount": 9,
+      "firstSampleIndex": 68,
+      "lastPositiveSampleIndex": 76
+    },
+    {
+      "stageIndex": 10,
+      "encoder": "0x7f81bd8bae00",
+      "label": "render;rt=512x512x6;z=512x512x6,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 9,
+      "positiveTimestampCount": 9,
+      "firstSampleIndex": 77,
+      "lastPositiveSampleIndex": 85
+    },
+    {
+      "stageIndex": 11,
+      "encoder": "0x7f81bc0e4800",
+      "label": "render;rt=512x512x6;z=512x512x6,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 9,
+      "positiveTimestampCount": 9,
+      "firstSampleIndex": 86,
+      "lastPositiveSampleIndex": 94
+    },
+    {
+      "stageIndex": 12,
+      "encoder": "0x7f819de2c800",
+      "label": "render;rt=512x512x6;z=512x512x6,m0,s0,d0,f250,n1,l2,o4,r0",
+      "sampleCount": 9,
+      "positiveTimestampCount": 7,
+      "firstSampleIndex": 95,
+      "lastPositiveSampleIndex": 101
+    },
+    {
+      "stageIndex": 13,
+      "encoder": "0x7f813ee05000",
+      "label": "compute",
+      "sampleCount": 6,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 104,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 14,
+      "encoder": "0x7f819d7b8800",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f92,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 110,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 15,
+      "encoder": "0x7f819d714200",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f90,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 111,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 16,
+      "encoder": "0x7f819d721a00",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f80,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 112,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 17,
+      "encoder": "0x7f819d72f200",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f81,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 113,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 18,
+      "encoder": "0x7f819d73ca00",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f110,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 114,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 19,
+      "encoder": "0x7f819d6aac00",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f80,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 115,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 20,
+      "encoder": "0x7f819d6f0000",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f80,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 116,
+      "lastPositiveSampleIndex": null
+    },
+    {
+      "stageIndex": 21,
+      "encoder": "0x7f819d6fd800",
+      "label": "render;rt=1900x1092x1;c0=1900x1092x1,m0,s0,d0,f80,n1,l2,o4,r0",
+      "sampleCount": 1,
+      "positiveTimestampCount": 0,
+      "firstSampleIndex": 117,
+      "lastPositiveSampleIndex": null
+    }
+  ],
+  "lastReachedSample": {
+    "label": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+    "kind": "graphics-pipeline",
+    "timestamp": 88458600816350,
+    "valid": true,
+    "encoder": "0x7f819de2c800",
+    "index": 101
+  },
+  "firstUnreachedSample": {
+    "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+    "kind": "graphics-pipeline",
+    "timestamp": 0,
+    "valid": true,
+    "encoder": "0x7f819de2c800",
+    "index": 102
+  },
+  "culpritStageIndex": 12,
+  "culpritStageLabel": "render;rt=512x512x6;z=512x512x6,m0,s0,d0,f250,n1,l2,o4,r0",
+  "culpritPipelineIntervalStart": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+  "culpritPipelineIntervalEnd": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+  "candidateDrawsBetweenReachedAndUnreachedBoundaries": [
+    {
+      "encoder": "0x7f819de2c800",
+      "label": "mode=direct-indexed;pipeline=obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4;elements=49314;instances=1;buffers=16;textures=0;samplers=0;sets=4;vertexBuffers=7;vertexBytes=1457412;index=0x7f814c14f490;indexOffset=3932160;indexSize=215964",
+      "kind": "draw",
+      "time": 814510409.46756,
+      "index": 217
+    },
+    {
+      "encoder": "0x7f819de2c800",
+      "label": "mode=direct-indexed;pipeline=obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4;elements=3300;instances=1;buffers=16;textures=0;samplers=0;sets=4;vertexBuffers=7;vertexBytes=1457412;index=0x7f814c14f490;indexOffset=3932160;indexSize=215964",
+      "kind": "draw",
+      "time": 814510409.468301,
+      "index": 218
+    }
+  ],
+  "conclusion": "GPU reached the e587... pipeline boundary in encoder stage 12 but never reached the following aa294... pipeline boundary. The hang is inside one of the two direct indexed draws under e587...; stages 13-21 were not reached.",
+  "nextDiagnostic": "Add GPU counter samples at individual draws for the e587... pipeline to distinguish the 49,314-index and 3,300-index draws.",
+  "gamePlayableProven": false
+}

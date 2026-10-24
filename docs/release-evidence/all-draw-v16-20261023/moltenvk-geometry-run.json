@@ -1,0 +1,31 @@
+{
+  "command": [
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/probes/geometry_specialization_gpu",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/fresh-mesh-spec-input",
+    "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/v16-all-draw-candidate-geometry-gpu-20261023/output.json"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 0.9037892039923463,
+  "candidateSHA256": "6b2b80a1584282bc5142a1bb9a793d507fb096ca13ff68a510ef1589d94d128b",
+  "result": {
+    "passed": true,
+    "actualDraws": 8,
+    "concurrentPipelineRequests": 8,
+    "checkedPixels": 512,
+    "mismatchedComponents": 0,
+    "geometryToMesh": true
+  },
+  "failedMeshReplayEnabled": false,
+  "freshMeshLibraries": false,
+  "safeMeshLibraries": false,
+  "syncMeshLibraries": false,
+  "syncMeshPipelines": false,
+  "meshLinkDifferential": false,
+  "metalValidationEnabled": true,
+  "shardedShaderCacheLocks": true,
+  "passed": true,
+  "parameterReadback": false,
+  "geometryDrawTraceLabel": null,
+  "geometryDrawTraceFiles": [],
+  "sharedLiveSnapshots": false
+}

@@ -1,0 +1,50 @@
+{
+  "timeLocal": "2026-10-23T22:34:03.790259-07:00",
+  "candidateSHA256": "6b2b80a1584282bc5142a1bb9a793d507fb096ca13ff68a510ef1589d94d128b",
+  "proxySHA256": "196e221929abf152ee35922e9c09d3bec8dbe93fd8de15b153485d820e2ca4ca",
+  "liveGameLibrariesChanged": false,
+  "sharedLiveSnapshots": false,
+  "gpuTimeoutTrace": false,
+  "specializedQueues": true,
+  "useMTLHeap": false,
+  "crossEncoderLiveCache": false,
+  "registrationDeltaCache": false,
+  "shardedShaderCacheLocks": false,
+  "descriptorWriteShards": false,
+  "qualificationScope": "compute-and-presentation",
+  "batchArgumentHeaps": false,
+  "argumentHeapThreshold": 16,
+  "results": {
+    "compute-seed": {
+      "pid": 11027,
+      "exitCode": -15,
+      "timedOut": true,
+      "actualGPUOutputPassed": false,
+      "privateCandidateMapped": false,
+      "privateProxyMapped": false,
+      "assetGuardReady": false,
+      "sharedGameCandidateMapped": false,
+      "nativeCacheBytes": 0,
+      "missingDescriptorHeapWarnings": 0,
+      "d3d12DLLSHA256": {
+        "d3d12.dll": "526ed60c3edd558748968ab4d3ce5d774c662a70f135b65d5907ca30d46a53d6",
+        "d3d12core.dll": "9fa9ef3f91c161a0857866abcfa046cd46b81d24592360862e9895bb5b5bdeb6"
+      },
+      "probeExecutableSHA256": "db8fb6f55da7d80d9c432368556c1a40fb83ab92b876b16063b63e2c6dbf360a",
+      "passed": false,
+      "actualNativeGPUCounterRecords": 0,
+      "validNativeGPUTimestamps": 0
+    }
+  },
+  "stagedD3D12Directory": null,
+  "descriptorOnly": false,
+  "descriptorFixture": null,
+  "ownedProbeSource": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/probe-app",
+  "sharedGameCandidateBefore": "cd6ada9048ff9df2eb67f7a188027cd7668da0bc8c1bb9c2c42f344af4eb7065",
+  "sharedGameCandidateAfter": "cd6ada9048ff9df2eb67f7a188027cd7668da0bc8c1bb9c2c42f344af4eb7065",
+  "sharedGameCandidateUnchanged": true,
+  "passed": false,
+  "nativeArchiveHitRateMeasured": false,
+  "presentationPassed": false,
+  "actualGamePerformanceMeasured": false
+}

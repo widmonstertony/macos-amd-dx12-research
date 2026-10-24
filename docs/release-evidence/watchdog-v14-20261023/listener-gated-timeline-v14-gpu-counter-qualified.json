@@ -1,0 +1,26 @@
+{
+  "timeUTC": "2026-10-24T04:15:14.495803+00:00",
+  "qualified": true,
+  "nativeRegressionPassed": true,
+  "originalTencentDevicePassed": true,
+  "originalTencentComputePassed": true,
+  "originalTencentPresentationPassed": true,
+  "originalTencentFullGUIHostPassed": false,
+  "deferredGameGuardPassed": true,
+  "qualificationComposition": "v13 semantics plus externally armed Metal draw/dispatch boundary timestamps; real Radeon compute and presentation output controls passed before deployment",
+  "gamePlayable": false,
+  "optimization": "diagnostic only; no rendering semantic or cache change",
+  "GPUCounterQualification": "evidence/private-cache-wine-20261024T041322Z/run.json",
+  "geometryEvidence": "evidence/normal-mesh-unique-entry-20261023/specialization.json",
+  "deployment": "evidence/listener-gated-timeline-v14-gpu-counter-20261023-deployment.json",
+  "deferredRuntime": {
+    "qualification": "evidence/private-cache-wine-20261024T041322Z/run.json",
+    "candidate": "/private/tmp/mvk-guard-proxy/libQualifiedCandidateReexport.dylib",
+    "candidateSHA256": "cd6ada9048ff9df2eb67f7a188027cd7668da0bc8c1bb9c2c42f344af4eb7065",
+    "proxy": "/private/tmp/mvk-guard-proxy/libMoltenVKGuard.dylib",
+    "proxySHA256": "93cd1caca3b0ffe712325735598cbf93a30897e60780b67440765bfa4f0d3c44",
+    "devicePassed": true,
+    "computePassed": true,
+    "presentationPassed": true
+  }
+}

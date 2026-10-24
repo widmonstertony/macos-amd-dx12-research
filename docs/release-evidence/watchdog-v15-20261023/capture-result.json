@@ -1,0 +1,21 @@
+{
+  "startUTC": "2026-10-24T05:16:27.806908+00:00",
+  "gamePID": 75424,
+  "controllerPID": 91552,
+  "profile": "listener-gated-timeline-v15-e587-draw-counter-20261023",
+  "maximumSeconds": 180,
+  "refreshSeconds": 5,
+  "workMarkerMaximumNativeAgeSeconds": 30,
+  "gpuCounterMarkerMaximumNativeAgeSeconds": 30,
+  "preexistingFailureFiles": [],
+  "inputSent": false,
+  "cacheDeleted": false,
+  "refreshes": 27,
+  "faultFiles": [
+    "trace-gpu-timeout-75424-1.json"
+  ],
+  "finished": "new-gpu-timeout-captured",
+  "workMarkerRemoved": true,
+  "counterMarkerExpired": true,
+  "endUTC": "2026-10-24T05:18:38.279701+00:00"
+}

@@ -4,13 +4,13 @@
 
 Open-source D3D12 → Vulkan → Metal compatibility research for Intel Macs with AMD GPUs. The primary reproduction target is the licensed Windows Steam edition of **Stellar Blade**. Contributions on shaders, synchronization, caches, Wine windows, and performance are welcome.
 
-> **Experimental; not yet playable.** The latest game run reached correctly rendered output at about 6.5 FPS, then a single Metal command buffer ran for 6.34 seconds and triggered the AMD GPU watchdog. Downloads are developer test kits, **not a finished solution that lets every Mac run Stellar Blade**. Probe success does not establish game compatibility, FSR3 support, or support for other games/GPUs.
+> **Experimental; not yet playable.** The latest game run reached correctly rendered output at about 6 FPS. One real fault is now localized to the only 61,365-index draw in the 14th encoder, while the Metal command buffer still ran for 7.21 seconds and triggered the AMD GPU watchdog. Downloads are developer test kits, **not a finished solution that lets every Mac run Stellar Blade**. Probe success does not establish game compatibility, FSR3 support, or support for other games/GPUs.
 
 See the [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and [full research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
 
 ## Download and test
 
-[Experimental downloads](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.1.0-experimental) · [Testing](docs/TESTING.en.md) · [Known issues](docs/KNOWN_ISSUES.en.md) · [Contributing](CONTRIBUTING.md)
+[Latest diagnostic download](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [Testing](docs/TESTING.en.md) · [Known issues](docs/KNOWN_ISSUES.en.md) · [Contributing](CONTRIBUTING.md)
 
 The relocatable kit contains research libraries, native GPU readback probes, environment inspection, and file verification. It includes no game, Steam client, Apple/Tencent engine, saves, or login state. Probes run independently. Game integration requires your own licensed game and compatible Wine environment; there is no one-click game installer.
 
@@ -42,9 +42,9 @@ Licensed Windows game → vkd3d-proton / DXIL-DXBC translation → Vulkan/SPIR-V
 | Compute / graphics fixtures | GPU readback and pixel comparisons | Complete DX12 / Robustness2 support |
 | Compute archives | 33 strict hits in an isolated Wine fixture | Elimination of game recompilation |
 | Steam launch and scene entry | Reached earlier; serious defects | Stable gameplay |
-| Latest full replay | About 6.5 FPS; a 23-encoder graphics command buffer ran for 6.34 seconds before watchdog | A proven offending draw/dispatch or safe split point |
+| Latest fault replay | About 6 FPS; a 24-encoder command buffer watchdog followed the sole 61,365-index draw in encoder 14 | That draw is the invariant cause, or safe segmentation is complete |
 
-See the [latest checkpoint](docs/CHECKPOINT-2026-10-23.md). The immediate priority is a 30-second bounded per-draw capture that identifies the offending draw/dispatch among the 23 encoders, followed by an evidence-based shader, resource-binding, or intra-command-buffer segmentation fix. Feature-bit changes and device creation alone are not valid compatibility evidence.
+See the [latest checkpoint](docs/CHECKPOINT-2026-10-23.md). v16 adds a one-shot 512-sample all-draw GPU timestamp mode. The next normal-Steam failure will establish whether the exact draw is stable before an evidence-based resource/shader or intra-command-buffer segmentation repair. Feature-bit changes and device creation alone are not valid compatibility evidence.
 
 ## Source, build, recovery
 

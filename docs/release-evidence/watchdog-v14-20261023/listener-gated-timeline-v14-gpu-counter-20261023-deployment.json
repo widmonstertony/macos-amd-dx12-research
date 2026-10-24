@@ -1,0 +1,15 @@
+{
+  "timeUTC": "2026-10-24T04:14:31.163921+00:00",
+  "label": "listener-gated-timeline-v14-gpu-counter-20261023",
+  "sourceCandidate": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/build/listener-gated-timeline-v14-gpu-counter-20261023-game/libCandidate.dylib",
+  "sourceCandidateSHA256": "11e1412231c0f6ad8d8e8d05414f0a50b56072da4b2a31b1bc09df918caf1781",
+  "deployedCandidate": "/private/tmp/mvk-guard-proxy/libQualifiedCandidateReexport.dylib",
+  "deployedCandidateSHA256": "cd6ada9048ff9df2eb67f7a188027cd7668da0bc8c1bb9c2c42f344af4eb7065",
+  "deployedProxy": "/private/tmp/mvk-guard-proxy/libMoltenVKGuard.dylib",
+  "deployedProxySHA256": "93cd1caca3b0ffe712325735598cbf93a30897e60780b67440765bfa4f0d3c44",
+  "nativeEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/private-cache-wine-20261024T041322Z/run.json",
+  "geometryEvidence": "/Users/tonytan/Documents/GitHub/gptk-intel-research-20261011/open-game-stack-20261015/evidence/normal-mesh-unique-entry-20261023/specialization.json",
+  "codesignVerified": true,
+  "atomicReplacement": true,
+  "gameStarted": false
+}

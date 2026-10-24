@@ -55,6 +55,7 @@ def main():
     parser.add_argument('--batch-argument-heaps', action='store_true')
     parser.add_argument('--argument-heap-threshold', type=int, default=16)
     parser.add_argument('--gpu-counter-trace',action='store_true',help='Qualify timed native GPU counter collection on owned probes')
+    parser.add_argument('--gpu-counter-all-draws',action='store_true',help='Qualify the bounded 512-sample all-draw counter mode on presentation')
     parser.add_argument('--probe-timeout', type=int, default=40,
                         help='Per-probe timeout in seconds (10..180) for bounded diagnostics')
     args = parser.parse_args()
@@ -62,6 +63,8 @@ def main():
         parser.error('--probe-timeout must be between 10 and 180 seconds')
     if args.compute_only and args.descriptor_only:
         parser.error('Select either compute-only or descriptor-only')
+    if args.gpu_counter_all_draws and not args.gpu_counter_trace:
+        parser.error('--gpu-counter-all-draws requires --gpu-counter-trace')
     d3d12_directory = args.d3d12_directory.resolve() if args.d3d12_directory else None
     if d3d12_directory and (not any(d3d12_directory.is_relative_to(ROOT / p) for p in ('build', 'evidence'))
             or not all((d3d12_directory / n).is_file() for n in ('d3d12.dll', 'd3d12core.dll'))):
@@ -208,6 +211,9 @@ def main():
             arm=d/'gpu-counter.arm';arm.touch()
             run_env['MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH']=str(arm)
             run_env['MVK_AMD_GPU_TIMEOUT_TRACE']='1'
+            if args.gpu_counter_all_draws:
+                run_env['MVK_AMD_GPU_COUNTER_PIPELINE_LABEL']='*'
+                run_env['MVK_AMD_GPU_COUNTER_ALL_DRAWS']='1'
         with (d / "stdout.log").open("w") as stdout, (d / "stderr.log").open("w") as stderr:
             p = subprocess.Popen([str(qualified.SUPPORT / "wine-loader"), str(executable)],
                                  env=run_env, cwd=d, stdout=stdout, stderr=stderr,
@@ -263,6 +269,13 @@ def main():
             entry['actualNativeGPUCounterRecords']=len(counter_records)
             entry['validNativeGPUTimestamps']=len(samples)
             entry['passed']=entry['passed'] and len(samples)>=2
+            if args.gpu_counter_all_draws and name.startswith('present'):
+                draw_samples=[s for s in samples if s.get('kind')=='draw']
+                timestamp_rows=[row.get('gpuTimestamps',{}) for row in counter_records]
+                entry['allDrawCounterRecords']=sum(row.get('allDraws') is True for row in timestamp_rows)
+                entry['allDrawCounterCapacity']=max((row.get('capacity',0) for row in timestamp_rows),default=0)
+                entry['validNativeDrawTimestamps']=len(draw_samples)
+                entry['passed']=entry['passed'] and bool(draw_samples) and entry['allDrawCounterCapacity']==512
         result["results"][name] = entry
         print(json.dumps({name: {k:v for k,v in entry.items() if k!="computeArchiveRecords"}}), flush=True)
         if not entry["passed"]:

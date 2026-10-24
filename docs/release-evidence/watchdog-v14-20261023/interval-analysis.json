@@ -1,0 +1,1104 @@
+{
+  "gameOrProbePID": 44555,
+  "nativeCounterRecords": 1,
+  "emptyCounterRecords": 0,
+  "CPUResolvedRecords": 1,
+  "unresolvedRecords": 0,
+  "validSameEncoderIntervals": 89,
+  "ranking": [
+    {
+      "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+      "count": 3,
+      "totalTimestampTicks": 19592810,
+      "medianTimestampTicks": 6857440,
+      "p95TimestampTicks": 7602130,
+      "maxTimestampTicks": 7602130,
+      "largestIntervalEvidence": {
+        "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+        "kind": "graphics-pipeline",
+        "ticks": 7602130,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 75,
+        "nextIndex": 76
+      }
+    },
+    {
+      "label": "obj=mvk_mesh_a9611db700aa1a06_0;mesh=mvk_mesh_9cdc863ba02e61e9_3;fs=mvk_mesh_0a7f84c57417c6ea_4",
+      "count": 4,
+      "totalTimestampTicks": 21454720,
+      "medianTimestampTicks": 5355500.0,
+      "p95TimestampTicks": 5543840,
+      "maxTimestampTicks": 5543840,
+      "largestIntervalEvidence": {
+        "label": "obj=mvk_mesh_a9611db700aa1a06_0;mesh=mvk_mesh_9cdc863ba02e61e9_3;fs=mvk_mesh_0a7f84c57417c6ea_4",
+        "kind": "graphics-pipeline",
+        "ticks": 5543840,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 87,
+        "nextIndex": 88
+      }
+    },
+    {
+      "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+      "count": 8,
+      "totalTimestampTicks": 15962300,
+      "medianTimestampTicks": 1597840.0,
+      "p95TimestampTicks": 4812980,
+      "maxTimestampTicks": 4812980,
+      "largestIntervalEvidence": {
+        "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+        "kind": "graphics-pipeline",
+        "ticks": 4812980,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 89,
+        "nextIndex": 90
+      }
+    },
+    {
+      "label": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+      "count": 3,
+      "totalTimestampTicks": 11492680,
+      "medianTimestampTicks": 3764960,
+      "p95TimestampTicks": 4045720,
+      "maxTimestampTicks": 4045720,
+      "largestIntervalEvidence": {
+        "label": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+        "kind": "graphics-pipeline",
+        "ticks": 4045720,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 92,
+        "nextIndex": 93
+      }
+    },
+    {
+      "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_94c37176d82593a6_4",
+      "count": 4,
+      "totalTimestampTicks": 1693840,
+      "medianTimestampTicks": 395940.0,
+      "p95TimestampTicks": 524160,
+      "maxTimestampTicks": 524160,
+      "largestIntervalEvidence": {
+        "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_94c37176d82593a6_4",
+        "kind": "graphics-pipeline",
+        "ticks": 524160,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 86,
+        "nextIndex": 87
+      }
+    },
+    {
+      "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_5fc58d364b7a7254_4",
+      "count": 4,
+      "totalTimestampTicks": 373440,
+      "medianTimestampTicks": 92460.0,
+      "p95TimestampTicks": 111320,
+      "maxTimestampTicks": 111320,
+      "largestIntervalEvidence": {
+        "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_5fc58d364b7a7254_4",
+        "kind": "graphics-pipeline",
+        "ticks": 111320,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 91,
+        "nextIndex": 92
+      }
+    },
+    {
+      "label": "obj=mvk_mesh_990ee354b2083dbe_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_f3cb3a65ceeb3efa_4",
+      "count": 4,
+      "totalTimestampTicks": 334800,
+      "medianTimestampTicks": 82800.0,
+      "p95TimestampTicks": 99360,
+      "maxTimestampTicks": 99360,
+      "largestIntervalEvidence": {
+        "label": "obj=mvk_mesh_990ee354b2083dbe_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_f3cb3a65ceeb3efa_4",
+        "kind": "graphics-pipeline",
+        "ticks": 99360,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 90,
+        "nextIndex": 91
+      }
+    },
+    {
+      "label": "vs=main0;fs=main0",
+      "count": 59,
+      "totalTimestampTicks": 697560,
+      "medianTimestampTicks": 8400,
+      "p95TimestampTicks": 34600,
+      "maxTimestampTicks": 41400,
+      "largestIntervalEvidence": {
+        "label": "vs=main0;fs=main0",
+        "kind": "graphics-pipeline",
+        "ticks": 41400,
+        "submission": 2922952,
+        "file": "trace-gpu-timeout-44555-303.json",
+        "firstIndex": 55,
+        "nextIndex": 56
+      }
+    }
+  ],
+  "faultRecords": [
+    {
+      "file": "trace-gpu-timeout-44555-303.json",
+      "submission": 2922952,
+      "nativeErrorCode": 2,
+      "CPUResolveSucceeded": true,
+      "samples": [
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458527995440,
+          "valid": true,
+          "encoder": "0x7f819de13200",
+          "index": 0
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528024720,
+          "valid": true,
+          "encoder": "0x7f819de13200",
+          "index": 1
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528026040,
+          "valid": true,
+          "encoder": "0x7f819de13200",
+          "index": 2
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458528028840,
+          "valid": true,
+          "encoder": "0x7f819de13200",
+          "index": 3
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528060760,
+          "valid": true,
+          "encoder": "0x7f819de04000",
+          "index": 4
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528095360,
+          "valid": true,
+          "encoder": "0x7f819de04000",
+          "index": 5
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528104480,
+          "valid": true,
+          "encoder": "0x7f819de04000",
+          "index": 6
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528118480,
+          "valid": true,
+          "encoder": "0x7f819de04000",
+          "index": 7
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528118480,
+          "valid": true,
+          "encoder": "0x7f819de04000",
+          "index": 8
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528144240,
+          "valid": true,
+          "encoder": "0x7f819de04000",
+          "index": 9
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458528144240,
+          "valid": true,
+          "encoder": "0x7f819de04000",
+          "index": 10
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528184600,
+          "valid": true,
+          "encoder": "0x7f81bc8a0c00",
+          "index": 11
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528222960,
+          "valid": true,
+          "encoder": "0x7f81bc8a0c00",
+          "index": 12
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528230840,
+          "valid": true,
+          "encoder": "0x7f81bc8a0c00",
+          "index": 13
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528259240,
+          "valid": true,
+          "encoder": "0x7f81bc8a0c00",
+          "index": 14
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458528259240,
+          "valid": true,
+          "encoder": "0x7f81bc8a0c00",
+          "index": 15
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528307320,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 16
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528336840,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 17
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528339760,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 18
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528343320,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 19
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528362440,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 20
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528372880,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 21
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528384400,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 22
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528391200,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 23
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528411720,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 24
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458528416800,
+          "valid": true,
+          "encoder": "0x7f81bc9d2200",
+          "index": 25
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528468480,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 26
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528498640,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 27
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528501840,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 28
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528505400,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 29
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528525600,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 30
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528541360,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 31
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528544880,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 32
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528548960,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 33
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458528568520,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 34
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458528572000,
+          "valid": true,
+          "encoder": "0x7f81bc9dfa00",
+          "index": 35
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529282560,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 36
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529304160,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 37
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529304200,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 38
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529307360,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 39
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529320360,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 40
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529328760,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 41
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529338600,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 42
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529339720,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 43
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529359440,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 44
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458529363560,
+          "valid": true,
+          "encoder": "0x7f81bd87c200",
+          "index": 45
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529394320,
+          "valid": true,
+          "encoder": "0x7f81987f3e00",
+          "index": 46
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458529415320,
+          "valid": true,
+          "encoder": "0x7f81987f3e00",
+          "index": 47
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529454000,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 48
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529482240,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 49
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529484280,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 50
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529487080,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 51
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529515960,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 52
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529515960,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 53
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529532720,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 54
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529532720,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 55
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529574120,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 56
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458529574120,
+          "valid": true,
+          "encoder": "0x7f81bd885200",
+          "index": 57
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529625920,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 58
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529650600,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 59
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529652280,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 60
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529654920,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 61
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529663920,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 62
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529668560,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 63
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529677440,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 64
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529677560,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 65
+        },
+        {
+          "label": "vs=main0;fs=main0",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529696840,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 66
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458529696840,
+          "valid": true,
+          "encoder": "0x7f81bd89fe00",
+          "index": 67
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_94c37176d82593a6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458529723720,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 68
+        },
+        {
+          "label": "obj=mvk_mesh_a9611db700aa1a06_0;mesh=mvk_mesh_9cdc863ba02e61e9_3;fs=mvk_mesh_0a7f84c57417c6ea_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458530134560,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 69
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458535566400,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 70
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458537346280,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 71
+        },
+        {
+          "label": "obj=mvk_mesh_990ee354b2083dbe_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_f3cb3a65ceeb3efa_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458539181640,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 72
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_5fc58d364b7a7254_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458539251480,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 73
+        },
+        {
+          "label": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458539328680,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 74
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458543093640,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 75
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458550695770,
+          "valid": true,
+          "encoder": "0x7f81bd8ad600",
+          "index": 76
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_94c37176d82593a6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458550731930,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 77
+        },
+        {
+          "label": "obj=mvk_mesh_a9611db700aa1a06_0;mesh=mvk_mesh_9cdc863ba02e61e9_3;fs=mvk_mesh_0a7f84c57417c6ea_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458551109730,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 78
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458556388890,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 79
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458557808450,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 80
+        },
+        {
+          "label": "obj=mvk_mesh_990ee354b2083dbe_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_f3cb3a65ceeb3efa_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458559367690,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 81
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_5fc58d364b7a7254_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458559448970,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 82
+        },
+        {
+          "label": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458559535890,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 83
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458563217890,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 84
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458568351130,
+          "valid": true,
+          "encoder": "0x7f81bd8bae00",
+          "index": 85
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_94c37176d82593a6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458568471330,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 86
+        },
+        {
+          "label": "obj=mvk_mesh_a9611db700aa1a06_0;mesh=mvk_mesh_9cdc863ba02e61e9_3;fs=mvk_mesh_0a7f84c57417c6ea_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458568995490,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 87
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458574539330,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 88
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458576007530,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 89
+        },
+        {
+          "label": "obj=mvk_mesh_990ee354b2083dbe_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_f3cb3a65ceeb3efa_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458580820510,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 90
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_5fc58d364b7a7254_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458580919870,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 91
+        },
+        {
+          "label": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458581031190,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 92
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458585076910,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 93
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 88458591934350,
+          "valid": true,
+          "encoder": "0x7f81bc0e4800",
+          "index": 94
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_94c37176d82593a6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458591966030,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 95
+        },
+        {
+          "label": "obj=mvk_mesh_a9611db700aa1a06_0;mesh=mvk_mesh_9cdc863ba02e61e9_3;fs=mvk_mesh_0a7f84c57417c6ea_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458592347070,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 96
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458597546950,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 97
+        },
+        {
+          "label": "obj=mvk_mesh_032e851f6f8f0fe7_0;mesh=mvk_mesh_4da5749c27203cef_3;fs=fragCmdMeshWithoutFragmentShader",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458598997590,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 98
+        },
+        {
+          "label": "obj=mvk_mesh_990ee354b2083dbe_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_f3cb3a65ceeb3efa_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458600634030,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 99
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_5fc58d364b7a7254_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458600718350,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 100
+        },
+        {
+          "label": "obj=mvk_mesh_e58761467fb0600e_0;mesh=mvk_mesh_2df0ca9d88954467_3;fs=mvk_mesh_d3d2014863974f7e_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 88458600816350,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 101
+        },
+        {
+          "label": "obj=mvk_mesh_7bd461a7101cd12a_0;mesh=mvk_mesh_85ac7a829f241719_3;fs=mvk_mesh_aa294ecb68d4e8d6_4",
+          "kind": "graphics-pipeline",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 102
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819de2c800",
+          "index": 103
+        },
+        {
+          "label": "mvk-cs2-3bb434ddfd646ff22e336cfe0d03875f9a3d06e1ddca24e448ddb746b4a9e6ab",
+          "kind": "compute-pipeline",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f813ee05000",
+          "index": 104
+        },
+        {
+          "label": "mvk-cs2-aced9e39c614ca98882f040b2aece39340216be2413cba3a6987f1a188584806",
+          "kind": "compute-pipeline",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f813ee05000",
+          "index": 105
+        },
+        {
+          "label": "mvk-cs2-8e15dbaba229434424d30693f189982750665371c3f668e0c157ba79c6fff483",
+          "kind": "compute-pipeline",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f813ee05000",
+          "index": 106
+        },
+        {
+          "label": "mvk-cs2-3d5e1a7be4c02b6c3fd47193115c50404fd149f2b546fc58e70ea7fe46cb5d01",
+          "kind": "compute-pipeline",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f813ee05000",
+          "index": 107
+        },
+        {
+          "label": "mvk-cs2-9bfbb92471fe565e0c4cf252784c1a9f81fa1b49a7a857176c2034c2a6b5ed52",
+          "kind": "compute-pipeline",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f813ee05000",
+          "index": 108
+        },
+        {
+          "label": "vkCmdDispatch ComputeEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f813ee05000",
+          "index": 109
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d7b8800",
+          "index": 110
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d714200",
+          "index": 111
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d721a00",
+          "index": 112
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d72f200",
+          "index": 113
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d73ca00",
+          "index": 114
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d6aac00",
+          "index": 115
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d6f0000",
+          "index": 116
+        },
+        {
+          "label": "vkCmdBeginRendering RenderEncoder",
+          "kind": "encoder-end",
+          "timestamp": 0,
+          "valid": true,
+          "encoder": "0x7f819d6fd800",
+          "index": 117
+        }
+      ]
+    }
+  ],
+  "intervalsAreNotExclusiveShaderExecutionTimes": true,
+  "withBarrier": false,
+  "exactShaderRootProven": false,
+  "gamePlayableProven": false
+}

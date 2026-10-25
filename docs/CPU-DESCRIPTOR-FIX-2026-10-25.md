@@ -46,3 +46,7 @@ of this change.
 
 当前检查点已部署候选并经原正版 Steam 启动，**修复后的实际场景性能仍待验证，尚未
 宣称游戏可玩**。FSR3 两项仍未验证。本改动没有通过降低分辨率或关闭功能来算作修复。
+
+Actual scene follow-up: a 35-second foreground observation measured 6.36 FPS initially and another measured 7.29 FPS after warming; the preceding same-window observation was 6.57 FPS. These short intervals are insufficient for a broad performance claim. The game remains too slow to play normally.
+
+实际场景后续：35 秒前台观测初段为 6.36 FPS，稳定后另一段为 7.29 FPS；上一候选相同窗口的观测为 6.57 FPS。短区间不足以作广泛性能承诺，仍未达到正常可玩。

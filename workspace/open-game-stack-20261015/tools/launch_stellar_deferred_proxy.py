@@ -67,6 +67,36 @@ def is_original_steam_process(comm: str) -> bool:
             normalized == "c:/program files (x86)/steam/steam.exe")
 
 
+def is_stellar_process(comm: str) -> bool:
+    normalized = comm.replace("\\", "/").casefold()
+    return normalized.endswith("/sb-win64-shipping.exe") or "/stellarblade/sb.exe" in normalized
+
+
+def wait_for_steam_game_clear() -> float:
+    """Avoid an ignored -applaunch while Steam still tracks the exited run.
+
+    The original client can log process removal several seconds after the
+    native PID disappears. Never close Steam or edit its running-game state.
+    """
+    log = STEAM.parent / "logs/gameprocess_log.txt"
+    start = time.monotonic()
+    while log.is_file():
+        running = False
+        with log.open("rb") as stream:
+            stream.seek(max(0, log.stat().st_size - 2 * 1024 * 1024))
+            for line in stream:
+                if b"Remove 3489700 from running list" in line:
+                    running = False
+                elif b"AppID 3489700 adding PID " in line:
+                    running = True
+        if not running:
+            break
+        if time.monotonic() - start >= 20:
+            raise RuntimeError("Steam still tracks the old Stellar Blade run; no duplicate launch submitted")
+        time.sleep(0.25)
+    return time.monotonic() - start
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--proof", type=Path, default=PROOF)
@@ -97,7 +127,8 @@ def main() -> int:
     if inner_steam_rows:
         steam_rows = inner_steam_rows
     assert len(steam_rows) == 1, "Expected one running original Steam client"
-    assert not any("SB-Win64-Shipping.exe" in comm or "/StellarBlade/SB.exe" in comm for _, _, comm in rows), "Game already running"
+    assert not any(is_stellar_process(comm) for _, _, comm in rows), "Game already running"
+    steam_ready_wait = wait_for_steam_game_clear()
     disk_free_at_launch = shutil.disk_usage(ROOT).free
     assert disk_free_at_launch >= 10 * 1024**3, "At least 10 GiB free is required for this research game test after actual ENOSPC"
     prepare_crash_state()
@@ -166,6 +197,7 @@ def main() -> int:
         "gameOnlyExceptionLogging": args.game_exception_log,
         "gameOnlyExceptionLoggingRequested": args.game_exception_log,
         "gameOnlyExceptionLoggingVerified": False,
+        "steamReadyWaitSeconds": steam_ready_wait,
         "verificationScope": "candidate/window module mappings and original asset write protection only",
         "graphicsInitializationVerified": False,
     }
@@ -181,7 +213,7 @@ def main() -> int:
         elapsed = int(90 - (deadline - time.monotonic()))
         alive = []
         for pid, ppid, comm in process_rows():
-            if "SB-Win64-Shipping.exe" not in comm and "/StellarBlade/SB.exe" not in comm:
+            if not is_stellar_process(comm):
                 continue
             alive.append(pid)
             item = record["observed"].setdefault(str(pid), {"pid": pid, "ppid": ppid, "comm": comm, "mappings": []})

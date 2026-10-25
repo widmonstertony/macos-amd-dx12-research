@@ -87,6 +87,24 @@ static void mvkRecordDrawMetadata(MVKCommandEncoder* cmdEncoder,
 	auto counts = mvkDrawResourceTraceCounts(cmdEncoder);
 	auto& index = cmdEncoder->getVkGraphics()._indexBuffer;
 	id<MTLRenderPipelineState> pipeline = cmdEncoder->getMtlGraphics()._pipeline;
+	// Avoid a Foundation format allocation for every ordinary draw. The work
+	// ring already stores at most 511 label bytes. Armed counter records keep
+	// the original full NSString route below, including timestamp semantics.
+	if (!mvkGPUTimestampArmed() && !objc_getAssociatedObject(encoder,sel_registerName("mvkGPUCounterRecordV1"))) {
+		NSMutableData* data=objc_getAssociatedObject(encoder,mvkEncodedWorkKey());
+		if (data) {
+			char text[512];
+			snprintf(text,sizeof(text),"mode=%s;pipeline=%s;elements=%u;instances=%u;buffers=%u;textures=%u;samplers=%u;sets=%u;vertexBuffers=%u;vertexBytes=%llu;index=%p;indexOffset=%llu;indexSize=%llu",
+				mode.UTF8String ?: "",mvkPipelineTraceLabel(pipeline).UTF8String ?: "",elements,instances,
+				counts.buffers,counts.textures,counts.samplers,counts.descriptorSets,
+				counts.vertexBuffers,(unsigned long long)counts.vertexBytes,
+				(void*)(indexed ? index.mtlBuffer : nil),
+				(unsigned long long)(indexed ? index.offset : 0),
+				(unsigned long long)(indexed ? index.size : 0));
+			mvkAppendEncodedWorkBytes(data,encoder,"draw",text);
+		}
+		return;
+	}
 	NSString* label = [NSString stringWithFormat:
 		@"mode=%@;pipeline=%@;elements=%u;instances=%u;buffers=%u;textures=%u;samplers=%u;sets=%u;vertexBuffers=%u;vertexBytes=%llu;index=%p;indexOffset=%llu;indexSize=%llu",
 		mode ?: @"", mvkPipelineTraceLabel(pipeline), elements, instances,

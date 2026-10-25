@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <cassert>
 #include <vector>
+#include <objc/runtime.h>
 
 struct MVKEncodedWorkEvent {
     uint64_t index;
@@ -20,11 +21,12 @@ struct MVKEncodedWorkEvent {
 struct MVKEncodedWorkRing {
     os_unfair_lock lock;
     uint64_t count;
-    // Timed diagnostics only. A UE menu transition can encode more than one
-    // hundred pipeline and encoder boundaries into the command buffer that
-    // later trips the GPU watchdog. Keep that complete frame locally so a
-    // failure snapshot does not discard the expensive middle encoder.
-    MVKEncodedWorkEvent events[1024];
+    // Most native command buffers contain far fewer than 64 work records.
+    // Do not zero 580 KiB for every one of hundreds of submissions per second.
+    // The associated overflow data is allocated only at event 65, and retained
+    // by this ring's NSMutableData owner until both encoders and snapshots finish.
+    MVKEncodedWorkEvent events[64];
+    MVKEncodedWorkEvent* overflow;
 };
 
 inline size_t mvkEncodedWorkSlot(uint64_t index) {
@@ -37,22 +39,32 @@ inline NSMutableData* mvkNewEncodedWorkRing() {
     auto* ring = new (data.mutableBytes) MVKEncodedWorkRing;
     ring->lock = OS_UNFAIR_LOCK_INIT;
     ring->count = 0;
+    ring->overflow = nullptr;
     return data;
 }
-inline void mvkAppendEncodedWork(NSMutableData* data, const void* encoder, NSString* kind, NSString* label) {
+inline void mvkAppendEncodedWorkBytes(NSMutableData* data, const void* encoder,
+                                     const char* kindText, const char* labelText) {
     auto* ring = static_cast<MVKEncodedWorkRing*>(data.mutableBytes);
-    // Prepare string bytes before locking; snapshotting never needs the encoder.
-    const char* kindText = kind.UTF8String ?: "";
-    const char* labelText = label.UTF8String ?: "";
     os_unfair_lock_lock(&ring->lock);
     uint64_t index = ring->count++;
-    auto& event = ring->events[mvkEncodedWorkSlot(index)];
+    size_t slot = mvkEncodedWorkSlot(index);
+    if (slot >= 64 && !ring->overflow) {
+        NSMutableData* overflow = [NSMutableData dataWithLength:960*sizeof(MVKEncodedWorkEvent)];
+        objc_setAssociatedObject(data, sel_registerName("mvkEncodedWorkOverflowV1"), overflow,
+                                 OBJC_ASSOCIATION_RETAIN);
+        ring->overflow = static_cast<MVKEncodedWorkEvent*>(overflow.mutableBytes);
+    }
+    auto& event = slot < 64 ? ring->events[slot] : ring->overflow[slot-64];
     event.index = index;
     event.time = CFAbsoluteTimeGetCurrent();
     event.encoder = reinterpret_cast<uintptr_t>(encoder);
     strlcpy(event.kind, kindText, sizeof(event.kind));
     strlcpy(event.label, labelText, sizeof(event.label));
     os_unfair_lock_unlock(&ring->lock);
+}
+inline void mvkAppendEncodedWork(NSMutableData* data, const void* encoder, NSString* kind, NSString* label) {
+    // Existing callers and the armed GPU-counter route keep their exact labels.
+    mvkAppendEncodedWorkBytes(data,encoder,kind.UTF8String ?: "",label.UTF8String ?: "");
 }
 inline NSDictionary* mvkSnapshotEncodedWork(NSMutableData* data) {
     if (!data) return @{@"workEvents":@[], @"workCount":@0, @"truncatedWorkEvents":@0};
@@ -69,7 +81,8 @@ inline NSDictionary* mvkSnapshotEncodedWork(NSMutableData* data) {
     copy.resize(size);
     for (size_t i = 0; i < size; ++i) {
         uint64_t index = i < 64 || count <= 1024 ? i : count - 960 + i - 64;
-        copy[i] = ring->events[mvkEncodedWorkSlot(index)];
+        size_t slot = mvkEncodedWorkSlot(index);
+        copy[i] = slot < 64 ? ring->events[slot] : ring->overflow[slot-64];
     }
     os_unfair_lock_unlock(&ring->lock);
     NSMutableArray* events = [NSMutableArray arrayWithCapacity:size];

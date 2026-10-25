@@ -1954,8 +1954,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCmdDraw.mm",
-      "bytes": 113986,
-      "sha256": "8ebf776e94f3e5919effccf1be92476b3b52fcc59c2916034a97470b811e7198",
+      "bytes": 115090,
+      "sha256": "3853d94d9840abacc40e18a3811ef4e381e70477c795a8f475b25cb16e51f401",
       "executable": false
     },
     {
@@ -2192,8 +2192,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKEncodedWorkRing.h",
-      "bytes": 3951,
-      "sha256": "07985aa1b9ce33c4073052bd00f6b2ddebd5c9c76dc10bf62242d14983139649",
+      "bytes": 4723,
+      "sha256": "2b1a05c47facc0cdf7d6bbece7a779b717335d0ac9703a17c3a9166df56fc8e9",
       "executable": false
     },
     {
@@ -33736,6 +33736,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/encoded_work_ring_full_allocation.h",
+      "bytes": 3951,
+      "sha256": "07985aa1b9ce33c4073052bd00f6b2ddebd5c9c76dc10bf62242d14983139649",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/crash_metadata_probe.c",
       "bytes": 2517,
       "sha256": "bcf0beeb5e5a8b959d714d45a2b9d5d2ea9515096cc920b16db2d3990e1567e2",
@@ -33820,8 +33826,9 @@
     },
     {
       "path": "open-game-stack-20261015/src/encoded_work_ring_control.mm",
-      "sha256": "b8e805c2fd3eae84663f3e7016a8f7d6c442b284fed1b3ef77353044456315ef",
-      "bytes": 2292
+      "bytes": 4564,
+      "sha256": "da173e13fe8b69ac53ccd8d8ad4f31fe8ff78ec8a0f5924b26d46d95f5c22f8c",
+      "executable": false
     },
     {
       "path": "open-game-stack-20261015/src/fresh-mesh-specialization.frag",
@@ -34547,8 +34554,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/launch_stellar_deferred_proxy.py",
-      "bytes": 13033,
-      "sha256": "d63c1b3eb91e1a9703a29bcef4ac37e50c3132e432f3dc3ef7cfb53130e14904",
+      "bytes": 14243,
+      "sha256": "a5127656aa6e70a9b6ecee2743a8939e8cc734c05988f5e186eb450540e9a0ce",
       "executable": false
     },
     {
@@ -34614,6 +34621,12 @@
       "path": "open-game-stack-20261015/tools/qualify_descriptor_interior.py",
       "bytes": 2212,
       "sha256": "251b46cead03c436263372c9ee45f13dab301770089fe882908776475e8c46ef",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_encoded_work_ring.py",
+      "bytes": 1675,
+      "sha256": "be4b13ac2216e2ed5dcf43a164afdc938664ed3eb8521ebd4fcbe5211a692771",
       "executable": false
     },
     {
@@ -70400,6 +70413,6 @@
     "sourceFilesUpdatedThisCheckpoint": 54
   },
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
-  "latestSourceUpdateUTC": "2026-10-25T08:47:19.135177+00:00",
+  "latestSourceUpdateUTC": "2026-10-25T09:21:39.139758+00:00",
   "lastSourceOnlyUpdateUTC": "2026-10-22T02:19:58.857641+00:00"
 }

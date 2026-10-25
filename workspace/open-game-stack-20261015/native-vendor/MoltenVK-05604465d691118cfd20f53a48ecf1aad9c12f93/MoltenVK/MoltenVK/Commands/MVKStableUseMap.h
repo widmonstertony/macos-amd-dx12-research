@@ -70,6 +70,22 @@ public:
         slots[i]={key,entries.size()};
         return {entries.end()-1,true};
     }
+    std::pair<Value*,bool> emplaceValue(Key key, const Value& value) {
+        if(slots.empty())reserve(1);
+        auto i=std::hash<Key>{}(key)&(slots.size()-1);
+        while(slots[i].indexPlusOne) {
+            if(slots[i].key==key)return {&entries[slots[i].indexPlusOne-1].second,false};
+            i=(i+1)&(slots.size()-1);
+        }
+        if(entries.size()+1>slots.size()/2) {
+            reserve(entries.size()+1);
+            i=std::hash<Key>{}(key)&(slots.size()-1);
+            while(slots[i].indexPlusOne)i=(i+1)&(slots.size()-1);
+        }
+        entries.emplace_back(key,value);
+        slots[i]={key,entries.size()};
+        return {&entries.back().second,true};
+    }
     void clear() {
         entries.clear();
         std::fill(slots.begin(),slots.end(),Slot{});

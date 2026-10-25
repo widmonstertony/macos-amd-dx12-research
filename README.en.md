@@ -4,9 +4,9 @@
 
 Open-source D3D12 → Vulkan → Metal compatibility research for Intel Macs with AMD GPUs. The primary reproduction target is the licensed Windows Steam edition of **Stellar Blade**. Contributions on shaders, synchronization, caches, Wine windows, and performance are welcome.
 
-> **Experimental; not yet playable.** The latest game run reached correctly rendered output at about 6 FPS. One real fault is now localized to the only 61,365-index draw in the 14th encoder, while the Metal command buffer still ran for 7.21 seconds and triggered the AMD GPU watchdog. Downloads are developer test kits, **not a finished solution that lets every Mac run Stellar Blade**. Probe success does not establish game compatibility, FSR3 support, or support for other games/GPUs.
+> **Experimental, not yet playable.** Actual original-Tencent-Wine / normal-Steam scene intervals on 2026-10-25 measured 6.57 FPS for v26, 7.92 FPS after reducing diagnostic overhead in v28, and 9.69 FPS after precise descriptor invalidation in v29. Rendering can be correct, but performance, attack stability and both FSR3 features remain unqualified. Downloads are developer test kits, not a finished Stellar Blade compatibility package.
 
-See the [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and [full research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
+See the [2026-10-25 CPU scan fix](docs/CPU-DIRTY-BITMAP-2026-10-25.md) and [diagnostic CPU fix](docs/DIAGNOSTIC-CPU-FIX-2026-10-25.md) for current measurements. See the historical [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and [full research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
 
 ## Download and test
 
@@ -42,9 +42,10 @@ Licensed Windows game → vkd3d-proton / DXIL-DXBC translation → Vulkan/SPIR-V
 | Compute / graphics fixtures | GPU readback and pixel comparisons | Complete DX12 / Robustness2 support |
 | Compute archives | 33 strict hits in an isolated Wine fixture | Elimination of game recompilation |
 | Steam launch and scene entry | Reached earlier; serious defects | Stable gameplay |
-| Latest fault replay | About 6 FPS; a 24-encoder command buffer watchdog followed the sole 61,365-index draw in encoder 14 | That draw is the invariant cause, or safe segmentation is complete |
+| Historical fault replay | Watchdog after encoder 14; later evidence identified cumulative geometry work as one cause | One invariant faulty draw |
+| Current CPU scene control | v26 6.57 → v28 7.92 → v29 9.69 FPS with preserved caches | Playability or FSR3 qualification |
 
-See the [latest checkpoint](docs/CHECKPOINT-2026-10-23.md). v16 adds a one-shot 512-sample all-draw GPU timestamp mode. The next normal-Steam failure will establish whether the exact draw is stable before an evidence-based resource/shader or intra-command-buffer segmentation repair. Feature-bit changes and device creation alone are not valid compatibility evidence.
+See the historical [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and subsequent [2026-10-25 diagnostics](docs/DIAGNOSTICS-2026-10-25.md). Current work targets measured CPU resource-binding and snapshot rebuilding costs. Actual game measurements determine performance claims.
 
 ## Source, build, recovery
 

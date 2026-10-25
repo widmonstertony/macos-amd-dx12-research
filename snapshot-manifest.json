@@ -2032,8 +2032,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 150209,
-      "sha256": "8738d8f5542e367ffdb3f68246da438b99907b7aa08581edefa4519100345279",
+      "bytes": 150194,
+      "sha256": "d9beb8efb6a06db1dbf7bde128a298c263b039c2fedc3f3d2a6f0b992336aaa3",
       "executable": false
     },
     {
@@ -2120,8 +2120,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKStableUseMap.h",
-      "bytes": 2913,
-      "sha256": "bd8952dfdef8fe69331f217a029d3550c1af0212813f59220908ebf898bd9656",
+      "bytes": 3600,
+      "sha256": "f9e86fe80834ecaa52891b984cf0c21e5c0c50976ed2e023f8aa9e4e7a4ebe0d",
       "executable": false
     },
     {
@@ -33748,6 +33748,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/stable_use_before_pointer_return.h",
+      "bytes": 2913,
+      "sha256": "bd8952dfdef8fe69331f217a029d3550c1af0212813f59220908ebf898bd9656",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/crash_metadata_probe.c",
       "bytes": 2517,
       "sha256": "bcf0beeb5e5a8b959d714d45a2b9d5d2ea9515096cc920b16db2d3990e1567e2",
@@ -34249,6 +34255,12 @@
       "path": "open-game-stack-20261015/src/snapshot_stage_coverage_gpu.mm",
       "bytes": 9954,
       "sha256": "8424c3097ea6b1400809b22ff97bb6fc62adc9893651e06cf1c2f2596ccee49d",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/stable_use_pointer_control.mm",
+      "bytes": 5263,
+      "sha256": "af6bcdaed16e6fbdd7a9949c84156f57f4be3f7fe672276a55b0ecec50c7591a",
       "executable": false
     },
     {

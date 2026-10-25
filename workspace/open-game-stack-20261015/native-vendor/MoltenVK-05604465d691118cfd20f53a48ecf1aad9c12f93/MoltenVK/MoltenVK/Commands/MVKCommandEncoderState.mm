@@ -1113,8 +1113,8 @@ void MVKUseResourceHelper::finishPendingBatch() {
 
 MVKUseResourceHelper::ResourceInfo* MVKUseResourceHelper::add(id<MTLResource> resource, MVKResourceUsageStages stage, bool write) {
 	ResourceInfo info { stage, write, true, false, encoderGeneration };
-	auto res = used.emplace(resource, info);
-	ResourceInfo& stored = res.first->second;
+	auto res = used.emplaceValue(resource, info);
+	ResourceInfo& stored = *res.first;
 	bool fresh = res.second || stored.generation != encoderGeneration;
 	if (fresh && !res.second) {
 		// A cross-encoder liveness reference is independent of per-encoder
@@ -1329,9 +1329,9 @@ void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snaps
             if (std::find(retainedSnapshotLeases.begin(),retainedSnapshotLeases.end(),lease)==retainedSnapshotLeases.end())
                 retainedSnapshotLeases.push_back(lease);
             for (id<MTLResource> resource : *lease) {
-                auto inserted=used.emplace(resource,ResourceInfo{stage,write,true,true,0});
-                inserted.first->second.liveRetained=true;
-                RetainedSnapshotResource record{resource,&inserted.first->second};
+                auto inserted=used.emplaceValue(resource,ResourceInfo{stage,write,true,true,0});
+                inserted.first->liveRetained=true;
+                RetainedSnapshotResource record{resource,inserted.first};
                 addRetainedSnapshotResource(record,encoder,func,stage,write);
                 if (live) live->push_back(record);
             }
@@ -1631,8 +1631,8 @@ bool MVKUseResourceHelper::addImmediateLive(id<MTLResource> resource, MVKLiveLis
 
 MVKUseResourceHelper::ResourceInfo* MVKUseResourceHelper::addImmediate(id<MTLResource> resource, id<MTLCommandEncoder> enc, MVKResourceBinder::UseResource func, MVKResourceUsageStages stage, bool write) {
 	ResourceInfo info { stage, write, false, false, encoderGeneration };
-	auto res = used.emplace(resource, info);
-	ResourceInfo& stored = res.first->second;
+	auto res = used.emplaceValue(resource, info);
+	ResourceInfo& stored = *res.first;
 	bool fresh = res.second || stored.generation != encoderGeneration;
 	if (fresh && !res.second) stored = info;
 	if (fresh || !isCompatible(stored, info)) {

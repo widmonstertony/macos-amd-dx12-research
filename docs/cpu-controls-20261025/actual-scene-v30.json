@@ -1,0 +1,16 @@
+{
+  "timeUTC": "2026-10-25T10:46:25.795405+00:00",
+  "sourceCandidateSHA256": "81b75dabb60a07b62be194825e6d7fa98119de551b32818f609bb4520500e289",
+  "windowPoints": [
+    363,
+    263
+  ],
+  "resolutionSettingChanged": false,
+  "warmSceneFPS": 9.634723681781457,
+  "GPUTimeoutRecords": 0,
+  "gamePlayable": false,
+  "FSR3FeaturesValidated": false,
+  "cachePreserved": true,
+  "version": "v30",
+  "initialSceneFPS": 8.657441987825099
+}

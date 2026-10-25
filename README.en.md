@@ -4,7 +4,7 @@
 
 Open-source D3D12 → Vulkan → Metal compatibility research for Intel Macs with AMD GPUs. The primary reproduction target is the licensed Windows Steam edition of **Stellar Blade**. Contributions on shaders, synchronization, caches, Wine windows, and performance are welcome.
 
-> **Experimental, not yet playable.** Actual original-Tencent-Wine / normal-Steam scene intervals on 2026-10-25 measured 6.57 FPS for v26, 7.92 FPS after reducing diagnostic overhead in v28, and 9.69 FPS after precise descriptor invalidation in v29. Rendering can be correct, but performance, attack stability and both FSR3 features remain unqualified. Downloads are developer test kits, not a finished Stellar Blade compatibility package.
+> **Experimental, not yet playable.** Actual original-Tencent-Wine / normal-Steam scene intervals on 2026-10-25 measured 6.57 FPS for v26, 7.92 FPS after reducing diagnostic overhead in v28, and 9.69 FPS after precise descriptor invalidation in v29. The v30 resource-table micro-optimization measured 9.63 FPS, without a demonstrated whole-frame gain. Rendering can be correct, but performance, attack stability and both FSR3 features remain unqualified. Downloads are developer test kits, not a finished Stellar Blade compatibility package.
 
 See the [2026-10-25 CPU scan fix](docs/CPU-DIRTY-BITMAP-2026-10-25.md) and [diagnostic CPU fix](docs/DIAGNOSTIC-CPU-FIX-2026-10-25.md) for current measurements. See the historical [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and [full research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
 

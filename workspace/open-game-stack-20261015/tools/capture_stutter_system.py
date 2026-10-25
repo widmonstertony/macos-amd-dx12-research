@@ -187,7 +187,7 @@ class NativeReader:
                         alternate=numeric_json(by_mtime,cf_now)
                         if alternate.get('sourceCFAbsoluteTime',0)>result['latestPresent'].get('sourceCFAbsoluteTime',0):
                             result['latestPresent']=alternate;result['presentFilenameSequenceReused']=True
-        for prefix in ('memory-current','resource-use-current','resource-use','residency-cost','shared-snapshot-stats','descriptor-dirty'):
+        for prefix in ('memory-current','resource-use-current','resource-use','residency-cost','shared-snapshot-stats','descriptor-dirty','heap-plan-stats'):
             for ext in ('.json','.jsonl'):
                 p=self.trace/f'{prefix}-{self.pid}{ext}'
                 if p.is_file():result[prefix]=numeric_json(p,cf_now)

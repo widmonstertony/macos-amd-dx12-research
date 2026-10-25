@@ -783,6 +783,30 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/heap-plan-lifecycle-v35-20261025/build_fixture.py",
+      "sha256": "7478bafadef49aa6fc45b64cfea85ef730f6fb7b58a83872680bda0d57e64bc0",
+      "bytes": 2314,
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-lifecycle-v35-20261025/lifecycle_cases.inc",
+      "sha256": "4eaea623f30f3cca1f56d4e8cee6f812c0d834bc10854d64f34a94f44208b9c7",
+      "bytes": 12577,
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-lifecycle-v35-20261025/residency_lifecycle_gpu.mm",
+      "sha256": "78c0880c0efce3eec39021043ad53bfd3d17c2fd9646c1a7fed37dcb828ab962",
+      "bytes": 26057,
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-lifecycle-v35-20261025/run_control.py",
+      "sha256": "5b7686db92eca6908e349c5c79e75894cb7beed9e46174bfdab861e45336e8ce",
+      "bytes": 1928,
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/lazy-counter-allocation-20261025/lazy_counter_gpu.mm",
       "bytes": 6805,
       "sha256": "a579bcf55ac0e0c466ec9dc57b2de2d4e7d7fef256b7819afeee7ed6a6c793b1",
@@ -33161,6 +33185,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/profiles/buffer-read-plan-v35.json",
+      "sha256": "ffe748419a8ad79b3dd9d5023133d9515c0cb99630887b4d951e7acd8fd13712",
+      "bytes": 1355,
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/repro-amd-compiler-20261015/RESULT.txt",
       "bytes": 2854,
       "sha256": "402cbe17d0ae87601ee39ae7fa7659a0bc11b757d2c64f515ed8778db0ec7dab",
@@ -34634,8 +34664,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/capture_stutter_system.py",
-      "bytes": 35548,
-      "sha256": "f23411d0844f6d612f20a612caa1e6f47ba5a8ded495bcbcbfdc3118065efb58",
+      "sha256": "9d0595a769e1cab170d661a5d53f8809cd37beb09ecd7cbb06e3d81d00b38661",
+      "bytes": 35566,
       "executable": false
     },
     {
@@ -34793,8 +34823,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_geometry_specialization.py",
-      "bytes": 12156,
-      "sha256": "1920fecc582b6e04e5e9bf790430cf037b832391b9bbf7f2c2d966130db78066",
+      "sha256": "37b3ab2340192cd848ab00a5735b1de841051be35c6fa23bb4ea84fb23c82012",
+      "bytes": 12422,
       "executable": false
     },
     {
@@ -70573,19 +70603,18 @@
   ],
   "updatedUTC": "2026-10-24T03:54:53.820584+00:00",
   "currentSourceState": {
-    "label": "cpu-unattributed-v34-20261025",
+    "label": "buffer-read-plan-v35-20261025",
     "gamePlayable": false,
     "candidateDeployed": true,
     "actualGamePerformanceValidated": false,
     "humanGameTestingOnly": true,
-    "newOptimizationHeapPlansEnabled": false,
-    "focus": "Fix measured shared diagnostic mutex contention without dropping attribution counters; game rendering/resource coverage unchanged",
-    "sourceFilesUpdatedThisCheckpoint": 5,
     "nativeCandidateSHA256": "151af81c4674b8a005bafd2c7ebdfb0d251acb97e0119dcdb9737aaca9b589bf",
-    "nativeBuildPassed": true,
-    "qualificationScope": "CPU accounting, source-stable native build, owned GPU output and original Wine presentation/guard controls; human game performance pending"
+    "nativeImplementationReusedFromV34": true,
+    "encoderHeapPlansEnabled": true,
+    "focus": "Reuse lease-owned large buffer read plans before per-resource replay; preserve precise writes and runtime fallback",
+    "sourceFilesUpdatedThisCheckpoint": 7
   },
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
-  "latestSourceUpdateUTC": "2026-10-25T21:36:46.215191+00:00",
+  "latestSourceUpdateUTC": "2026-10-25T22:54:40.983777+00:00",
   "lastSourceOnlyUpdateUTC": "2026-10-22T02:19:58.857641+00:00"
 }

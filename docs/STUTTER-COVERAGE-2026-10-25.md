@@ -56,3 +56,13 @@ Archive publication now reserves bounded process-local capacity before creating/
 A human-operated foreground scene capture confirmed diagnostic contention: events without a logical submission still acquired the shared detail-domain lock. Their event count and self total now drain together from the existing thread aggregate shard, while real submission details retain domain ownership. Concurrent drain and arm-transition controls pass without lost counts; unattributed work still marks detailed coverage incomplete. This is an observer-overhead fix, not a playable-FPS claim. Native write declarations are retained: the observed call pattern tracks encoder creation, and there is no evidence that required declarations can safely be dropped.
 
 由用户操作的前台采集已完成。修复把无 submission 的诊断计数放回已有线程分片，消除共享日志锁争用，保留无归属和覆盖不完整标记；并发 drain、arm 边界与原控制通过。真实资源写声明尚无安全省略证据，保持原有覆盖。新采集工具检测到持续前台才启动有界采样，不会启动、停止或操作游戏；启动时详细 CPU 采样改为显式选择。游戏主性能问题仍未解决，实际帧率改善待用户验证。
+
+## Resource replay integration / 资源重放优化接入
+
+The next measured target is warm snapshot identity replay followed by rebuilding heap groups for each encoder. v35 enables the existing lease-owned buffer read-plan implementation before that per-resource loop. It admits only sufficiently large, validated buffer snapshots and eligible heap groups; textures and ineligible buffers fall back, and writes remain precise. The native implementation is reused from v34; the authored portable profile records the one functional configuration change.
+
+New native-only GPU controls cover the same buffer changing from grouped read to precise write, one helper across multiple encoders, and a separately scoped defensive lease-retention case. CPU-encoding helper lifetime is not GPU-completion lifetime: normal Vulkan resource owners use the existing all-queue deferred-release chain. No new fences, events or resource-lifetime shortcuts were introduced. Original Wine compute/presentation/cache and geometry controls pass. Human-run plan eligibility and warmed scene performance remain unverified; runtime shader conversion and host CPU limits must be separated in comparisons.
+
+v35 把已有分组算法接入实际游戏配置，保留逐资源写声明和不满足条件时的回退。新增跨 encoder、同资源读后写及限定 scope 的保活 GPU 测试。后续采集会记录 bulkChildren、nativeHeapCalls、preciseChildren、priorWriteReplays，判断游戏里是否真正命中，不能仅凭配置开启推断提帧。原生 Steam 入口、着色器功能和实际可玩性仍是各自独立的验证范围。
+
+Portable build options: `workspace/open-game-stack-20261015/profiles/buffer-read-plan-v35.json`. This is an experimental profile, not a new playable release.

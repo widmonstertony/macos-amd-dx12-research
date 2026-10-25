@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "name": "buffer-read-plan-v35",
+  "description": "Experimental lease-owned buffer read plans with precise writes; human game performance validation required.",
+  "descriptionZh": "实验性只读 buffer 分组计划，保留精确写声明；需用户验证游戏性能。",
+  "builder": "tools/build_profile_candidate.py",
+  "builderArguments": [
+    "--resource-stats",
+    "--snapshot-reuse",
+    "--cross-snapshot-reuse",
+    "--failure-context",
+    "--registration-delta-cache",
+    "--shared-live-snapshots",
+    "--split-command-buffers",
+    "--continuous-work-trace",
+    "--gpu-counters",
+    "--gpu-counter-all-draws",
+    "--suppress-archive-trace",
+    "--normal-mesh-libraries",
+    "--sharded-shader-cache-locks",
+    "--descriptor-write-shards",
+    "--encoder-heap-plans",
+    "--stutter-coverage",
+    "--gpu-counter-burst",
+    "--suppress-link-differential",
+    "--slow-command-buffer-trace-ms",
+    "50.0",
+    "--gpu-counter-pipeline-label",
+    "*",
+    "--geometry-command-buffer-batch-limit",
+    "16"
+  ],
+  "eligibility": {
+    "knownBuffersOnly": true,
+    "minimumSnapshotIdentities": 128,
+    "minimumEligibleResources": 128,
+    "texturesUseFallback": true,
+    "preciseWritesRequired": true
+  },
+  "automaticStartupCPUCapture": false,
+  "gameLaunchIncluded": false,
+  "playabilityEstablished": false
+}

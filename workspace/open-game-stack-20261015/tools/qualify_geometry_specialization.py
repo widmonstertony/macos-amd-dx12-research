@@ -18,6 +18,7 @@ def main():
     ap.add_argument('--label', required=True)
     ap.add_argument('--shaders', type=Path, required=True)
     ap.add_argument('--shared-live-snapshots',action='store_true')
+    ap.add_argument('--encoder-heap-plans',action='store_true',help='Exercise the existing buffer read-plan/precise write backend')
     ap.add_argument('--safe-math', action='store_true')
     ap.add_argument('--normal-mesh-libraries', action='store_true')
     ap.add_argument('--sharded-shader-cache-locks', action='store_true')
@@ -69,6 +70,7 @@ def main():
         env.pop('MVK_AMD_FRESH_MESH_LIBRARIES', None)
     if args.sharded_shader_cache_locks:
         env['MVK_AMD_SHARDED_SHADER_CACHE_LOCKS'] = '1'
+    env['MVK_AMD_ENCODER_HEAP_PLANS'] = '1' if args.encoder_heap_plans else '0'
     if args.shared_live_snapshots:
         env.update(MVK_AMD_SHARED_LIVE_SNAPSHOTS="1",MVK_AMD_ENCODER_LIVE_CACHE="1",MVK_AMD_CROSS_ENCODER_LIVE_CACHE="1",MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE="1",MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE="1",MVK_AMD_BATCH_LIVE_USE_RESOURCE="1")
     if args.safe_math:
@@ -131,6 +133,7 @@ def main():
         row['geometryDrawTracePassed'] = bool(geometry_traces)
         row['passed'] = row['passed'] and row['geometryDrawTracePassed']
     row['sharedLiveSnapshots'] = args.shared_live_snapshots
+    row['encoderHeapPlans'] = args.encoder_heap_plans
     gpu_timestamp_traces = sorted((out / 'msl').glob('trace-gpu-timestamps-*.json'))
     row['gpuCounterAllDraws'] = args.gpu_counter_all_draws
     row['gpuCounterPipelineLabel'] = args.gpu_counter_pipeline_label or ('*' if args.gpu_counter_all_draws else None)

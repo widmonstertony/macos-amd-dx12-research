@@ -119,6 +119,7 @@ private:
     struct Shard {
         std::mutex lock;
         uint64_t thread=0,slowCount=0;
+        uint64_t unattributedEvents=0,unattributedSelfNS=0;
         std::array<std::unique_ptr<Block>,DomainCount> domains{};
         std::array<Span,SlowCapacity> slow{};
         std::array<Span,ActiveCapacity> active{};
@@ -127,7 +128,7 @@ private:
         std::mutex lock;
         std::unique_ptr<DetailTable> table;
         std::atomic<bool> prepared{false};
-        uint64_t overflowEvents=0,unattributedEvents=0,unattributedSelfNS=0;
+        uint64_t overflowEvents=0;
         uint64_t coldAllocations=0,coldAllocationNS=0,unpreparedEvents=0;
     };
     struct Registration {uint64_t uid=0;Shard* shard=nullptr;std::array<Block*,DomainCount> domains{};};
@@ -181,14 +182,21 @@ private:
         if(span.context.nativeCB){if(!entry.firstNativeCB)entry.firstNativeCB=span.context.nativeCB;else entry.mixedNativeCB|=entry.firstNativeCB!=span.context.nativeCB;entry.lastNativeCB=span.context.nativeCB;}
         if(span.context.frame){if(!entry.firstFrame)entry.firstFrame=span.context.frame;else entry.mixedFrame|=entry.firstFrame!=span.context.frame;entry.lastFrame=span.context.frame;}
     }
-    // Never called while a per-thread shard lock is held. Reporter uses the
-    // same separation, so thread/domain lock-order inversion is impossible.
+    // Caller already owns this thread's aggregate shard lock. Keep the count
+    // and self total paired with that same completion drain; submission0 has
+    // no domain-table entry and must not serialize unrelated producer threads.
+    void recordUnattributedDetailLocked(Shard&shard,const Span&span){
+        if(!span.context.submission&&_detailedEnabled.load(std::memory_order_relaxed)){
+            ++shard.unattributedEvents;shard.unattributedSelfNS+=span.selfNS;
+        }
+    }
+    // Nonzero submission details are never recorded while a thread-shard lock
+    // is held. Reporter uses the same separation to avoid lock-order inversion.
     void recordDetail(const Span&span,bool failure=false){
-        if(!_detailedEnabled.load(std::memory_order_relaxed))return;
+        if(!span.context.submission||!_detailedEnabled.load(std::memory_order_relaxed))return;
         prepareDetail(span.context);
         auto&domain=_details[span.context.domain];
         std::lock_guard<std::mutex> guard(domain.lock);
-        if(!span.context.submission){++domain.unattributedEvents;domain.unattributedSelfNS+=span.selfNS;return;}
         if(!domain.table){++domain.unpreparedEvents;return;}
         auto*entry=findDetail(*domain.table,span.context,true);if(!entry){++domain.overflowEvents;return;}
         touchDetail(*entry,span);
@@ -232,6 +240,8 @@ private:
         std::vector<Shard*> shards;{std::lock_guard<std::mutex> g(_registryLock);for(auto&x:_shards)shards.push_back(x.get());}out->registeredThreads=shards.size();out->aggregateReservedBytes=_aggregateBlockCount.load()*sizeof(Block);out->detailedReservedBytes=_detailedShardCount.load()*sizeof(DetailTable);out->threadShardReservedBytes=shards.size()*sizeof(Shard);
         for(Shard*shard:shards){std::lock_guard<std::mutex> g(shard->lock);
             for(size_t domain=0;domain<DomainCount;++domain)if(shard->domains[domain])for(size_t stage=0;stage<StageCount;++stage){auto&m=shard->domains[domain]->stages[stage];add(out->rows[domain*StageCount+stage],m);m=Metric{};}
+            out->detailedUnattributedEvents+=shard->unattributedEvents;shard->unattributedEvents=0;
+            out->detailedUnattributedSelfNS+=shard->unattributedSelfNS;shard->unattributedSelfNS=0;
             uint64_t first=shard->slowCount>SlowCapacity?shard->slowCount-SlowCapacity:0;out->slowSpansDropped+=first;
             for(uint64_t i=first;i<shard->slowCount;++i)out->slowSpans.push_back(shard->slow[i%SlowCapacity]);shard->slowCount=0;
             for(auto active:shard->active)if(active.active){active.endNS=now;active.inclusiveNS=now>=active.startNS?now-active.startNS:0;out->inFlight.push_back(active);}
@@ -247,8 +257,6 @@ private:
             }
             out->detailDomainOverflowEvents[index]=domain.overflowEvents;
             out->detailedOverflowEvents+=domain.overflowEvents;domain.overflowEvents=0;
-            out->detailedUnattributedEvents+=domain.unattributedEvents;domain.unattributedEvents=0;
-            out->detailedUnattributedSelfNS+=domain.unattributedSelfNS;domain.unattributedSelfNS=0;
             out->detailedColdAllocations+=domain.coldAllocations;domain.coldAllocations=0;
             out->detailedColdAllocationNS+=domain.coldAllocationNS;domain.coldAllocationNS=0;
             out->detailedUnpreparedEvents+=domain.unpreparedEvents;domain.unpreparedEvents=0;
@@ -317,10 +325,10 @@ public:
             uint64_t inclusive=Clock::toNS(elapsed),self=Clock::toNS(elapsed>=_child?elapsed-_child:0),cpu=cpuEnd>=_cpuStart?cpuEnd-_cpuStart:0;
             try{
                 Span s;s.context=_context;s.thread=_shard->thread;s.tag=_tag;s.stage=_stage;s.depth=_depth;s.startNS=Clock::toNS(_start);s.endNS=Clock::toNS(end);s.inclusiveNS=inclusive;s.selfNS=self;s.threadCPUNS=cpu;
-                {std::lock_guard<std::mutex> g(_shard->lock);if(unavailableUID!=trace->_uid)update(_block->stages[_stage],inclusive,self,cpu,_captureCPU&&_cpuStart&&cpuEnd);else ++trace->_diagnosticSuppressedEvents;
+                {std::lock_guard<std::mutex> g(_shard->lock);if(unavailableUID!=trace->_uid){update(_block->stages[_stage],inclusive,self,cpu,_captureCPU&&_cpuStart&&cpuEnd);trace->recordUnattributedDetailLocked(*_shard,s);}else ++trace->_diagnosticSuppressedEvents;
                     if(_depth<ActiveCapacity)_shard->active[_depth].active=false;
                     if(unavailableUID!=trace->_uid&&inclusive>=trace->_slowNS)trace->remember(*_shard,s);}
-                if(unavailableUID!=trace->_uid)trace->recordDetail(s);
+                if(unavailableUID!=trace->_uid&&s.context.submission)trace->recordDetail(s);
             }catch(...){trace->disableCurrentThread();}
             _trace=nullptr;errno=priorErrno;return inclusive;
         }
@@ -330,21 +338,21 @@ public:
         if(unavailableUID==_uid){++_diagnosticSuppressedEvents;return;}int priorErrno=errno;try{
         Context context=currentContext;context.domain=checkedDomain(context.domain);auto localPair=local(context.domain);auto*shard=localPair.first;prepareDetail(context);uint64_t end=Clock::toNS(Clock::ticks());
         Span s;s.context=context;s.thread=shard->thread;s.tag=tag;s.stage=stage;s.startNS=end>=elapsedNS?end-elapsedNS:0;s.endNS=end;s.inclusiveNS=elapsedNS;s.async=true;
-        {std::lock_guard<std::mutex> g(shard->lock);update(localPair.second->stages[stage],elapsedNS,0,0,false);if(elapsedNS>=_slowNS)remember(*shard,s);}
-        recordDetail(s);
+        {std::lock_guard<std::mutex> g(shard->lock);update(localPair.second->stages[stage],elapsedNS,0,0,false);recordUnattributedDetailLocked(*shard,s);if(elapsedNS>=_slowNS)remember(*shard,s);}
+        if(s.context.submission)recordDetail(s);
         }catch(...){disableCurrentThread();}errno=priorErrno;
     }
     void recordFailure(size_t stage,int64_t code,uint64_t tag=0) noexcept {
         if(!enabled())return;if(stage>=StageCount){++_invalidIDs;return;}if(unavailableUID==_uid){++_diagnosticSuppressedEvents;return;}int priorErrno=errno;try{Context context=currentContext;context.domain=checkedDomain(context.domain);auto localPair=local(context.domain);auto*shard=localPair.first;prepareDetail(context);
         Span s;s.context=context;s.thread=shard->thread;s.tag=tag;s.stage=stage;s.startNS=s.endNS=Clock::toNS(Clock::ticks());s.failureCode=code;
-        {std::lock_guard<std::mutex> g(shard->lock);auto&m=localPair.second->stages[stage];++m.failures;m.lastFailureCode=code;remember(*shard,s);}
-        recordDetail(s,true);
+        {std::lock_guard<std::mutex> g(shard->lock);auto&m=localPair.second->stages[stage];++m.failures;m.lastFailureCode=code;recordUnattributedDetailLocked(*shard,s);remember(*shard,s);}
+        if(s.context.submission)recordDetail(s,true);
         }catch(...){disableCurrentThread();}errno=priorErrno;
     }
 
     std::unique_ptr<Report> snapshot(){std::lock_guard<std::mutex> g(_publishLock);return snapshotLocked(Clock::toNS(Clock::ticks()));}
     void writeJSON(FILE*f,const Report&r)const{
-        fprintf(f,"{\"schema\":1,\"captureEnabled\":%s,\"time\":%.9f,\"unixTimeNS\":%llu,\"windowStartNS\":%llu,\"windowEndNS\":%llu,\"windowAssignment\":\"span completion\",\"selfMeaning\":\"same-thread measured-child subtraction; async self is zero; not process CPU utilization\",\"diagnosticOverheadNotSubtracted\":true,\"detailStorage\":\"stable-domain\",\"threadBudgetApplicable\":false,\"submissionSelfMeaning\":\"sum of same-thread self spans; mixed-thread entries are cumulative work, not one-thread wall or a critical path\",\"rows\":[",r.captureEnabled?"true":"false",double(r.unixTimeNS)/1e9-978307200.0,(unsigned long long)r.unixTimeNS,(unsigned long long)r.windowStartNS,(unsigned long long)r.windowEndNS);
+        fprintf(f,"{\"schema\":1,\"captureEnabled\":%s,\"time\":%.9f,\"unixTimeNS\":%llu,\"windowStartNS\":%llu,\"windowEndNS\":%llu,\"windowAssignment\":\"span completion\",\"selfMeaning\":\"same-thread measured-child subtraction; async self is zero; not process CPU utilization\",\"diagnosticOverheadNotSubtracted\":true,\"detailStorage\":\"stable-domain\",\"unattributedStorage\":\"originating-thread-shard\",\"unattributedWindowAssignment\":\"detail arm checked at aggregate completion update; paired with same thread-shard drain; report is not a globally atomic instant\",\"threadBudgetApplicable\":false,\"submissionSelfMeaning\":\"sum of same-thread self spans; mixed-thread entries are cumulative work, not one-thread wall or a critical path\",\"rows\":[",r.captureEnabled?"true":"false",double(r.unixTimeNS)/1e9-978307200.0,(unsigned long long)r.unixTimeNS,(unsigned long long)r.windowStartNS,(unsigned long long)r.windowEndNS);
         bool comma=false;for(size_t domain=0;domain<DomainCount;++domain)for(size_t stage=0;stage<StageCount;++stage){const auto&m=r.rows[domain*StageCount+stage];if(!m.count&&!m.failures)continue;if(comma)fputc(',',f);comma=true;fprintf(f,"{\"domain\":%zu,\"stage\":%zu,\"name\":",domain,stage);printString(f,_info[stage].name);fprintf(f,",\"kind\":\"%s\",\"count\":%llu,\"inclusiveWallNS\":%llu,\"selfWallNS\":%llu,\"maxInclusiveNS\":%llu,\"maxSelfNS\":%llu,\"threadCPUCount\":%llu,\"inclusiveThreadCPUNS\":%llu,\"failures\":%llu,\"lastFailureCode\":%lld,\"p50UpperNS\":%llu,\"p95UpperNS\":%llu,\"p99UpperNS\":%llu,\"inclusiveHistogram\":[",_info[stage].kind==Kind::Work?"work":(_info[stage].kind==Kind::Wait?"wait":"async"),(unsigned long long)m.count,(unsigned long long)m.inclusiveNS,(unsigned long long)m.selfNS,(unsigned long long)m.maxInclusiveNS,(unsigned long long)m.maxSelfNS,(unsigned long long)m.threadCPUCount,(unsigned long long)m.inclusiveThreadCPUNS,(unsigned long long)m.failures,(long long)m.lastFailureCode,(unsigned long long)quantileUpper(m.inclusiveHistogram,50),(unsigned long long)quantileUpper(m.inclusiveHistogram,95),(unsigned long long)quantileUpper(m.inclusiveHistogram,99));
             for(size_t i=0;i<HistogramBins;++i)fprintf(f,"%s%llu",i?",":"",(unsigned long long)m.inclusiveHistogram[i]);fputs("],\"selfHistogram\":[",f);for(size_t i=0;i<HistogramBins;++i)fprintf(f,"%s%llu",i?",":"",(unsigned long long)m.selfHistogram[i]);fputs("]}",f);}
         fprintf(f,"],\"slowSpansDropped\":%llu,\"invalidIDs\":%llu,\"badNesting\":%llu,\"depthOverflow\":%llu,\"publicationFailures\":%llu,\"slowSpans\":[",(unsigned long long)r.slowSpansDropped,(unsigned long long)r.invalidIDs,(unsigned long long)r.badNesting,(unsigned long long)r.depthOverflow,(unsigned long long)r.publicationFailures);for(size_t i=0;i<r.slowSpans.size();++i){if(i)fputc(',',f);printSpan(f,r.slowSpans[i]);}fputs("],\"inFlight\":[",f);for(size_t i=0;i<r.inFlight.size();++i){if(i)fputc(',',f);printSpan(f,r.inFlight[i]);}

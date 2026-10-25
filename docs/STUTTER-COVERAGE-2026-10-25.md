@@ -50,3 +50,9 @@ Deployed v33 fixes three measurement defects: stable domain-owned CPU detail sto
 Archive publication now reserves bounded process-local capacity before creating/adding/serializing a Metal archive. Existing cache keys and files are retained. Successful atomic publication settles actual bytes; failed work releases the reservation. Admission conservatively leaves a tail smaller than one maximum shard, and the existing cross-process limitation remains. No FPS improvement is claimed before human-run validation.
 
 由用户负责开游戏和复现；新版修正线程明细预算、空提交采样预算和慢日志风暴。满额缓存的无效构建改为提前拒绝，保留已有缓存和 key。实际游戏效果仍待用户验证。
+
+## Foreground follow-up / 前台归因后续
+
+A human-operated foreground scene capture confirmed diagnostic contention: events without a logical submission still acquired the shared detail-domain lock. Their event count and self total now drain together from the existing thread aggregate shard, while real submission details retain domain ownership. Concurrent drain and arm-transition controls pass without lost counts; unattributed work still marks detailed coverage incomplete. This is an observer-overhead fix, not a playable-FPS claim. Native write declarations are retained: the observed call pattern tracks encoder creation, and there is no evidence that required declarations can safely be dropped.
+
+由用户操作的前台采集已完成。修复把无 submission 的诊断计数放回已有线程分片，消除共享日志锁争用，保留无归属和覆盖不完整标记；并发 drain、arm 边界与原控制通过。真实资源写声明尚无安全省略证据，保持原有覆盖。新采集工具检测到持续前台才启动有界采样，不会启动、停止或操作游戏；启动时详细 CPU 采样改为显式选择。游戏主性能问题仍未解决，实际帧率改善待用户验证。

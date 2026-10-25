@@ -27,6 +27,18 @@ def main():
     ap.add_argument('--parameter-readback', action='store_true')
     ap.add_argument('--geometry-draw-trace-label',
                     help='Timed metadata-only geometry draw trace selector; use * for owned probes')
+    ap.add_argument('--gpu-counter-all-draws', action='store_true',
+                    help='Capture bounded GPU timestamps for all draws and internal geometry batches')
+    ap.add_argument('--gpu-counter-pipeline-label',
+                    help='Lazily begin timestamps at this pipeline substring; targeted mode uses 4096 slots')
+    ap.add_argument('--dump-function-substrings',
+                    help='Comma-separated generated Metal entry-point substrings to copy for source inspection')
+    ap.add_argument('--geometry-command-buffer-batch-limit', type=int,
+                    help='Opt-in AMD geometry batch count before a native command-buffer split')
+    ap.add_argument('--split-stress', action='store_true',
+                    help='Use the owned 8192-primitive indexed geometry draw')
+    ap.add_argument('--dump-work-records', action='store_true',
+                    help='Verify CPU work metadata on completed owned-probe submissions')
     ap.add_argument('--probe-binary',type=Path,default=ROOT/'build/probes/geometry_specialization_gpu')
     args = ap.parse_args()
     lib, shaders = args.library.resolve(), args.shaders.resolve()
@@ -65,12 +77,28 @@ def main():
         env['MVK_AMD_LINK_DIFFERENTIAL_CAPTURE'] = '1'
     if args.parameter_readback:
         env['MVK_OWNED_GEOMETRY_PARAMETER_READBACK'] = '1'
-    if args.geometry_draw_trace_label:
-        assert len(args.geometry_draw_trace_label) <= 128
+    if args.geometry_draw_trace_label or args.gpu_counter_all_draws:
         arm = out / 'gpu-counter.arm'
         arm.touch()
         env['MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH'] = str(arm)
+    if args.geometry_draw_trace_label:
+        assert len(args.geometry_draw_trace_label) <= 128
         env['MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL'] = args.geometry_draw_trace_label
+    if args.gpu_counter_all_draws:
+        env['MVK_AMD_GPU_COUNTER_PIPELINE_LABEL'] = args.gpu_counter_pipeline_label or '*'
+        env['MVK_AMD_GPU_COUNTER_ALL_DRAWS'] = '1'
+    if args.dump_function_substrings:
+        assert len(args.dump_function_substrings) <= 384
+        assert re.fullmatch(r'[A-Za-z0-9_,.-]+', args.dump_function_substrings)
+        env['MVK_AMD_DUMP_FUNCTION_SUBSTRINGS'] = args.dump_function_substrings
+    if args.geometry_command_buffer_batch_limit is not None:
+        assert 1 <= args.geometry_command_buffer_batch_limit <= 1024
+        env['MVK_AMD_GEOMETRY_COMMAND_BUFFER_BATCH_LIMIT'] = str(args.geometry_command_buffer_batch_limit)
+    if args.split_stress:
+        assert args.geometry_command_buffer_batch_limit is not None
+        env['MVK_OWNED_GEOMETRY_SPLIT_STRESS'] = '1'
+    if args.dump_work_records:
+        env['MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL'] = '1'
     probe=args.probe_binary.resolve()
     assert probe.is_relative_to(ROOT/'build/probes') and probe.is_file()
     command = [str(probe), str(shaders), str(out / 'output.json')]
@@ -93,6 +121,36 @@ def main():
         row['geometryDrawTracePassed'] = bool(geometry_traces)
         row['passed'] = row['passed'] and row['geometryDrawTracePassed']
     row['sharedLiveSnapshots'] = args.shared_live_snapshots
+    gpu_timestamp_traces = sorted((out / 'msl').glob('trace-gpu-timestamps-*.json'))
+    row['gpuCounterAllDraws'] = args.gpu_counter_all_draws
+    row['gpuCounterPipelineLabel'] = args.gpu_counter_pipeline_label or ('*' if args.gpu_counter_all_draws else None)
+    row['dumpFunctionSubstrings'] = args.dump_function_substrings
+    row['geometryCommandBufferBatchLimit'] = args.geometry_command_buffer_batch_limit
+    row['dumpWorkRecords'] = args.dump_work_records
+    if args.dump_work_records:
+        records = [json.loads(path.read_text()) for path in (out / 'msl').glob('trace-queue-dependencies-*.json')]
+        kinds = {event['kind'] for record in records for event in record.get('workEvents', [])}
+        row['workRecordKinds'] = sorted(kinds)
+        row['geometryGridMetadataVerified'] = 'geometry-grid' in kinds
+        row['geometrySplitMetadataVerified'] = 'geometry-cb-split' in kinds
+        row['passed'] = row['passed'] and row['geometryGridMetadataVerified']
+        if args.split_stress:
+            row['passed'] = row['passed'] and row['geometrySplitMetadataVerified']
+    row['splitStressRequested'] = args.split_stress
+    row['splitStressPassed'] = (not args.split_stress or
+                                (result.get('splitStress') is True and result.get('stressPrimitives') == 8192))
+    row['passed'] = row['passed'] and row['splitStressPassed']
+    row['selectedFunctionSources'] = [str(p.relative_to(ROOT)) for p in sorted((out / 'msl').glob('selected-source-*.metal'))]
+    if args.dump_function_substrings:
+        row['selectedFunctionSourcePassed'] = bool(row['selectedFunctionSources'])
+        row['passed'] = row['passed'] and row['selectedFunctionSourcePassed']
+    row['gpuTimestampTraceFiles'] = [str(p.relative_to(ROOT)) for p in gpu_timestamp_traces]
+    if args.gpu_counter_all_draws:
+        timestamp_records = [json.loads(p.read_text()) for p in gpu_timestamp_traces]
+        samples = [sample for record in timestamp_records for sample in record.get('gpuTimestamps', {}).get('samples', [])]
+        row['geometryBatchTimestampCount'] = sum(sample.get('kind') == 'geometry-batch' for sample in samples)
+        row['gpuCounterAllDrawsPassed'] = bool(gpu_timestamp_traces) and row['geometryBatchTimestampCount'] > 0
+        row['passed'] = row['passed'] and row['gpuCounterAllDrawsPassed']
     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')
     print(json.dumps(row))
     return 0 if row['passed'] else 1

@@ -55,7 +55,7 @@ def main():
     parser.add_argument('--batch-argument-heaps', action='store_true')
     parser.add_argument('--argument-heap-threshold', type=int, default=16)
     parser.add_argument('--gpu-counter-trace',action='store_true',help='Qualify timed native GPU counter collection on owned probes')
-    parser.add_argument('--gpu-counter-all-draws',action='store_true',help='Qualify the bounded 512-sample all-draw counter mode on presentation')
+    parser.add_argument('--gpu-counter-all-draws',action='store_true',help='Qualify bounded all-draw counter mode (at least the original 512 samples) on presentation')
     parser.add_argument('--probe-timeout', type=int, default=40,
                         help='Per-probe timeout in seconds (10..180) for bounded diagnostics')
     args = parser.parse_args()
@@ -275,7 +275,13 @@ def main():
                 entry['allDrawCounterRecords']=sum(row.get('allDraws') is True for row in timestamp_rows)
                 entry['allDrawCounterCapacity']=max((row.get('capacity',0) for row in timestamp_rows),default=0)
                 entry['validNativeDrawTimestamps']=len(draw_samples)
-                entry['passed']=entry['passed'] and bool(draw_samples) and entry['allDrawCounterCapacity']==512
+                # The diagnostic capacity may grow when a targeted game draw
+                # contains more internal geometry batches.  Qualification is
+                # about bounded allocation plus a real timestamp, not an old
+                # implementation constant.
+                capacity = entry['allDrawCounterCapacity']
+                entry['allDrawCounterCapacityBounded'] = 512 <= capacity <= 16384
+                entry['passed']=entry['passed'] and bool(draw_samples) and entry['allDrawCounterCapacityBounded']
         result["results"][name] = entry
         print(json.dumps({name: {k:v for k,v in entry.items() if k!="computeArchiveRecords"}}), flush=True)
         if not entry["passed"]:

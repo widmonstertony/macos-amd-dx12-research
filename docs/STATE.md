@@ -1,3 +1,6 @@
+> 2026-10-25：补齐查询/几何/CPU 资源声明耗时诊断，并提供经用户授权的 Wine PID AppleScript 控制。实际游戏仍卡顿；未修复电脑插件内部匹配，未验证 FSR3。详见 [诊断检查点 / Diagnostic checkpoint](DIAGNOSTICS-2026-10-25.md)。
+> Add query/geometry/host-residency attribution and an explicitly authorized Wine PID control fallback. Game performance, proprietary plugin matching and FSR3 remain unresolved.
+
 > 非对齐缓冲区拷贝的计算回退由单线程逐字节循环改为有边界检查的并行字节拷贝，地址相加前使用 64 位整数。附全字节哨兵、非对齐偏移、同缓冲区非重叠范围及 Vulkan 调用层的 GPU 对照源码。限时计数器可用有上限的标记刷新覆盖较晚故障。单个函数的提速不代表整体游戏提速，图形队列超时仍未修复；此更新不发布新的本机测试数据或下载运行库。
 > The unaligned-buffer compute fallback now copies bytes in parallel with bounds checks and widened offset arithmetic, replacing a serial single-thread loop. GPU controls cover full-byte sentinels, unaligned offsets, disjoint same-buffer ranges and the Vulkan call path. Bounded marker refresh can cover later faults. A faster helper does not prove game-wide speedup; the graphics-queue timeout remains unresolved. This update publishes no new local test data or downloadable runtimes.
 

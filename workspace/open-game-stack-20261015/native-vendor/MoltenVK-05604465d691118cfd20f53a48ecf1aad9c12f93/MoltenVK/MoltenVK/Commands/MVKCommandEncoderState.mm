@@ -1055,6 +1055,24 @@ static bool isGraphicsStage(MVKShaderStage stage) {
 
 static constexpr MTLResourceUsage MTLResourceUsageReadWrite = MTLResourceUsageRead | MTLResourceUsageWrite;
 
+// Attribute host residency cost without changing resource coverage or ordering.
+// The only per-call work when disabled is the existing statistics flag check.
+template<class F> static void measureResidencyDeclaration(bool enabled, uint64_t& total,
+    uint64_t& maximum, id<MTLCommandEncoder> encoder, const char* kind,
+    size_t count, unsigned stages, F&& declaration) {
+    if (!enabled) { declaration(); return; }
+    uint64_t start = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+    declaration();
+    uint64_t elapsed = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - start;
+    total += elapsed;
+    maximum = std::max(maximum, elapsed);
+    if (elapsed >= 2000000) {
+        mvkRecordEncoderWork(encoder, @"host-residency",
+            [NSString stringWithFormat:@"kind=%s count=%zu stages=%u hostNS=%llu",
+             kind, count, stages, (unsigned long long)elapsed]);
+    }
+}
+
 static bool isCompatible(MVKUseResourceHelper::ResourceInfo current, MVKUseResourceHelper::ResourceInfo add) {
 	if (!current.write && add.write)
 		return false;
@@ -1357,6 +1375,7 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
         uint64_t descriptorWriteRanges=0, descriptorUnchangedWriteRanges=0, descriptorChangedWriteRanges=0;
 		uint64_t bindCalls=0, inputRead=0, inputReadWrite=0;
 		uint64_t preciseRead=0, preciseReadWrite=0, collapsedRead=0, heapDeclarations=0, heapQueries=0;
+		uint64_t heapDeclarationNS=0, readDeclarationNS=0, writeDeclarationNS=0, declarationMaxNS=0;
         double start=0;
     };
     static std::mutex lock;
@@ -1366,6 +1385,11 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     double now=[NSDate timeIntervalSinceReferenceDate];
     if (!total.start) total.start=now;
     total.calls+=statsCalls; total.lookups+=statsLookups;
+    total.heapDeclarationNS+=statsHeapDeclarationNS;
+    total.readDeclarationNS+=statsReadDeclarationNS;
+    total.writeDeclarationNS+=statsWriteDeclarationNS;
+    total.declarationMaxNS=std::max(total.declarationMaxNS,statsDeclarationMaxNS);
+    statsHeapDeclarationNS=statsReadDeclarationNS=statsWriteDeclarationNS=statsDeclarationMaxNS=0;
     total.registrationQueries+=statsRegistrationQueries; total.registrationUnrelated+=statsRegistrationUnrelated;
     statsRegistrationQueries=statsRegistrationUnrelated=0;
     total.snapshotCalls+=statsSnapshotCalls;total.snapshotSkips+=statsSnapshotSkips;total.snapshotWordsSkipped+=statsSnapshotWordsSkipped;total.snapshotFilterHits+=statsSnapshotFilterHits;
@@ -1414,6 +1438,18 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
             }
         }
         char path[4096];snprintf(path,sizeof(path),"%s/resource-use-%d.jsonl",directory,getpid());
+        char residencyPath[4096];
+        snprintf(residencyPath,sizeof(residencyPath),"%s/residency-cost-%d.jsonl",directory,getpid());
+        if (records < 1024) {
+            if (FILE* file=fopen(residencyPath,"a")) {
+                fprintf(file,"{\"time\":%.6f,\"wallSeconds\":%.6f,\"heapDeclarationMS\":%.6f,\"readDeclarationMS\":%.6f,\"writeDeclarationMS\":%.6f,\"largestDeclarationMS\":%.6f,\"heapDeclarations\":%llu,\"readResources\":%llu,\"writeResources\":%llu,\"encoderResets\":%llu}\n",
+                        now,now-total.start,total.heapDeclarationNS/1e6,total.readDeclarationNS/1e6,
+                        total.writeDeclarationNS/1e6,total.declarationMaxNS/1e6,
+                        (unsigned long long)total.heapDeclarations,(unsigned long long)total.preciseRead,
+                        (unsigned long long)total.preciseReadWrite,(unsigned long long)total.resets);
+                fclose(file);
+            }
+        }
         char line[4096];
 		snprintf(line,sizeof(line),"{\"time\":%.6f,\"wallSeconds\":%.6f,\"calls\":%llu,\"liveLookups\":%llu,\"liveFound\":%llu,\"retainedHits\":%llu,\"absentHits\":%llu,\"registrationQueries\":%llu,\"registrationUnrelated\":%llu,\"snapshotCalls\":%llu,\"snapshotSkips\":%llu,\"snapshotWordsSkipped\":%llu,\"snapshotFilterHits\":%llu,\"snapshotDeltaHits\":%llu,\"snapshotDeltaReused\":%llu,\"snapshotColdWords\":%llu,\"snapshotCacheClears\":%llu,\"descriptorSnapshotFastHits\":%llu,\"descriptorSnapshotMisses\":%llu,\"snapshotBulkFastHits\":%llu,\"snapshotBulkResources\":%llu,\"descriptorWriteRanges\":%llu,\"descriptorUnchangedWriteRanges\":%llu,\"descriptorChangedWriteRanges\":%llu,\"encoderResets\":%llu,\"capacityClears\":%llu,\"maxUsed\":%llu,\"queuedSuperseded\":%llu,\"bindCalls\":%llu,\"inputRead\":%llu,\"inputReadWrite\":%llu,\"preciseRead\":%llu,\"preciseReadWrite\":%llu,\"collapsedRead\":%llu,\"heapDeclarations\":%llu,\"heapQueries\":%llu}\n",now,now-total.start,(unsigned long long)total.calls,(unsigned long long)total.lookups,(unsigned long long)total.liveFound,(unsigned long long)total.retainedHits,(unsigned long long)total.absentHits,(unsigned long long)total.registrationQueries,(unsigned long long)total.registrationUnrelated,(unsigned long long)total.snapshotCalls,(unsigned long long)total.snapshotSkips,(unsigned long long)total.snapshotWordsSkipped,(unsigned long long)total.snapshotFilterHits,(unsigned long long)total.snapshotDeltaHits,(unsigned long long)total.snapshotDeltaReused,(unsigned long long)total.snapshotColdWords,(unsigned long long)total.snapshotCacheClears,(unsigned long long)total.descriptorSnapshotFastHits,(unsigned long long)total.descriptorSnapshotMisses,(unsigned long long)total.snapshotBulkFastHits,(unsigned long long)total.snapshotBulkResources,(unsigned long long)total.descriptorWriteRanges,(unsigned long long)total.descriptorUnchangedWriteRanges,(unsigned long long)total.descriptorChangedWriteRanges,(unsigned long long)total.resets,(unsigned long long)total.capClears,(unsigned long long)total.maxUsed,(unsigned long long)total.queuedSuperseded,(unsigned long long)total.bindCalls,(unsigned long long)total.inputRead,(unsigned long long)total.inputReadWrite,(unsigned long long)total.preciseRead,(unsigned long long)total.preciseReadWrite,(unsigned long long)total.collapsedRead,(unsigned long long)total.heapDeclarations,(unsigned long long)total.heapQueries);
         if (records < 1024) {
@@ -1644,24 +1680,24 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 				}
 				entry.read.resources.resize(output);
 				entry.read.heaps.resize(output);
-				[encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size() stages:mtlStages];
+				measureResidencyDeclaration(resourceUseStats,statsHeapDeclarationNS,statsDeclarationMaxNS,encoder,"heap",declaredHeaps.size(),i,[&]{ [encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size() stages:mtlStages]; });
 				if (resourceUseStats) { statsCollapsedRead += collapsedResources; statsHeapDeclarations += declaredHeaps.size(); }
 				if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS graphics resources=%u heaps=%zu stage=%u\n", collapsedResources, declaredHeaps.size(), i);
 			}
 		}
 		if (!entry.retainedSnapshotReads.empty()) {
 			if (resourceUseStats) statsPreciseRead += entry.retainedSnapshotReads.size();
-			[encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead stages:mtlStages];
+			measureResidencyDeclaration(resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.retainedSnapshotReads.size(),i,[&]{ [encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead stages:mtlStages]; });
 			entry.retainedSnapshotReads.clear();
 		}
 		if (!entry.read.empty()) {
 			if (resourceUseStats) statsPreciseRead += entry.read.size();
-			[encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead stages:mtlStages];
+			measureResidencyDeclaration(resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.read.size(),i,[&]{ [encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead stages:mtlStages]; });
 			entry.read.clear();
 		}
 		if (!entry.readWrite.empty()) {
 			if (resourceUseStats) statsPreciseReadWrite += entry.readWrite.size();
-			[encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite stages:mtlStages];
+			measureResidencyDeclaration(resourceUseStats,statsWriteDeclarationNS,statsDeclarationMaxNS,encoder,"write",entry.readWrite.size(),i,[&]{ [encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite stages:mtlStages]; });
 			entry.readWrite.clear();
 		}
 	}
@@ -1700,24 +1736,24 @@ void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> enco
 			}
 			entry.read.resources.resize(output);
 			entry.read.heaps.resize(output);
-			[encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size()];
+			measureResidencyDeclaration(resourceUseStats,statsHeapDeclarationNS,statsDeclarationMaxNS,encoder,"heap",declaredHeaps.size(),0,[&]{ [encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size()]; });
 			if (resourceUseStats) { statsCollapsedRead += collapsedResources; statsHeapDeclarations += declaredHeaps.size(); }
 			if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS compute resources=%u heaps=%zu\n", collapsedResources, declaredHeaps.size());
 		}
 	}
 	if (!entry.retainedSnapshotReads.empty()) {
 		if (resourceUseStats) statsPreciseRead += entry.retainedSnapshotReads.size();
-		[encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead];
+		measureResidencyDeclaration(resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.retainedSnapshotReads.size(),0,[&]{ [encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead]; });
 		entry.retainedSnapshotReads.clear();
 	}
 	if (!entry.read.empty()) {
 		if (resourceUseStats) statsPreciseRead += entry.read.size();
-		[encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead];
+		measureResidencyDeclaration(resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.read.size(),0,[&]{ [encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead]; });
 		entry.read.clear();
 	}
 	if (!entry.readWrite.empty()) {
 		if (resourceUseStats) statsPreciseReadWrite += entry.readWrite.size();
-		[encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite];
+		measureResidencyDeclaration(resourceUseStats,statsWriteDeclarationNS,statsDeclarationMaxNS,encoder,"write",entry.readWrite.size(),0,[&]{ [encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite]; });
 		entry.readWrite.clear();
 	}
 	for (uint32_t i = 1; i < std::size(entries.elements); i++) {

@@ -309,7 +309,7 @@ void MVKCommandBuffer::submit(MVKQueueCommandBufferSubmission* cmdBuffSubmit,
 		clearPrefilledMTLCommandBuffer();
 	} else {
 		MVKCommandEncoder encoder(this);
-		encoder.encode(cmdBuffSubmit->getActiveMTLCommandBuffer(), pEncodingContext);
+		encoder.encode(cmdBuffSubmit->getActiveMTLCommandBuffer(), pEncodingContext, cmdBuffSubmit);
 	}
 
 	if ( !_supportsConcurrentExecution ) { _isExecutingNonConcurrently.clear(); }
@@ -411,9 +411,11 @@ void MVKCommandBuffer::recordBindPipeline(MVKCmdBindPipeline* mvkBindPipeline) {
 // MVKConfiguration::prefillMetalCommandBuffers is set to immediate prefilling,
 // because that would include app time between command submissions.
 void MVKCommandEncoder::encode(id<MTLCommandBuffer> mtlCmdBuff,
-							   MVKCommandEncodingContext* pEncodingContext) {
+							   MVKCommandEncodingContext* pEncodingContext,
+							   MVKQueueCommandBufferSubmission* cmdBuffSubmit) {
 	uint64_t startTime = getPerformanceTimestamp();
 
+	_cmdBuffSubmit = cmdBuffSubmit;
     beginEncoding(mtlCmdBuff, pEncodingContext);
     encodeCommands(_cmdBuffer->_head);
     endEncoding();
@@ -1137,6 +1139,18 @@ void MVKCommandEncoder::endCurrentMetalEncoding() {
 	encodeTimestampStageCounterSamples();
 }
 
+bool MVKCommandEncoder::splitMetalCommandBufferInRenderPass() {
+	if (!_cmdBuffSubmit || !isInRenderPass() || !_mtlCmdBuffer) { return false; }
+	encodeStoreActions(true);
+	endCurrentMetalEncoding();
+	if (_cmdBuffSubmit->commitActiveMTLCommandBuffer(false) != VK_SUCCESS) { return false; }
+	_mtlCmdBuffer = _cmdBuffSubmit->getActiveMTLCommandBuffer();
+	if (!_mtlCmdBuffer) { return false; }
+	beginMetalRenderPass(kMVKCommandUseRestartSubpass);
+	finalizeDrawState(kMVKGraphicsStageRasterization);
+	return _mtlRenderEncoder && getGraphicsPipeline() && getGraphicsPipeline()->hasValidMTLPipelineStates();
+}
+
 static MTLDispatchType getDispatchType(MVKCommandUse use) {
 	switch (use) {
 		case kMVKCommandUseAccumOcclusionQuery:
@@ -1279,18 +1293,25 @@ const MVKMTLBufferAllocation* MVKCommandEncoder::copyToTempMTLBufferAllocation(c
 // encoder is currently in use, creating a temporary BLIT encoder if no encoder is currently active.
 // We only encode the GPU sample if the platform allows encoding at the associated pipeline point.
 void MVKCommandEncoder::encodeGPUCounterSample(MVKGPUCounterQueryPool* mvkQryPool, uint32_t sampleIndex, MVKCounterSamplingFlags samplingPoints){
+	// Record the actual counter slot and encoder chosen by the existing path.
+	// This lets a slow resolve be matched to its producer without reading the
+	// application's buffers or introducing another GPU sample/barrier.
 	if (_mtlRenderEncoder) {
 		if (mvkIsAnyFlagEnabled(samplingPoints, MVK_COUNTER_SAMPLING_AT_DRAW)) {
+			mvkRecordEncoderWork(_mtlRenderEncoder, @"timestamp-sample", [NSString stringWithFormat:@"pool=%p;counter=%p;slot=%u;path=draw;barrier=1",mvkQryPool,mvkQryPool->getMTLCounterBuffer(),sampleIndex]);
 			[_mtlRenderEncoder sampleCountersInBuffer: mvkQryPool->getMTLCounterBuffer() atSampleIndex: sampleIndex withBarrier: YES];
 		}
 	} else if (_mtlComputeEncoder) {
 		if (mvkIsAnyFlagEnabled(samplingPoints, MVK_COUNTER_SAMPLING_AT_DISPATCH)) {
+			mvkRecordEncoderWork(_mtlComputeEncoder, @"timestamp-sample", [NSString stringWithFormat:@"pool=%p;counter=%p;slot=%u;path=dispatch;barrier=1",mvkQryPool,mvkQryPool->getMTLCounterBuffer(),sampleIndex]);
 			[_mtlComputeEncoder sampleCountersInBuffer: mvkQryPool->getMTLCounterBuffer() atSampleIndex: sampleIndex withBarrier: YES];
 		}
 	} else if (mvkIsAnyFlagEnabled(samplingPoints, MVK_COUNTER_SAMPLING_AT_BLIT)) {
+		mvkRecordEncoderWork(getMTLBlitEncoder(kMVKCommandUseRecordGPUCounterSample), @"timestamp-sample", [NSString stringWithFormat:@"pool=%p;counter=%p;slot=%u;path=blit;barrier=1",mvkQryPool,mvkQryPool->getMTLCounterBuffer(),sampleIndex]);
 		[getMTLBlitEncoder(kMVKCommandUseRecordGPUCounterSample) sampleCountersInBuffer: mvkQryPool->getMTLCounterBuffer() atSampleIndex: sampleIndex withBarrier: YES];
 	} else if (mvkIsAnyFlagEnabled(samplingPoints, MVK_COUNTER_SAMPLING_AT_DISPATCH)) {
 		// Workaround for broken 10.15 AMD driver which crashes if you try to record to an empty blit encoder
+		mvkRecordEncoderWork(getMTLComputeEncoder(kMVKCommandUseRecordGPUCounterSample), @"timestamp-sample", [NSString stringWithFormat:@"pool=%p;counter=%p;slot=%u;path=empty-dispatch;barrier=1",mvkQryPool,mvkQryPool->getMTLCounterBuffer(),sampleIndex]);
 		[getMTLComputeEncoder(kMVKCommandUseRecordGPUCounterSample) sampleCountersInBuffer: mvkQryPool->getMTLCounterBuffer() atSampleIndex: sampleIndex withBarrier: YES];
 	}
 }
@@ -1440,6 +1461,7 @@ MVKCommandEncoder::MVKCommandEncoder(MVKCommandBuffer* cmdBuffer, MVKPrefillMeta
 	, _prefillStyle(prefillStyle) {
 	_pActivatedQueries = nullptr;
 	_mtlCmdBuffer = nil;
+	_cmdBuffSubmit = nullptr;
 	_mtlRenderEncoder = nil;
 	_mtlComputeEncoder = nil;
 	_mtlComputeEncoderUse = kMVKCommandUseNone;

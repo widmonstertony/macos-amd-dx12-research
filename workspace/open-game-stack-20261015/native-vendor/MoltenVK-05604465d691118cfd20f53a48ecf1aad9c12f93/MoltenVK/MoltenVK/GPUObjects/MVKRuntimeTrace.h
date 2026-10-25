@@ -34,6 +34,19 @@ static inline bool mvkRuntimeReplayEnabled(const MVKConfiguration& config) {
     const char* value = getenv("MVK_AMD_REPLAY_FAILED_MESH");
     return value && !strcmp(value, "1") && mvkRuntimeTraceEnabled(config);
 }
+// Comma-separated, generated Metal function-name fragments.  This is a
+// diagnostic source selector, not a shader replacement: the exact source that
+// was already used to create the selected MTLFunction is copied after a normal
+// cache lookup/compile.  Keeping the selection at function granularity avoids
+// dumping tens of thousands of unrelated game shaders.
+static inline bool mvkSelectedFunctionSource(NSString* functionName) {
+    const char* value = getenv("MVK_AMD_DUMP_FUNCTION_SUBSTRINGS");
+    if (!value || !value[0] || !functionName.length) return false;
+    NSString* selectors = @(value);
+    for (NSString* selector in [selectors componentsSeparatedByString:@","])
+        if (selector.length && [functionName containsString:selector]) return true;
+    return false;
+}
 // Opt-in timing of the complete compute construction path, including shader
 // conversion/library creation and the final Metal pipeline link. A high default
 // threshold avoids per-PSO files in normal runs; 0 is useful for probe validation.
@@ -58,6 +71,9 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
         ![kind isEqualToString:@"mesh-link-differential"] &&
         ![kind isEqualToString:@"compute-failure"] &&
         ![kind isEqualToString:@"slow-compute"] &&
+        ![kind isEqualToString:@"slow-command-buffer"] &&
+        ![kind isEqualToString:@"selected-function-source"] &&
+        ![kind isEqualToString:@"geometry-index"] &&
         !([kind isEqualToString:@"gpu-timestamps"] && getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH")) &&
         !([kind isEqualToString:@"geometry-draw"] && getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH")) &&
         !([kind isEqualToString:@"render-archive"] && mvkRuntimeEnvFlagEnabled("MVK_AMD_RENDER_ARCHIVE_TRACE")) &&

@@ -457,6 +457,76 @@ static void encodeGeometryMeshDraw(MVKCommandEncoder* cmdEncoder, MVKGraphicsPip
 		mvkRecordEncoderWork(cmdEncoder->_mtlRenderEncoder, @"geometry-direct",
 			[NSString stringWithFormat:@"primitives=%u instances=%u indexed=%u", primCount, instanceCount, indexBuffer != nil]);
 	}
+	// One-shot, selector-gated diagnosis for a data-dependent geometry timeout.
+	// Copy only an explicitly requested index range through Metal before the draw;
+	// never map application-private memory on the CPU and never alter index data.
+	// Keeping this separate from the timeout handler lets the bytes survive even
+	// when the following render encoder is terminated by the GPU watchdog.
+	static std::atomic<bool> capturedSelectedIndexRange{false};
+	const char* captureElementValue = getenv("MVK_AMD_GEOMETRY_INDEX_CAPTURE_ELEMENT");
+	const char* captureCountValue = getenv("MVK_AMD_GEOMETRY_INDEX_CAPTURE_COUNT");
+	if (traceSelected && indexBuffer && !capturedSelectedIndexRange.load(std::memory_order_relaxed) &&
+		captureElementValue && captureCountValue) {
+		char* elementEnd = nullptr;
+		char* countEnd = nullptr;
+		unsigned long long firstElement = strtoull(captureElementValue, &elementEnd, 10);
+		unsigned long long elementCount = strtoull(captureCountValue, &countEnd, 10);
+		uint64_t bufferAddress = indexBuffer.gpuAddress;
+		uint64_t indexAddress = drawInfo.indexBuffer;
+		uint64_t baseOffset = indexAddress >= bufferAddress ? indexAddress - bufferAddress : UINT64_MAX;
+		uint64_t byteOffset = baseOffset;
+		uint64_t byteCount = 0;
+		bool arithmeticValid = drawInfo.indexSize > 0 && drawInfo.indexSize <= 4 &&
+			firstElement <= UINT64_MAX / uint64_t(drawInfo.indexSize) &&
+			elementCount <= UINT64_MAX / uint64_t(drawInfo.indexSize);
+		if (arithmeticValid) {
+			uint64_t relativeOffset = firstElement * uint64_t(drawInfo.indexSize);
+			byteCount = elementCount * uint64_t(drawInfo.indexSize);
+			arithmeticValid = baseOffset <= UINT64_MAX - relativeOffset;
+			if (arithmeticValid) byteOffset = baseOffset + relativeOffset;
+		}
+		bool boundsValid = arithmeticValid && elementEnd && !*elementEnd && countEnd && !*countEnd &&
+			elementCount && byteOffset <= indexBuffer.length && byteCount <= indexBuffer.length - byteOffset;
+		bool expected = false;
+		if (boundsValid && capturedSelectedIndexRange.compare_exchange_strong(expected, true)) {
+			id<MTLBuffer> readback = [indexBuffer.device newBufferWithLength:NSUInteger(byteCount)
+				options:MTLResourceStorageModeShared];
+			cmdEncoder->encodeStoreActions(true);
+			id<MTLBlitCommandEncoder> blit = cmdEncoder->getMTLBlitEncoder(kMVKCommandUseCopyBuffer);
+			[blit copyFromBuffer:indexBuffer sourceOffset:NSUInteger(byteOffset)
+				toBuffer:readback destinationOffset:0 size:NSUInteger(byteCount)];
+			NSString* pipelineLabel = [mvkPipelineTraceLabel(cmdEncoder->getMtlGraphics()._pipeline) copy];
+			uint32_t indexSize = uint32_t(drawInfo.indexSize);
+			[cmdEncoder->_mtlCmdBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+				NSData* bytes = [NSData dataWithBytes:readback.contents length:NSUInteger(byteCount)];
+				NSString* path = [@(getGlobalMVKConfig().shaderDumpDir)
+					stringByAppendingPathComponent:[NSString stringWithFormat:@"geometry-index-%d-%llu-%llu.bin",
+						getpid(), firstElement, elementCount]];
+				BOOL wrote = [bytes writeToFile:path options:NSDataWritingAtomic error:nil];
+				uint64_t minimum = UINT64_MAX, maximum = 0, restartCount = 0;
+				const uint8_t* data = static_cast<const uint8_t*>(bytes.bytes);
+				for (uint64_t idx = 0; idx < elementCount; ++idx) {
+					uint64_t value = indexSize == 1 ? data[idx] :
+						(indexSize == 2 ? reinterpret_cast<const uint16_t*>(data)[idx] :
+						 reinterpret_cast<const uint32_t*>(data)[idx]);
+					minimum = std::min(minimum, value); maximum = std::max(maximum, value);
+					uint64_t restart = indexSize == 1 ? 0xffu : (indexSize == 2 ? 0xffffu : 0xffffffffu);
+					restartCount += value == restart;
+				}
+				mvkWriteRuntimeTrace(getGlobalMVKConfig(), @"geometry-index", @{
+					@"pipeline":pipelineLabel ?: @"", @"firstElement":@(firstElement),
+					@"elementCount":@(elementCount), @"indexSize":@(indexSize),
+					@"sourceByteOffset":@(byteOffset), @"byteCount":@(byteCount),
+					@"minimum":@(minimum), @"maximum":@(maximum), @"restartCount":@(restartCount),
+					@"path":path, @"writeSucceeded":@(wrote), @"commandBufferStatus":@(cb.status),
+					@"commandBufferError":cb.error.localizedDescription ?: @""});
+				[pipelineLabel release];
+			}];
+			[readback release];
+			cmdEncoder->beginMetalRenderPass(kMVKCommandUseRestartSubpass);
+			cmdEncoder->finalizeDrawState(kMVKGraphicsStageRasterization);
+		}
+	}
 	auto draw = [&](uint32_t xfbMode, const MVKMTLBufferAllocation* prims) {
 		id<MTLRenderCommandEncoder> mtlRendEnc = cmdEncoder->_mtlRenderEncoder;
 		if (indexBuffer) { [mtlRendEnc useResource: indexBuffer usage: MTLResourceUsageRead stages: MTLRenderStageObject]; }
@@ -467,6 +537,18 @@ static void encodeGeometryMeshDraw(MVKCommandEncoder* cmdEncoder, MVKGraphicsPip
 		const bool bounded = cmdEncoder->getDevice()->getPhysicalDevice()->isAMDHardware();
 		const uint32_t batchLimit = bounded ? std::min<uint32_t>(256, primCount) : primCount;
 		const uint32_t instanceLimit = bounded ? std::max<uint32_t>(1, 256 / batchLimit) : instanceCount;
+		static const uint32_t nativeCommandBufferBatchLimit = [] {
+			const char* value = getenv("MVK_AMD_GEOMETRY_COMMAND_BUFFER_BATCH_LIMIT");
+			if (!value || !value[0]) return 0u;
+			char* end = nullptr;
+			unsigned long parsed = strtoul(value, &end, 10);
+			return end && !*end && parsed >= 1 && parsed <= 1024 ? uint32_t(parsed) : 0u;
+		}();
+		uint32_t batchesInNativeCommandBuffer = 0;
+		mvkRecordEncoderWork(mtlRendEnc, @"geometry-grid",
+			[NSString stringWithFormat:@"pipeline=%@;xfbMode=%u;primitives=%u;instances=%u;primitiveBatch=%u;instanceBatch=%u;commandBufferBatchLimit=%u",
+			 mvkPipelineTraceLabel(cmdEncoder->getMtlGraphics()._pipeline), xfbMode,
+			 primCount, instanceCount, batchLimit, instanceLimit, nativeCommandBufferBatchLimit]);
 		for (uint64_t firstInstance = 0; firstInstance < instanceCount; ) {
 		 uint32_t instances = std::min<uint32_t>(instanceLimit, instanceCount - uint32_t(firstInstance));
 		 for (uint64_t first = 0; first < primCount; ) {
@@ -476,10 +558,31 @@ static void encodeGeometryMeshDraw(MVKCommandEncoder* cmdEncoder, MVKGraphicsPip
 			batch.primitiveCount = primCount;
 			batch.instanceBase = uint32_t(firstInstance);
 			[mtlRendEnc setObjectBytes: &batch length: sizeof(batch) atIndex: pipeline->getDrawInfoBufferIndex()];
+			if (mvkGPUCounterAllDraws()) {
+				mvkRecordEncoderWorkImpl(mtlRendEnc, @"geometry-batch",
+					[NSString stringWithFormat:@"pipeline=%@;xfbMode=%u;primitiveBase=%u;primitiveCount=%u;totalPrimitives=%u;instanceBase=%u;instances=%u",
+					 mvkPipelineTraceLabel(cmdEncoder->getMtlGraphics()._pipeline), xfbMode,
+					 batch.primitiveBase, count, primCount, batch.instanceBase, instances]);
+			}
 			[mtlRendEnc drawMeshThreadgroups: MTLSizeMake(count, instances, 1)
 				 threadsPerObjectThreadgroup: MTLSizeMake(1, 1, 1)
 				   threadsPerMeshThreadgroup: MTLSizeMake(1, 1, 1)];
 			first += count;
+			++batchesInNativeCommandBuffer;
+			bool moreWork = first < primCount || firstInstance + instances < instanceCount;
+			if (xfbMode == 0 && nativeCommandBufferBatchLimit && moreWork &&
+				batchesInNativeCommandBuffer >= nativeCommandBufferBatchLimit) {
+				mvkRecordEncoderWork(mtlRendEnc, @"geometry-cb-split",
+					[NSString stringWithFormat:@"pipeline=%@;xfbMode=%u;nextPrimitive=%llu;totalPrimitives=%u;instanceBase=%llu;batches=%u",
+					 mvkPipelineTraceLabel(cmdEncoder->getMtlGraphics()._pipeline), xfbMode,
+					 (unsigned long long)first, primCount, (unsigned long long)firstInstance,
+					 batchesInNativeCommandBuffer]);
+				if (!cmdEncoder->splitMetalCommandBufferInRenderPass()) { return; }
+				mtlRendEnc = cmdEncoder->_mtlRenderEncoder;
+				if (indexBuffer) { [mtlRendEnc useResource:indexBuffer usage:MTLResourceUsageRead stages:MTLRenderStageObject]; }
+				bindGeometryXfb(cmdEncoder, pipeline, xfbMode, prims);
+				batchesInNativeCommandBuffer = 0;
+			}
 		 }
 		 firstInstance += instances;
 		}
@@ -666,6 +769,12 @@ static void encodeGeometryIndirectDraws(MVKCommandEncoder* cmdEncoder, MVKGraphi
 		cmdEncoder->reportMessage(MVK_CONFIG_LOG_LEVEL_ERROR, "Transform feedback is not captured by indirect draws with a geometry shader.");
 	}
 	bindGeometryXfb(cmdEncoder, pipeline, 0, nullptr);
+	mvkRecordEncoderWork(mtlRendEnc, @"geometry-indirect-grid",
+		[NSString stringWithFormat:@"pipeline=%@;draws=%u;batchesPerDraw=%u;encodedDraws=%u;parameterBuffer=%p;dispatchOffset=%lu;drawInfoOffset=%llu;drawInfoStride=%llu",
+		 mvkPipelineTraceLabel(cmdEncoder->getMtlGraphics()._pipeline), drawCount,
+		 params.batchCount, encodedDrawCount, tempBuff->_mtlBuffer,
+		 (unsigned long)tempBuff->_offset, (unsigned long long)drawInfoOffset,
+		 (unsigned long long)drawInfoStride]);
 	for (uint32_t drawIdx = 0; drawIdx < encodedDrawCount; drawIdx++) {
 		[mtlRendEnc setObjectBuffer: tempBuff->_mtlBuffer
 							 offset: tempBuff->_offset + drawInfoOffset + drawInfoStride * drawIdx

@@ -21,13 +21,22 @@ inline std::atomic<unsigned>& mvkGPUTimestampInFlight() { static std::atomic<uns
 inline bool mvkAllocateGPUTimestampBuffer(NSMutableDictionary* record, id<MTLDevice> device) {
     if (record[@"gpuCounterBuffer"] || !device || !mvkGPUTimestampArmed()) return record[@"gpuCounterBuffer"] != nil;
     auto& n=mvkGPUTimestampInFlight();
-    if(n.fetch_add(1)>=64) { n.fetch_sub(1); return false; }
+    // A full draw/batch trace is intentionally much larger than the ordinary
+    // pipeline trace.  Keep only one such command buffer instrumented at a
+    // time so the diagnostic cannot multiply its shared-memory and Objective-C
+    // event-array cost across the game's deep queue backlog.
+    const unsigned inFlightLimit = mvkGPUCounterAllDraws() ? 1 : 64;
+    if(n.fetch_add(1)>=inFlightLimit) { n.fetch_sub(1); return false; }
     if (![device supportsCounterSampling:MTLCounterSamplingPointAtDrawBoundary] ||
         ![device supportsCounterSampling:MTLCounterSamplingPointAtDispatchBoundary]) { n.fetch_sub(1);return false; }
     id<MTLCounterSet>set=nil;
     for(id<MTLCounterSet>s in device.counterSets)if([s.name isEqualToString:MTLCommonCounterSetTimestamp]){set=s;break;}
     if(!set){n.fetch_sub(1);return false;}
-    const NSUInteger sampleCapacity = mvkGPUCounterAllDraws() ? 512 : 128;
+    // The first internal geometry-batch capture filled 512 samples after only
+    // 22.9 ms of a command buffer that ultimately ran for about seven seconds.
+    // 16K samples keep the capture bounded while covering the complete failing
+    // buffer in one run instead of repeatedly guessing a later pipeline hash.
+    const NSUInteger sampleCapacity = mvkGPUCounterAllDraws() ? 16384 : 128;
     auto desc=[MTLCounterSampleBufferDescriptor new];desc.counterSet=set;desc.storageMode=MTLStorageModeShared;desc.sampleCount=sampleCapacity;
     NSError* error=nil;auto buffer=[device newCounterSampleBufferWithDescriptor:desc error:&error];[desc release];
     if(!buffer){n.fetch_sub(1);return false;}
@@ -59,7 +68,8 @@ inline void mvkSampleGPUTimestamp(NSMutableDictionary* record, id<MTLCommandEnco
     bool render=[encoder respondsToSelector:@selector(setRenderPipelineState:)];
     bool compute=[encoder respondsToSelector:@selector(setComputePipelineState:)];
     if(!render&&!compute)return;
-    const bool selectedDraw = mvkGPUCounterAllDraws() && [kind isEqualToString:@"draw"];
+    const bool selectedDraw = mvkGPUCounterAllDraws() &&
+        ([kind isEqualToString:@"draw"] || [kind isEqualToString:@"geometry-batch"]);
     if(![kind containsString:@"pipeline"]&&![kind isEqualToString:@"encoder-end"]&&
        ![kind isEqualToString:@"geometry-tail"]&&!selectedDraw)return;
     @synchronized(record){

@@ -253,7 +253,8 @@ public:
 	MVKVulkanAPIObject* getVulkanAPIObject() override { return _cmdBuffer->getVulkanAPIObject(); };
 
 	/** Encode commands from the command buffer onto the Metal command buffer. */
-	void encode(id<MTLCommandBuffer> mtlCmdBuff, MVKCommandEncodingContext* pEncodingContext);
+	void encode(id<MTLCommandBuffer> mtlCmdBuff, MVKCommandEncodingContext* pEncodingContext,
+	            MVKQueueCommandBufferSubmission* cmdBuffSubmit = nullptr);
     
     void beginEncoding(id<MTLCommandBuffer> mtlCmdBuff, MVKCommandEncodingContext* pEncodingContext);
     void encodeCommands(MVKCommand* command);
@@ -356,6 +357,13 @@ public:
 
 	/** Ends encoding operations on the current Metal command encoder if it is a rendering encoder. */
 	void endMetalRenderEncoding();
+
+	/**
+	 * Stores the active attachments, commits the current native command buffer,
+	 * and resumes the same Vulkan render pass on the next queue-ordered Metal
+	 * command buffer. Used only by the opt-in AMD geometry watchdog workaround.
+	 */
+	bool splitMetalCommandBufferInRenderPass();
 
 	/** 
 	 * Returns the current Metal compute encoder for the specified use,
@@ -496,6 +504,9 @@ public:
 
 	/** The current Metal command buffer. */
 	id<MTLCommandBuffer> _mtlCmdBuffer;
+
+	/** Queue submission that owns the active Metal command buffer, if deferred encoding is in use. */
+	MVKQueueCommandBufferSubmission* _cmdBuffSubmit;
 
 	/** The current Metal render encoder. */
 	id<MTLRenderCommandEncoder> _mtlRenderEncoder;

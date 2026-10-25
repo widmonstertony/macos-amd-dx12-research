@@ -206,6 +206,36 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
         mvkRecordDependencyPhase(mtlCB, @"completed");
         NSDictionary* counterRecord=objc_getAssociatedObject(mtlCB,mvkDependencyKey());
         if(counterRecord[@"gpuCounterBuffer"])mvkWriteRuntimeTrace(getMVKConfig(), @"gpu-timestamps", mvkCommandBufferDependencies(mtlCB));
+		// A downstream present buffer may be the command that reports the
+		// watchdog even when the expensive upstream buffer completed normally.
+		// Preserve the bounded work ring for any unusually long successful
+		// buffer before mvkEndDependencyTrace() removes it from the registry.
+		// This is diagnostic only: it never changes ordering or completion.
+		static const double slowTraceMilliseconds = [] {
+			const char* value = getenv("MVK_AMD_SLOW_COMMAND_BUFFER_TRACE_MS");
+			if (!value || !value[0]) { return 0.0; }
+			char* end = nullptr;
+			double parsed = strtod(value, &end);
+			return end && !*end && parsed >= 1.0 && parsed <= 60000.0 ? parsed : 0.0;
+		}();
+		double gpuMilliseconds = (mtlCB.GPUStartTime > 0.0 && mtlCB.GPUEndTime >= mtlCB.GPUStartTime)
+			? (mtlCB.GPUEndTime - mtlCB.GPUStartTime) * 1000.0 : 0.0;
+		if (slowTraceMilliseconds > 0.0 && gpuMilliseconds >= slowTraceMilliseconds) {
+			NSMutableDictionary* slow = [mvkCommandBufferDependencies(mtlCB) mutableCopy];
+			slow[@"gpuDurationMilliseconds"] = @(gpuMilliseconds);
+			slow[@"nativeStatus"] = @(mtlCB.status);
+			slow[@"nativeError"] = mtlCB.error.localizedDescription ?: @"";
+			slow[@"thresholdMilliseconds"] = @(slowTraceMilliseconds);
+			slow[@"GPUStartTime"] = @(mtlCB.GPUStartTime);
+			slow[@"GPUEndTime"] = @(mtlCB.GPUEndTime);
+			MVKQueueTimingRecord* timing = objc_getAssociatedObject(mtlCB, mvkQueueTimingKey());
+			if (timing) {
+				slow[@"hostEncodingMilliseconds"] = @((timing->committed - timing->created) * 1000.0);
+				slow[@"commitToGPUStartMilliseconds"] = @((mtlCB.GPUStartTime - timing->committed) * 1000.0);
+			}
+			mvkWriteRuntimeTrace(getMVKConfig(), @"slow-command-buffer", slow);
+			[slow release];
+		}
 		handleMTLCommandBufferError(mtlCB);
 		if (mvkDependencyTraceEnabled() && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))
 			mvkWriteRuntimeTrace(getMVKConfig(), @"queue-dependencies", mvkCommandBufferDependencies(mtlCB));

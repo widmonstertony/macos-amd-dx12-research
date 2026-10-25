@@ -52,6 +52,7 @@ inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, ui
     NSNumber* serial = @(state.sequence.fetch_add(1));
     NSMutableDictionary* record = [@{@"submission":serial, @"queueFamily":@(family),
         @"queueIndex":@(index), @"createdTime":@([NSDate timeIntervalSinceReferenceDate]),
+        @"nativeCommandBufferLabel":cb.label ?: @"",
         @"logicalDevice":[NSString stringWithFormat:@"%p",device],
         @"logicalQueue":[NSString stringWithFormat:@"%p",queue],
         @"nativeQueue":[NSString stringWithFormat:@"%p",cb.commandQueue],
@@ -139,6 +140,7 @@ inline NSDictionary* mvkSnapshotDependencyRecord(NSDictionary* record) {
         }
         return @{@"logicalDevice":record[@"logicalDevice"], @"logicalQueue":record[@"logicalQueue"],
             @"nativeQueue":record[@"nativeQueue"], @"phases":[NSArray arrayWithArray:record[@"phases"]],
+            @"nativeCommandBufferLabel":record[@"nativeCommandBufferLabel"] ?: @"",
             @"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
             @"queueIndex":record[@"queueIndex"], @"createdTime":record[@"createdTime"],
             @"events":events, @"truncatedEvents":record[@"truncatedEvents"],

@@ -551,6 +551,29 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
         }
         if (renderShard) mvkSetFunctionRecipe(result.getMTLFunction(), safeMesh ? [@"safe-mesh-v1|" stringByAppendingString:@(hex)] : @(hex));
     }
+	// Copy only explicitly selected generated sources.  This runs after the
+	// ordinary function has been obtained and never recompiles, substitutes, or
+	// changes its options.  It therefore works for warm pipeline-cache hits too.
+	id<MTLFunction> selectedFunction = result.getMTLFunction();
+	if (mvkLib && mvkSelectedFunctionSource(selectedFunction.name)) {
+		std::string selectedSource;
+		mvkLib->decompressMSL(selectedSource);
+		size_t selectedHash = mvkHash(selectedSource.data(), selectedSource.size());
+		NSString* selectedPath = [@(getMVKConfig().shaderDumpDir)
+			stringByAppendingPathComponent:[NSString stringWithFormat:@"selected-source-%016zx-%016zx-%u.metal",
+				_key.codeHash, selectedHash, (unsigned)pShaderConfig->options.entryPointStage]];
+		BOOL existed = [[NSFileManager defaultManager] fileExistsAtPath:selectedPath];
+		if (!existed && [[NSData dataWithBytes:selectedSource.data() length:selectedSource.size()]
+			writeToFile:selectedPath options:NSDataWritingAtomic error:nil]) {
+			mvkWriteRuntimeTrace(getMVKConfig(), @"selected-function-source", @{
+				@"function":mvkTraceFunction(selectedFunction),
+				@"shader":[NSString stringWithFormat:@"%016zx", _key.codeHash],
+				@"sourceHash":[NSString stringWithFormat:@"%016zx", selectedHash],
+				@"sourceBytes":@(selectedSource.size()), @"path":selectedPath,
+				@"selectedConfig":mvkTraceConfig(*pShaderConfig),
+				@"copiedAfterNormalFunctionCreation":@YES});
+		}
+	}
 	if ((trace || replaySource || mvkGPUTimeoutTraceEnabled()) && mvkLib) {
 		std::string source;
 		mvkLib->decompressMSL(source);

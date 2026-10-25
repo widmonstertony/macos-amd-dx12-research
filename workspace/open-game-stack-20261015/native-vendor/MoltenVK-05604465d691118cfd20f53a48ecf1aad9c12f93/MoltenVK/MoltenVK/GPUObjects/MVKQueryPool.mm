@@ -23,6 +23,7 @@
 #include "MVKCommandEncodingPool.h"
 #include "MVKOSExtensions.h"
 #include "MVKFoundation.h"
+#include "MVKQueueDependencyTrace.h"
 #include <sys/mman.h>
 
 using namespace std;
@@ -212,6 +213,13 @@ void MVKQueryPool::encodeDirectCopyResults(MVKCommandEncoder* cmdEncoder,
 	id<MTLBlitCommandEncoder> mtlBlitCmdEnc = cmdEncoder->getMTLBlitEncoder(kMVKCommandUseCopyQueryPoolResults);
 	NSUInteger srcOffset;
 	id<MTLBuffer> srcBuff = getResultBuffer(cmdEncoder, firstQuery, queryCount, srcOffset);
+	mvkRecordEncoderWork(mtlBlitCmdEnc, @"query-copy",
+		[NSString stringWithFormat:@"pool=%p;first=%u;count=%u;stride=%llu;bytes=%llu;src=%p;srcOffset=%lu;srcLength=%lu;dst=%p;dstOffset=%llu;dstLength=%lu",
+		 this, firstQuery, queryCount, (unsigned long long)stride,
+		 (unsigned long long)(stride * queryCount), srcBuff, (unsigned long)srcOffset,
+		 (unsigned long)srcBuff.length, destBuffer->getMTLBuffer(),
+		 (unsigned long long)(destBuffer->getMTLBufferOffset() + destOffset),
+		 (unsigned long)destBuffer->getMTLBuffer().length]);
 	[mtlBlitCmdEnc copyFromBuffer: srcBuff
 					 sourceOffset: srcOffset
 						 toBuffer: destBuffer->getMTLBuffer()
@@ -432,6 +440,12 @@ void MVKTimestampQueryPool::encodeDirectCopyResults(MVKCommandEncoder* cmdEncode
 													VkDeviceSize stride) {
 	if (_mtlCounterBuffer) {
 		id<MTLBlitCommandEncoder> mtlBlitCmdEnc = cmdEncoder->getMTLBlitEncoder(kMVKCommandUseCopyQueryPoolResults);
+		mvkRecordEncoderWork(mtlBlitCmdEnc, @"timestamp-resolve",
+			[NSString stringWithFormat:@"pool=%p;counter=%p;first=%u;count=%u;bytes=%llu;dst=%p;dstOffset=%llu;dstLength=%lu;path=direct",
+			 this, _mtlCounterBuffer, firstQuery, queryCount,
+			 (unsigned long long)(queryCount * kMVKQuerySlotSizeInBytes), destBuffer->getMTLBuffer(),
+			 (unsigned long long)(destBuffer->getMTLBufferOffset() + destOffset),
+			 (unsigned long)destBuffer->getMTLBuffer().length]);
 		[mtlBlitCmdEnc resolveCounters: _mtlCounterBuffer
 							   inRange: NSMakeRange(firstQuery,  queryCount)
 					 destinationBuffer: destBuffer->getMTLBuffer()
@@ -456,6 +470,11 @@ id<MTLComputeCommandEncoder> MVKTimestampQueryPool::encodeComputeCopyResults(MVK
 		// MTLBlitCommandEncoder, before creating the compute encoder and set that temp buffer into it.
 		const MVKMTLBufferAllocation* tempBuff = cmdEncoder->getTempMTLBuffer(queryCount * _queryElementCount * sizeof(uint64_t));
 		id<MTLBlitCommandEncoder> mtlBlitCmdEnc = cmdEncoder->getMTLBlitEncoder(kMVKCommandUseCopyQueryPoolResults);
+		mvkRecordEncoderWork(mtlBlitCmdEnc, @"timestamp-resolve",
+			[NSString stringWithFormat:@"pool=%p;counter=%p;first=%u;count=%u;bytes=%llu;dst=%p;dstOffset=%lu;dstLength=%lu;path=compute",
+			 this, _mtlCounterBuffer, firstQuery, queryCount,
+			 (unsigned long long)(queryCount * _queryElementCount * sizeof(uint64_t)), tempBuff->_mtlBuffer,
+			 (unsigned long)tempBuff->_offset, (unsigned long)tempBuff->_mtlBuffer.length]);
 		[mtlBlitCmdEnc resolveCounters: _mtlCounterBuffer
 							   inRange: NSMakeRange(firstQuery,  queryCount)
 					 destinationBuffer: tempBuff->_mtlBuffer

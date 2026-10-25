@@ -355,6 +355,8 @@ struct MVKUseResourceHelper {
 	uint64_t statsBindCalls=0, statsInputRead=0, statsInputReadWrite=0;
 	uint64_t statsPreciseRead=0, statsPreciseReadWrite=0;
 	uint64_t statsCollapsedRead=0, statsHeapDeclarations=0, statsHeapQueries=0;
+	uint64_t statsHeapDeclarationNS=0, statsReadDeclarationNS=0, statsWriteDeclarationNS=0;
+	uint64_t statsDeclarationMaxNS=0;
 	void publishResourceUseStats(bool encoderReset);
     uint64_t pendingBatchGeneration = 1;
     uint64_t statsQueuedSuperseded = 0;

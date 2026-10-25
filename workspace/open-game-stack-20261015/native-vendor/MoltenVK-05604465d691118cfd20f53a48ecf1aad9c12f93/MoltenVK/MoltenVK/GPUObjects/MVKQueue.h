@@ -265,6 +265,7 @@ public:
 
 protected:
 	friend MVKCommandBuffer;
+	friend MVKCommandEncoder;
 
 	id<MTLCommandBuffer> getActiveMTLCommandBuffer();
 	void setActiveMTLCommandBuffer(id<MTLCommandBuffer> mtlCmdBuff);

@@ -1,3 +1,5 @@
+> 2026-10-25 CPU 候选：已修描述符脏区间中间未变化身份的重复扫描；独立集合/真实 GPU/原 Wine 回归通过，已部署，实际游戏性能待验证。详见 [CPU fix / CPU 修复](CPU-DESCRIPTOR-FIX-2026-10-25.md)。
+
 > 2026-10-25：补齐查询/几何/CPU 资源声明耗时诊断，并提供经用户授权的 Wine PID AppleScript 控制。实际游戏仍卡顿；未修复电脑插件内部匹配，未验证 FSR3。详见 [诊断检查点 / Diagnostic checkpoint](DIAGNOSTICS-2026-10-25.md)。
 > Add query/geometry/host-residency attribution and an explicitly authorized Wine PID control fallback. Game performance, proprietary plugin matching and FSR3 remain unresolved.
 

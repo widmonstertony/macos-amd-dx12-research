@@ -2156,8 +2156,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDescriptorUseCache.h",
-      "bytes": 26756,
-      "sha256": "44c4d2648786a23c74b0056dd165696873334eb4ea860a2a5b55876c22ea99d0",
+      "bytes": 28682,
+      "sha256": "6179887c4c5a3e8c392aaf6848af3a9cfa190b933edfcb45b15bbb0f936381b4",
       "executable": false
     },
     {
@@ -33730,6 +33730,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/descriptor_pre_interior_filter.h",
+      "bytes": 26756,
+      "sha256": "44c4d2648786a23c74b0056dd165696873334eb4ea860a2a5b55876c22ea99d0",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/crash_metadata_probe.c",
       "bytes": 2517,
       "sha256": "bcf0beeb5e5a8b959d714d45a2b9d5d2ea9515096cc920b16db2d3990e1567e2",
@@ -33767,14 +33773,20 @@
     },
     {
       "path": "open-game-stack-20261015/src/descriptor_clean_blocks_gpu.mm",
-      "bytes": 5549,
-      "sha256": "3992e6bb2c406834e92e59772a866d1f4901dddf753bbd0ea60f4b6ec8b6cbe4",
+      "bytes": 5760,
+      "sha256": "8c40eecca49e756865c088998012f76e0c18df2e93d168aa90c6e7c660f76fc7",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/src/descriptor_clean_blocks_paired.mm",
       "bytes": 3047,
       "sha256": "ffe7b802134f8e0d815475aed1c9a2e428d565a010a8273865314dcd83ae5edd",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/descriptor_interior_blocks_control.mm",
+      "bytes": 3390,
+      "sha256": "fb702e156bf8eef4f4b0c127d1100777cc42c7d31a4ad179861cd261e4675ae0",
       "executable": false
     },
     {
@@ -34596,6 +34608,12 @@
       "path": "open-game-stack-20261015/tools/qualify_crash_reporter.py",
       "bytes": 3320,
       "sha256": "82c7cec4be8276dd16f3555d0e8dd3247c94ac3897dc380a4cdb5a8865fb3ea0",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_descriptor_interior.py",
+      "bytes": 2212,
+      "sha256": "251b46cead03c436263372c9ee45f13dab301770089fe882908776475e8c46ef",
       "executable": false
     },
     {
@@ -70382,6 +70400,6 @@
     "sourceFilesUpdatedThisCheckpoint": 54
   },
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
-  "latestSourceUpdateUTC": "2026-10-25T08:20:33.937570+00:00",
+  "latestSourceUpdateUTC": "2026-10-25T08:47:19.135177+00:00",
   "lastSourceOnlyUpdateUTC": "2026-10-22T02:19:58.857641+00:00"
 }

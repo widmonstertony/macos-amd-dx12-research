@@ -354,6 +354,12 @@ public:
         for (auto range : entry.dirty) dirtySlots += range.second-range.first;
         bool trackDelta = entry.snapshot && dirtySlots <= 4096;
         std::unordered_set<id<MTLResource>> added, removed;
+        if constexpr (Contiguous) {
+            // Keep the original scalar updater/codegen for dense and strided
+            // tables. A separate bounded pre-pass only removes proven-identical
+            // interior blocks from coalesced sparse dirty ranges.
+            trimUnchangedInterior(src,entry.slots,entry.dirty);
+        }
         for (auto range : entry.dirty) {
             uint32_t originalCount = range.second-range.first;
             if constexpr (Contiguous) {
@@ -440,6 +446,41 @@ public:
                 (unsigned long long)_scanned, (unsigned long long)_emitted);
     }
 private:
+    using DirtyRange = std::pair<uint32_t,uint32_t>;
+    [[gnu::noinline]] static void trimUnchangedInterior(const char* src, const Resources& slots,
+                                                       std::vector<DirtyRange>& dirty) {
+        bool sparse = false;
+        for (auto range : dirty) {
+            uint32_t length=range.second-range.first;
+            if (length < 4096) continue;
+            uint32_t sample=range.first+length/4;
+            if (!memcmp(src+size_t(sample)*sizeof(id),slots.data()+sample,32*sizeof(id))) {
+                sparse=true;
+                break;
+            }
+        }
+        if (!sparse) return;
+        std::vector<DirtyRange> filtered;
+        filtered.reserve(dirty.size()+8);
+        for (auto range : dirty) {
+            if (range.second-range.first < 256) {
+                filtered.push_back(range);
+                continue;
+            }
+            for (uint32_t i=range.first; i<range.second;) {
+                uint32_t end=i+std::min<uint32_t>(32,range.second-i);
+                if (memcmp(src+size_t(i)*sizeof(id),slots.data()+i,size_t(end-i)*sizeof(id))) {
+                    if (!filtered.empty() && filtered.back().second==i) filtered.back().second=end;
+                    else filtered.emplace_back(i,end);
+                    // Metadata remains bounded. Abort without mutating the
+                    // original ranges if a table is more fragmented than this.
+                    if (filtered.size() > 256) return;
+                }
+                i=end;
+            }
+        }
+        dirty.swap(filtered);
+    }
     static constexpr size_t kWriteStripeCount = 64;
     static constexpr uintptr_t kWriteStripeGranule = 64;
     bool usesWriteShards() const {

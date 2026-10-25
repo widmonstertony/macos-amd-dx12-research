@@ -18,7 +18,9 @@ int main(int argc,const char**argv){@autoreleasepool{try{
    if(pass==2)slots[17]=slots[64]=next;
    if(pass==4)slots[17]=slots[64]=nil;
    if(pass==5)slots.back()=next;
-   if(pass==6)slots[0]=input;
+   // Change both interval edges and an interior block together. A block-skip
+   // implementation must not trim past either change or omit the middle one.
+   if(pass==6){slots[0]=input;slots[1]=next;slots[250001]=other;slots.back()=other;}
    if(pass==7)std::swap(slots[0],slots.back());
   }
   auto snapshot=cache.resources((const char*)slots.data(),slots.size(),sizeof(id));

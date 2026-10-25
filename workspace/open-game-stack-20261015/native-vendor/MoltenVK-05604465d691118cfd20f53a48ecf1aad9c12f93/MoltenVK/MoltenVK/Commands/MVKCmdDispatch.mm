@@ -25,6 +25,10 @@
 #include "MVKQueueDependencyTrace.h"
 #include "mvk_datatypes.hpp"
 
+static uint64_t mvkNextDispatchTraceID() {
+    static std::atomic<uint64_t> sequence{0};
+    return sequence.fetch_add(1, std::memory_order_relaxed) + 1;
+}
 
 #pragma mark -
 #pragma mark MVKCmdDispatch
@@ -49,7 +53,9 @@ void MVKCmdDispatch::encode(MVKCommandEncoder* cmdEncoder) {
 	cmdEncoder->finalizeDispatchState();	// Ensure all updated state has been submitted to Metal
 	id<MTLComputeCommandEncoder> mtlEncoder = cmdEncoder->getMTLComputeEncoder(kMVKCommandUseDispatch);
 	auto* pipeline = cmdEncoder->getComputePipeline();
+	uint64_t dispatchID = 0;
 	if (mvkEncoderWorkTraceEnabled()) {
+		dispatchID = mvkNextDispatchTraceID();
 		auto& bits = cmdEncoder->getMtlCompute()._exists;
 		uint32_t buffers = 0, textures = 0, samplers = 0, sets = 0;
 		for (auto word : bits.buffers.setBitsList()) for (auto bit : word) { (void)bit; ++buffers; }
@@ -58,8 +64,9 @@ void MVKCmdDispatch::encode(MVKCommandEncoder* cmdEncoder) {
 		for (auto word : bits.descriptorSetData.setBitsList()) for (auto bit : word) { (void)bit; ++sets; }
 		MTLSize threads = pipeline->getThreadgroupSize();
 		mvkRecordEncoderWorkImpl(mtlEncoder, @"dispatch", [NSString stringWithFormat:
-			@"pipeline=%@;groups=%ux%ux%u;threads=%lux%lux%lu;buffers=%u;textures=%u;samplers=%u;sets=%u",
-			cmdEncoder->getMtlCompute()._pipeline.label ?: @"", _groupCountX, _groupCountY, _groupCountZ,
+			@"dispatchID=%llu;mode=direct;pipeline=%@;nativePSO=%p;base=%ux%ux%u;groups=%ux%ux%u;threads=%lux%lux%lu;buffers=%u;textures=%u;samplers=%u;sets=%u",
+			(unsigned long long)dispatchID, cmdEncoder->getMtlCompute()._pipeline.label ?: @"", (void*)cmdEncoder->getMtlCompute()._pipeline,
+			_baseGroupX, _baseGroupY, _baseGroupZ, _groupCountX, _groupCountY, _groupCountZ,
 			(unsigned long)threads.width, (unsigned long)threads.height, (unsigned long)threads.depth,
 			buffers, textures, samplers, sets]);
 	}
@@ -70,6 +77,11 @@ void MVKCmdDispatch::encode(MVKCommandEncoder* cmdEncoder) {
 	}
 	[mtlEncoder dispatchThreadgroups: mtlThreadgroupCount.size
 			   threadsPerThreadgroup: pipeline->getThreadgroupSize()];
+	if (dispatchID && mvkGPUTimestampArmed()) {
+		mvkRecordEncoderWorkImpl(mtlEncoder, @"dispatch-end", [NSString stringWithFormat:
+			@"dispatchID=%llu;mode=direct;pipeline=%@;nativePSO=%p", (unsigned long long)dispatchID,
+			cmdEncoder->getMtlCompute()._pipeline.label ?: @"", (void*)cmdEncoder->getMtlCompute()._pipeline]);
+	}
 }
 
 
@@ -87,8 +99,26 @@ VkResult MVKCmdDispatchIndirect::setContent(MVKCommandBuffer* cmdBuff, VkBuffer 
 void MVKCmdDispatchIndirect::encode(MVKCommandEncoder* cmdEncoder) {
 	if ( !cmdEncoder->getComputePipeline() ) { return; }	// No valid pipeline bound (see MVKCmdBindPipeline).
     cmdEncoder->finalizeDispatchState();	// Ensure all updated state has been submitted to Metal
-    [cmdEncoder->getMTLComputeEncoder(kMVKCommandUseDispatch) dispatchThreadgroupsWithIndirectBuffer: _mtlIndirectBuffer
+	id<MTLComputeCommandEncoder> mtlEncoder = cmdEncoder->getMTLComputeEncoder(kMVKCommandUseDispatch);
+	uint64_t dispatchID = 0;
+	if (mvkEncoderWorkTraceEnabled()) {
+		dispatchID = mvkNextDispatchTraceID();
+		MTLSize threads = cmdEncoder->getComputePipeline()->getThreadgroupSize();
+		uint64_t length = _mtlIndirectBuffer.length;
+		uint64_t available = _mtlIndirectBufferOffset < length ? length - _mtlIndirectBufferOffset : 0;
+		mvkRecordEncoderWorkImpl(mtlEncoder, @"dispatch-indirect", [NSString stringWithFormat:
+			@"dispatchID=%llu;mode=indirect;pipeline=%@;nativePSO=%p;indirectBuffer=%p;indirectOffset=%llu;indirectBytes=%llu;availableBytes=%llu;threads=%lux%lux%lu;indirectArgumentsCaptured=0",
+			(unsigned long long)dispatchID, cmdEncoder->getMtlCompute()._pipeline.label ?: @"", (void*)cmdEncoder->getMtlCompute()._pipeline,
+			(void*)_mtlIndirectBuffer, (unsigned long long)_mtlIndirectBufferOffset, (unsigned long long)length,
+			(unsigned long long)available, (unsigned long)threads.width, (unsigned long)threads.height, (unsigned long)threads.depth]);
+	}
+    [mtlEncoder dispatchThreadgroupsWithIndirectBuffer: _mtlIndirectBuffer
 																				indirectBufferOffset: _mtlIndirectBufferOffset
 																			   threadsPerThreadgroup: cmdEncoder->getComputePipeline()->getThreadgroupSize()];
+	if (dispatchID && mvkGPUTimestampArmed()) {
+		mvkRecordEncoderWorkImpl(mtlEncoder, @"dispatch-end", [NSString stringWithFormat:
+			@"dispatchID=%llu;mode=indirect;pipeline=%@;nativePSO=%p", (unsigned long long)dispatchID,
+			cmdEncoder->getMtlCompute()._pipeline.label ?: @"", (void*)cmdEncoder->getMtlCompute()._pipeline]);
+	}
 }
 

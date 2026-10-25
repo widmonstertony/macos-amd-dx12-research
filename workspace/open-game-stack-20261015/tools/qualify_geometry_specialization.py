@@ -39,8 +39,13 @@ def main():
                     help='Use the owned 8192-primitive indexed geometry draw')
     ap.add_argument('--dump-work-records', action='store_true',
                     help='Verify CPU work metadata on completed owned-probe submissions')
+    ap.add_argument('--stutter-coverage',action='store_true',help='Qualify opt-in CPU/native provenance on the owned GPU workload')
+    ap.add_argument('--gpu-counter-burst',action='store_true',help='Bounded multi-CB/all-queue counter qualification')
+    ap.add_argument('--gpu-counter-burst-max-cbs',type=int,help='Owned-control cap used to close a short session for clock validation')
     ap.add_argument('--probe-binary',type=Path,default=ROOT/'build/probes/geometry_specialization_gpu')
     args = ap.parse_args()
+    if args.gpu_counter_burst and not args.gpu_counter_all_draws:ap.error('--gpu-counter-burst requires --gpu-counter-all-draws')
+    if args.gpu_counter_burst_max_cbs is not None and (not args.gpu_counter_burst or not 1<=args.gpu_counter_burst_max_cbs<=512):ap.error('Bounded burst cap requires burst mode and 1..512')
     lib, shaders = args.library.resolve(), args.shaders.resolve()
     assert lib.is_relative_to(ROOT / 'build') and lib.is_file()
     assert shaders.is_relative_to(ROOT) and shaders.is_dir()
@@ -77,6 +82,11 @@ def main():
         env['MVK_AMD_LINK_DIFFERENTIAL_CAPTURE'] = '1'
     if args.parameter_readback:
         env['MVK_OWNED_GEOMETRY_PARAMETER_READBACK'] = '1'
+    if args.stutter_coverage:
+        env.update(MVK_AMD_STUTTER_COVERAGE='1',MVK_AMD_STUTTER_DETAIL='1')
+        arm=out/'gpu-counter.arm';arm.touch();env['MVK_AMD_STUTTER_ARM_PATH']=str(arm)
+    if args.gpu_counter_burst:env['MVK_AMD_GPU_COUNTER_BURST']='1'
+    if args.gpu_counter_burst_max_cbs is not None:env['MVK_AMD_GPU_COUNTER_BURST_MAX_CBS']=str(args.gpu_counter_burst_max_cbs)
     if args.geometry_draw_trace_label or args.gpu_counter_all_draws:
         arm = out / 'gpu-counter.arm'
         arm.touch()
@@ -151,6 +161,21 @@ def main():
         row['geometryBatchTimestampCount'] = sum(sample.get('kind') == 'geometry-batch' for sample in samples)
         row['gpuCounterAllDrawsPassed'] = bool(gpu_timestamp_traces) and row['geometryBatchTimestampCount'] > 0
         row['passed'] = row['passed'] and row['gpuCounterAllDrawsPassed']
+    row['stutterCoverageRequested']=args.stutter_coverage
+    row['gpuCounterBurstRequested']=args.gpu_counter_burst
+    row['gpuCounterBurstMaxCBs']=args.gpu_counter_burst_max_cbs
+    row['GPUClockSidecars']=[str(p.relative_to(ROOT)) for p in (out/'msl').glob('gpu-counter-clock-sessions-*.jsonl')]
+    if args.stutter_coverage:
+        native_rows=[]
+        for path in (out/'msl').glob('stutter-native-*.jsonl'):
+            native_rows.extend(json.loads(line) for line in path.read_text().splitlines() if line.strip())
+        cpu_paths=sorted((out/'msl').glob('cpu-stutter-current-*.json'))
+        completed=[r for r in native_rows if r.get('type')=='nativeCB' and r.get('phase')=='completed']
+        row['nativeProvenanceRows']=len(native_rows)
+        row['nativeCompletedWithLogicalID']=sum(r.get('logicalSubmit',0)>0 and r.get('committedCA',0)>0 for r in completed)
+        row['CPUReports']=[str(p.relative_to(ROOT)) for p in cpu_paths]
+        row['stutterIntegrationPassed']=bool(completed) and row['nativeCompletedWithLogicalID']==len(completed) and bool(cpu_paths)
+        row['passed']=row['passed'] and row['stutterIntegrationPassed']
     (out / 'run.json').write_text(json.dumps(row, indent=2) + '\n')
     print(json.dumps(row))
     return 0 if row['passed'] else 1

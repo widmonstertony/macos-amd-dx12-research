@@ -2,6 +2,7 @@
 // addresses for the recent-resource cache while the flat index can grow.
 #pragma once
 #include <algorithm>
+#include "MVKStutterCoverage.h"
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -15,6 +16,7 @@ template<class Key, class Value> class MVKStableUseMap {
     Entries entries;
     std::vector<Slot> slots;
     void rehash(std::size_t capacity) {
+    MVK_CPU_SCOPE(CommandAllocation);
         slots.assign(capacity, Slot{});
         for (std::size_t n=0;n<entries.size();++n) {
             auto i=std::hash<Key>{}(entries[n].first)&(capacity-1);

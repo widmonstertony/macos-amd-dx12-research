@@ -51,11 +51,14 @@ def main():
     parser.add_argument('--registration-delta-cache',action='store_true')
     parser.add_argument('--sharded-shader-cache-locks',action='store_true')
     parser.add_argument('--descriptor-write-shards',action='store_true')
+    parser.add_argument('--encoder-heap-plans',action='store_true')
+    parser.add_argument('--stutter-coverage',action='store_true')
     parser.add_argument('--negative-live-cache',action='store_true')
     parser.add_argument('--batch-argument-heaps', action='store_true')
     parser.add_argument('--argument-heap-threshold', type=int, default=16)
     parser.add_argument('--gpu-counter-trace',action='store_true',help='Qualify timed native GPU counter collection on owned probes')
     parser.add_argument('--gpu-counter-all-draws',action='store_true',help='Qualify bounded all-draw counter mode (at least the original 512 samples) on presentation')
+    parser.add_argument('--gpu-counter-burst',action='store_true',help='Qualify bounded all-queue/multi-command-buffer counters in original Wine')
     parser.add_argument('--probe-timeout', type=int, default=40,
                         help='Per-probe timeout in seconds (10..180) for bounded diagnostics')
     args = parser.parse_args()
@@ -65,6 +68,7 @@ def main():
         parser.error('Select either compute-only or descriptor-only')
     if args.gpu_counter_all_draws and not args.gpu_counter_trace:
         parser.error('--gpu-counter-all-draws requires --gpu-counter-trace')
+    if args.gpu_counter_burst and not args.gpu_counter_trace:parser.error('--gpu-counter-burst requires --gpu-counter-trace')
     d3d12_directory = args.d3d12_directory.resolve() if args.d3d12_directory else None
     if d3d12_directory and (not any(d3d12_directory.is_relative_to(ROOT / p) for p in ('build', 'evidence'))
             or not all((d3d12_directory / n).is_file() for n in ('d3d12.dll', 'd3d12core.dll'))):
@@ -114,6 +118,9 @@ def main():
     if args.registration_delta_cache:env['MVK_AMD_REGISTRATION_DELTA_CACHE']='1'
     if args.sharded_shader_cache_locks:env['MVK_AMD_SHARDED_SHADER_CACHE_LOCKS']='1'
     if args.descriptor_write_shards:env['MVK_AMD_DESCRIPTOR_WRITE_SHARDS']='1'
+    if args.encoder_heap_plans:env['MVK_AMD_ENCODER_HEAP_PLANS']='1'
+    if args.stutter_coverage:env['MVK_AMD_STUTTER_COVERAGE']='1'
+    if args.gpu_counter_burst:env['MVK_AMD_GPU_COUNTER_BURST']='1'
     if args.batch_argument_heaps:
         if not args.use_mtl_heap:parser.error('--batch-argument-heaps requires --use-mtl-heap')
         if args.argument_heap_threshold < 1:parser.error('--argument-heap-threshold must be at least 1')
@@ -160,7 +167,7 @@ def main():
               "crossEncoderLiveCache": args.cross_encoder_live_cache,
               "registrationDeltaCache": args.registration_delta_cache,
               "shardedShaderCacheLocks": args.sharded_shader_cache_locks,
-              "descriptorWriteShards": args.descriptor_write_shards,
+              "descriptorWriteShards": args.descriptor_write_shards, "encoderHeapPlans": args.encoder_heap_plans, "stutterCoverage": args.stutter_coverage, "gpuCounterBurst": args.gpu_counter_burst,
               "qualificationScope": "compute-only" if args.compute_only else "compute-and-presentation",
               "batchArgumentHeaps": args.batch_argument_heaps,
               "argumentHeapThreshold": args.argument_heap_threshold, "results": {}}

@@ -24,6 +24,7 @@
 #include "MVKDescriptorUseCache.h"
 #include "MVKHeapUseTable.h"
 #include "MVKStableUseMap.h"
+#include "MVKEncoderHeapLedger.h"
 #include "MVKPipeline.h"
 #include "MVKSmallVector.h"
 #include "MVKBitArray.h"
@@ -205,6 +206,8 @@ struct MVKUseResourceHelper {
 		batchLiveResources |= value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_BATCH_ARGUMENT_HEAPS");
 		batchArgumentHeaps = value && !strcmp(value, "1");
+        value = getenv("MVK_AMD_ENCODER_HEAP_PLANS");
+        encoderHeapPlans = batchArgumentHeaps && batchLiveResources && value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_ARGUMENT_HEAP_THRESHOLD");
 		if (value) {
 			char* end = nullptr;
@@ -289,6 +292,32 @@ struct MVKUseResourceHelper {
 	bool crossEncoderLiveCache = false;
 	bool batchLiveResources = false;
 	bool batchArgumentHeaps = false;
+    bool encoderHeapPlans = false;
+    MVKEncoderHeapLedger<id<MTLResource>, id<MTLHeap>> heapLedger;
+    MVKSmallVector<id<MTLHeap>> encoderHeapOwners;
+    struct HeapReadSnapshot {
+        MVKDescriptorUseCache::Snapshot snapshot;
+        MVKLiveList* list;
+        uint64_t additions;
+        MVKLiveList::SnapshotLease lease;
+    };
+    std::vector<HeapReadSnapshot> heapReadSnapshots;
+    size_t heapReadSnapshotIdentities = 0;
+    struct CoveredHeapReadPlan { const BufferHeapReadPlan* plan; uint32_t stages; };
+    std::vector<CoveredHeapReadPlan> coveredHeapReadPlans;
+    struct HeapPlanHeapBatch { uint32_t stages; std::vector<id<MTLHeap>> resources; };
+    struct HeapPlanResourceBatch { uint32_t stages; std::vector<id<MTLResource>> resources; };
+    std::vector<HeapPlanHeapBatch> heapPlanHeapBatches;
+    std::vector<HeapPlanResourceBatch> heapPlanReadBatches, heapPlanWriteBatches;
+    uint64_t statsHeapPlanCalls=0, statsHeapPlanSkips=0, statsHeapPlanResources=0;
+    uint64_t statsHeapPlanPreciseResources=0, statsHeapPlanLeaseRefreshes=0;
+    uint64_t statsHeapPlanHeapCalls=0, statsHeapPlanWriteCalls=0, statsHeapPlanWriteReplays=0;
+    bool tryAddBufferHeapSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
+                                 id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
+                                 MVKResourceUsageStages stage);
+    id<MTLHeap> ownHeapPlanResource(id<MTLResource> resource, ResourceInfo& info);
+    void resetHeapPlanEncoder();
+    void bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, bool graphics);
 	MVKHeapUseTable<id<MTLHeap>> heapCounts;
 	uint32_t heapBatchThreshold = 16;
 	bool traceArgumentHeaps = false;
@@ -347,7 +376,7 @@ struct MVKUseResourceHelper {
     uint64_t statsSnapshotBulkFastHits=0, statsSnapshotBulkResources=0;
     void addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                          id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
-                         MVKResourceUsageStages stage, bool write);
+                         MVKResourceUsageStages stage, bool write, bool knownBuffers = false);
 	uint64_t statsCalls=0, statsLookups=0, statsRetainedHits=0, statsAbsentHits=0, statsLiveFound=0;
 	// Counts the resource declarations that survive helper-side deduplication
 	// and are actually submitted to Metal.  The high-level call counters above

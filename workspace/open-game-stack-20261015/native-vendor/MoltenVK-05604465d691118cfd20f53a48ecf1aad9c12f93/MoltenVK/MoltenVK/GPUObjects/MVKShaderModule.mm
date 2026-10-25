@@ -17,6 +17,7 @@
  */
 
 #include "MVKShaderModule.h"
+#include "MVKStutterCoverage.h"
 #include "MVKPipeline.h"
 #include "MVKFoundation.h"
 #include <sys/stat.h>
@@ -77,6 +78,7 @@ static uint32_t getWorkgroupDimensionSize(const SPIRVWorkgroupSizeDimension& wgD
 MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpecializationInfo,
 												VkPipelineCreationFeedback* pShaderFeedback,
 												MVKShaderModule* shaderModule) {
+    MVK_CPU_SCOPE_TAG(NativeFunctionSpecialize,shaderModule ? shaderModule->getKey().codeHash : 0);
 
 	if ( !_mtlLibrary ) { return MVKMTLFunctionNull; }
 
@@ -115,7 +117,13 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 	}
 
 
+	MVKStutterCPUTrace::Scope cpuNativeMonitor1(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
+
+
 	@synchronized (getMTLDevice()) {
+
+
+	    cpuNativeMonitor1.finish();
 		@autoreleasepool {
 			NSString* mtlFuncName = @(_shaderConversionResultInfo.entryPoint.mtlFunctionName.c_str());
 
@@ -244,6 +252,10 @@ MVKShaderLibrary::MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
 
 void MVKShaderLibrary::compileLibrary(const string& msl,
 									  const vector<pair<uint32_t, MVKShaderMacroValue> >* specializationMacroDef) {
+    const uint64_t cpuSourceTag=mvkStutterCPU().enabled() ? mvkHash(msl.data(),msl.size()) : 0;
+    auto cpuSourceContext=mvkStutterContext(); cpuSourceContext.shader=cpuSourceTag;
+    MVKCPUContextGuard cpuSourceContextGuard(cpuSourceContext);
+    MVK_CPU_SCOPE_CPU_TAG(NativeLibraryCompile,cpuSourceTag);
 	MVKShaderLibraryCompiler* slc = new MVKShaderLibraryCompiler(_owner);
 	NSString* nsSrc = [[NSString alloc] initWithUTF8String: msl.c_str()];	// temp retained
 
@@ -340,12 +352,18 @@ MVKShaderLibrary* MVKShaderLibraryCache::getShaderLibrary(SPIRVToMSLConversionCo
 														  MVKShaderModule* shaderModule, MVKPipeline* pipeline,
 														  bool* pWasAdded, VkPipelineCreationFeedback* pShaderFeedback,
 														  uint64_t startTime) {
+    MVK_CPU_SCOPE_TAG(ShaderLibraryGet,shaderModule->getKey().codeHash);
+	MVKStutterCPUTrace::Scope cpuShaderLockWait1(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::ShaderCacheLock));
 	lock_guard<mutex> lock(_accessLock);
+	cpuShaderLockWait1.finish();
 	bool wasAdded = false;
 	MVKShaderLibrary* shLib = findShaderLibrary(pShaderConfig, pShaderFeedback, startTime);
+    { MVKStutterCPUTrace::Scope outcome(mvkStutterCPU(), static_cast<size_t>(shLib ? MVKCPUPhase::ShaderCacheHit : MVKCPUPhase::ShaderCacheMiss), shaderModule->getKey().codeHash); }
+    if (!shLib && pipeline->shouldFailOnPipelineCompileRequired()) { MVK_CPU_SCOPE_TAG(ShaderCacheCompileRequired,shaderModule->getKey().codeHash); }
 	if ( !shLib && !pipeline->shouldFailOnPipelineCompileRequired() ) {
 		SPIRVToMSLConversionResult conversionResult;
 		if (shaderModule->convert(pShaderConfig, conversionResult)) {
+            MVK_CPU_SCOPE_TAG(ShaderLibraryBuild,shaderModule->getKey().codeHash);
 			shLib = addShaderLibrary(pShaderConfig, conversionResult);
 			if (pShaderFeedback) {
 				pShaderFeedback->duration += mvkGetElapsedNanoseconds(startTime);
@@ -364,6 +382,7 @@ MVKShaderLibrary* MVKShaderLibraryCache::getShaderLibrary(SPIRVToMSLConversionCo
 MVKShaderLibrary* MVKShaderLibraryCache::findShaderLibrary(SPIRVToMSLConversionConfiguration* pShaderConfig,
 														   VkPipelineCreationFeedback* pShaderFeedback,
 														   uint64_t startTime) {
+    MVK_CPU_SCOPE(ShaderLibraryLookup);
 	for (auto& slPair : _shaderLibraries) {
 		if (slPair.first.matches(*pShaderConfig)) {
 			pShaderConfig->alignWith(slPair.first);
@@ -392,6 +411,7 @@ MVKShaderLibrary* MVKShaderLibraryCache::addShaderLibrary(const SPIRVToMSLConver
 	MVKShaderLibrary* shLib = new MVKShaderLibrary(_owner, resultInfo, compressedMSL);
 	// Cached MSL that no longer compiles is dropped: the shader is converted again when it is used.
 	if ( !shLib->_mtlLibrary ) {
+        MVK_CPU_SCOPE(ShaderLibraryInvalidated);
 		shLib->destroy();
 		return nullptr;
 	}
@@ -425,6 +445,9 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
 											   MVKPipeline* pipeline,
 											   VkPipelineCreationFeedback* pShaderFeedback,
 											   bool forceReplaySource) {
+    auto cpuShaderContext=mvkStutterContext(); cpuShaderContext.shader=_key.codeHash;
+    MVKCPUContextGuard cpuShaderContextGuard(cpuShaderContext);
+    MVK_CPU_SCOPE_TAG(ShaderGetFunction,_key.codeHash);
 	bool trace = mvkRuntimeTraceEnabled(getMVKConfig()) && !mvkRuntimeReplayOnly();
 	bool replaySource = mvkRuntimeReplayEnabled(getMVKConfig()) &&
 		(pShaderConfig->options.mslOptions.for_mesh_pipeline || forceReplaySource);
@@ -436,7 +459,9 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
 		if (pipelineCache) {
 			mvkLib = pipelineCache->getShaderLibrary(pShaderConfig, this, pipeline, pShaderFeedback, startTime);
 		} else {
+			MVKStutterCPUTrace::Scope cpuShaderLockWait2(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::ShaderCacheLock));
 			lock_guard<mutex> lock(_accessLock);
+			cpuShaderLockWait2.finish();
 			mvkLib = _shaderLibraryCache.getShaderLibrary(pShaderConfig, this, pipeline, nullptr, pShaderFeedback, startTime);
 		}
 	} else {
@@ -591,16 +616,19 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
 
 bool MVKShaderModule::convert(SPIRVToMSLConversionConfiguration* pShaderConfig,
 							  SPIRVToMSLConversionResult& conversionResult) {
+    MVK_CPU_SCOPE_CPU_TAG(ShaderConvert,_key.codeHash);
 	const auto& mvkCfg = getMVKConfig();
 	bool shouldLogCode = mvkCfg.debugMode;
 	bool shouldLogEstimatedGLSL = shouldLogCode && mvkCfg.shaderLogEstimatedGLSL;
 
 	uint64_t startTime = getPerformanceTimestamp();
 	bool wasConverted = _spvConverter.convert(*pShaderConfig, conversionResult, shouldLogCode, shouldLogCode, shouldLogEstimatedGLSL);
+    if (!wasConverted) mvkStutterFailure(MVKCPUPhase::ShaderConvert,VK_ERROR_INITIALIZATION_FAILED,_key.codeHash);
 	addPerformanceInterval(getPerformanceStats().shaderCompilation.spirvToMSL, startTime);
 
 	const char* dumpDir = getMVKConfig().shaderDumpDir;
 	if (dumpDir && *dumpDir && !mvkRuntimeReplayOnly()) {
+        MVK_CPU_SCOPE(ShaderSourceDump);
 		char path[PATH_MAX];
 		const char* type;
 		switch (pShaderConfig->options.entryPointStage) {
@@ -732,18 +760,25 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 													   const SPIRVToMSLConversionResultInfo& shaderConversionResults,
 													   const vector<pair<MSLSpecializationMacroInfo, MVKShaderMacroValue>>& specializationMacroDef,
                                                      bool conservativeMeshLibrary) {
+    MVK_CPU_SCOPE_CPU(NativeLibraryCompile);
+	MVKStutterCPUTrace::Scope cpuShaderLockWait3(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	unique_lock<mutex> lock(_completionLock);
+	cpuShaderLockWait3.finish();
 	_mslSourceCode = mslSourceCode;		// For logMSLSource(), from handleError() within compile().
 	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_LIBRARIES");
 	bool synchronousMesh = conservativeMeshLibrary && syncOption && !strcmp(syncOption, "1");
 
+    const auto cpuCompileContext = mvkStutterContext();
 	compile(lock, ^{
+        MVKCPUContextGuard cpuCompilerContext(cpuCompileContext);
 		auto mtlDev = getMTLDevice();
 		MTLCompileOptions* synchronousOptions = nil;
 		NSDictionary* synchronousProvenance = nil;
 		NSDictionary* synchronousContext = nil;
 		uint64_t libraryOperation=0;
+		MVKStutterCPUTrace::Scope cpuNativeMonitor2(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 		@synchronized (mtlDev) {
+		    cpuNativeMonitor2.finish();
 			@autoreleasepool {
 				auto mtlCompileOptions = getDevice()->getMTLCompileOptions(shaderConversionResults.entryPoint.fpFastMathFlags,
 																		   shaderConversionResults.isPositionInvariant);
@@ -793,6 +828,8 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 				[mtlDev newLibraryWithSource: mslSourceCode
 									options: mtlCompileOptions
 						completionHandler: ^(id<MTLLibrary> mtlLib, NSError* error) {
+        MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
+        MVK_CPU_SCOPE(CallbackCompletion);
                             if (mtlLib && provenance) objc_setAssociatedObject(mtlLib, mvkCompileProvenanceKey(), provenance, OBJC_ASSOCIATION_COPY);
 							if (mtlLib && fullContext) objc_setAssociatedObject(mtlLib,mvkMeshContextKey(),fullContext,OBJC_ASSOCIATION_RETAIN);
 							mvkLinkOperationEnd(libraryOperation);
@@ -983,8 +1020,11 @@ void MVKShaderLibraryCompiler::logMSLSource() {
 }
 
 bool MVKShaderLibraryCompiler::compileComplete(id<MTLLibrary> mtlLibrary, NSError* compileError) {
+	MVKStutterCPUTrace::Scope cpuShaderLockWait4(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	lock_guard<mutex> lock(_completionLock);
+	cpuShaderLockWait4.finish();
 
+    if (!mtlLibrary) mvkStutterFailure(MVKCPUPhase::NativeLibraryCompile,compileError ? compileError.code : -1);
 	_mtlLibrary = [mtlLibrary retain];		// retained
 	return endCompile(compileError);
 }
@@ -1043,12 +1083,18 @@ MVKShaderLibraryCompiler::~MVKShaderLibraryCompiler() {
 id<MTLFunction> MVKFunctionSpecializer::newMTLFunction(id<MTLLibrary> mtlLibrary,
 													   NSString* funcName,
 													   MTLFunctionConstantValues* constantValues) {
+	MVKStutterCPUTrace::Scope cpuShaderLockWait5(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	unique_lock<mutex> lock(_completionLock);
+	cpuShaderLockWait5.finish();
 
+    const auto cpuCompileContext = mvkStutterContext();
 	compile(lock, ^{
+        MVKCPUContextGuard cpuCompilerContext(cpuCompileContext);
 		[mtlLibrary newFunctionWithName: funcName
 						 constantValues: constantValues
 					  completionHandler: ^(id<MTLFunction> mtlFunc, NSError* error) {
+        MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
+        MVK_CPU_SCOPE(CallbackCompletion);
 						  bool isLate = compileComplete(mtlFunc, error);
 						  if (isLate) { destroy(); }
 					  }];
@@ -1058,8 +1104,11 @@ id<MTLFunction> MVKFunctionSpecializer::newMTLFunction(id<MTLLibrary> mtlLibrary
 }
 
 bool MVKFunctionSpecializer::compileComplete(id<MTLFunction> mtlFunction, NSError* compileError) {
+	MVKStutterCPUTrace::Scope cpuShaderLockWait6(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	lock_guard<mutex> lock(_completionLock);
+	cpuShaderLockWait6.finish();
 
+    if (!mtlFunction) mvkStutterFailure(MVKCPUPhase::NativeFunctionSpecialize,compileError ? compileError.code : -1);
 	_mtlFunction = [mtlFunction retain];		// retained
 	return endCompile(compileError);
 }

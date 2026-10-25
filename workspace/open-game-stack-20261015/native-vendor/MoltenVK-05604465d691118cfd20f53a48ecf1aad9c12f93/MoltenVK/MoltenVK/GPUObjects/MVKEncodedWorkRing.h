@@ -1,6 +1,7 @@
 // Bounded CPU diagnostics only. No GPU commands, resources, or semaphore changes.
 #pragma once
 #import <Foundation/Foundation.h>
+#include "MVKStutterCoverage.h"
 #include <os/lock.h>
 #include <cstdint>
 #include <cstring>
@@ -33,6 +34,7 @@ inline size_t mvkEncodedWorkSlot(uint64_t index) {
     return index < 64 ? size_t(index) : 64 + size_t((index - 64) % 960);
 }
 inline NSMutableData* mvkNewEncodedWorkRing() {
+    MVK_CPU_SCOPE(WorkTrace);
     static_assert(std::is_trivially_destructible<MVKEncodedWorkRing>::value, "Data owner must not need a C++ destructor");
     NSMutableData* data = [NSMutableData dataWithLength:sizeof(MVKEncodedWorkRing)];
     assert(reinterpret_cast<uintptr_t>(data.mutableBytes) % alignof(MVKEncodedWorkRing) == 0);
@@ -44,6 +46,7 @@ inline NSMutableData* mvkNewEncodedWorkRing() {
 }
 inline void mvkAppendEncodedWorkBytes(NSMutableData* data, const void* encoder,
                                      const char* kindText, const char* labelText) {
+    MVK_CPU_SCOPE(WorkTrace);
     auto* ring = static_cast<MVKEncodedWorkRing*>(data.mutableBytes);
     os_unfair_lock_lock(&ring->lock);
     uint64_t index = ring->count++;
@@ -67,6 +70,7 @@ inline void mvkAppendEncodedWork(NSMutableData* data, const void* encoder, NSStr
     mvkAppendEncodedWorkBytes(data,encoder,kind.UTF8String ?: "",label.UTF8String ?: "");
 }
 inline NSDictionary* mvkSnapshotEncodedWork(NSMutableData* data) {
+    MVK_CPU_SCOPE(WorkTrace);
     if (!data) return @{@"workEvents":@[], @"workCount":@0, @"truncatedWorkEvents":@0};
     auto* ring = static_cast<MVKEncodedWorkRing*>(data.mutableBytes);
     // Copy bounded bytes under the ring lock. Foundation allocations happen

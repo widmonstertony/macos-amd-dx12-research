@@ -9,6 +9,7 @@
 #include "MVKTimedTraceArm.h"
 #include "MVKEncodedWorkRing.h"
 #include "MVKGPUTimestampTrace.h"
+#include "MVKStutterNativeTrace.h"
 
 inline bool mvkEncoderWorkTraceEnabled() {
     static const bool enabled = [] { const char* v=getenv("MVK_AMD_GPU_TIMEOUT_TRACE"); return v && !strcmp(v,"1"); }();
@@ -22,7 +23,7 @@ inline bool mvkEncoderWorkTraceEnabled() {
 }
 inline bool mvkDependencyTraceEnabled() {
     static const bool failure = [] { const char* v=getenv("MVK_AMD_QUEUE_FAILURE_CONTEXT"); return v && !strcmp(v,"1"); }();
-    return failure || mvkEncoderWorkTraceEnabled();
+    return mvkStutterNativeEnabled() || failure || mvkEncoderWorkTraceEnabled();
 }
 inline const void* mvkDependencyKey() { return sel_registerName("mvkQueueDependenciesV1"); }
 inline const void* mvkEncodedWorkKey() { return sel_registerName("mvkEncodedWorkRingV1"); }
@@ -59,6 +60,11 @@ inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, ui
         @"phases":[NSMutableArray array],
         @"workEvents":[NSMutableArray array], @"workCount":@0, @"truncatedWorkEvents":@0,
         @"events":[NSMutableArray array], @"truncatedEvents":@0} mutableCopy];
+    if(mvkStutterNativeEnabled()) {
+        record[@"nativeCBID"]=@(mvkStutterNativeID(cb));
+        record[@"nativeCommandBuffer"]=[NSString stringWithFormat:@"%p",cb];
+        record[@"logicalSubmissionID"]=@0;record[@"nativeSplitIndex"]=@0;record[@"presentFrameID"]=@0;
+    }
     mvkBeginGPUTimestamps(record, cb, family);
     objc_setAssociatedObject(cb, mvkDependencyKey(), record, OBJC_ASSOCIATION_RETAIN);
     {
@@ -72,18 +78,22 @@ inline void mvkBeginDependencyTrace(id<MTLCommandBuffer> cb, uint32_t family, ui
 // The encoder retains only bounded CPU metadata, never a command buffer or a
 // Vulkan/GPU resource. This also covers helper pipelines without a Vulkan owner.
 inline void mvkAssociateEncoderTrace(id<MTLCommandBuffer> cb, id<MTLCommandEncoder> encoder) {
-    if (!encoder || !mvkEncoderWorkTraceEnabled()) return;
+    if (!encoder) return;
+    bool workTrace=mvkEncoderWorkTraceEnabled();
+    if(!workTrace&&!mvkGPUCounterBurstEnabled())return;
     NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
     if (!record) return;
     @synchronized (record) {
-        NSMutableData* data = record[@"workBuffer"];
-        if (!data) { data = mvkNewEncodedWorkRing(); record[@"workBuffer"] = data; }
-        objc_setAssociatedObject(encoder, mvkEncodedWorkKey(), data, OBJC_ASSOCIATION_RETAIN);
+        if(workTrace) {
+            NSMutableData* data = record[@"workBuffer"];
+            if (!data) { data = mvkNewEncodedWorkRing(); record[@"workBuffer"] = data; }
+            objc_setAssociatedObject(encoder, mvkEncodedWorkKey(), data, OBJC_ASSOCIATION_RETAIN);
+        }
         // Keep the lightweight record association even before a counter buffer
         // exists.  Selected-pipeline tracing allocates lazily from the first
         // matching pipeline event; requiring a buffer here made that event
         // unreachable for encoders created before the match.
-        if(mvkGPUTimestampArmed())objc_setAssociatedObject(encoder, sel_registerName("mvkGPUCounterRecordV1"), record, OBJC_ASSOCIATION_RETAIN);
+        if(mvkGPUTimestampArmed()||mvkGPUCounterBurstEnabled())objc_setAssociatedObject(encoder, sel_registerName("mvkGPUCounterRecordV1"), record, OBJC_ASSOCIATION_RETAIN);
     }
 }
 inline void mvkRecordEncoderWorkImpl(id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
@@ -97,9 +107,12 @@ inline void mvkRecordEncoderWorkImpl(id<MTLCommandEncoder> encoder, NSString* ki
 // labels for every fence, draw or dispatch before the helper can return.
 #define mvkRecordEncoderWork(...) do { if (mvkEncoderWorkTraceEnabled()) mvkRecordEncoderWorkImpl(__VA_ARGS__); } while (false)
 inline void mvkRecordDependencyPhase(id<MTLCommandBuffer> cb, NSString* phase) {
-    if (!cb || !mvkDependencyTraceEnabled()) return;
+    if (!cb) return;
     NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
     if (!record) return;
+    // An arm controls creation, not the lifetime of an existing observation.
+    // Completion must remain resolvable after the marker expires or is removed.
+    if (![phase isEqualToString:@"completed"] && !mvkDependencyTraceEnabled()) return;
     @synchronized (record) {
         if([phase isEqualToString:@"completed"])record[@"nativeCompleted"]=@YES;
         NSMutableArray* phases = record[@"phases"];
@@ -111,6 +124,9 @@ inline void mvkRecordDependencyPhase(id<MTLCommandBuffer> cb, NSString* phase) {
 inline void mvkRecordEventDependency(id<MTLCommandBuffer> cb, id<MTLEvent> event,
                                      uint64_t value, NSString* operation, NSString* kind) {
     if (!cb || !event || !mvkDependencyTraceEnabled()) return;
+    mvkStutterNativeEvent(cb,(__bridge const void*)event,value,
+        [operation isEqualToString:@"signal"]?"signal":"wait",0,
+        [event respondsToSelector:@selector(signaledValue)]?((id<MTLSharedEvent>)event).signaledValue:0,false);
     NSMutableDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
     if (!record) return;
     @synchronized (record) {
@@ -141,6 +157,11 @@ inline NSDictionary* mvkSnapshotDependencyRecord(NSDictionary* record) {
         return @{@"logicalDevice":record[@"logicalDevice"], @"logicalQueue":record[@"logicalQueue"],
             @"nativeQueue":record[@"nativeQueue"], @"phases":[NSArray arrayWithArray:record[@"phases"]],
             @"nativeCommandBufferLabel":record[@"nativeCommandBufferLabel"] ?: @"",
+            @"nativeCBID":record[@"nativeCBID"]?:@0,
+            @"logicalSubmissionID":record[@"logicalSubmissionID"]?:@0,
+            @"nativeSplitIndex":record[@"nativeSplitIndex"]?:@0,
+            @"presentFrameID":record[@"presentFrameID"]?:@0,
+            @"nativeCommandBuffer":record[@"nativeCommandBuffer"]?:@"",
             @"submission":record[@"submission"], @"queueFamily":record[@"queueFamily"],
             @"queueIndex":record[@"queueIndex"], @"createdTime":record[@"createdTime"],
             @"events":events, @"truncatedEvents":record[@"truncatedEvents"],
@@ -164,8 +185,15 @@ inline NSArray* mvkSnapshotPendingDependencies() {
     [records release];
     return result;
 }
+inline void mvkMarkDependencyCounterCommit(id<MTLCommandBuffer> cb) {
+    if (!cb) return;
+    NSDictionary* record=objc_getAssociatedObject(cb,mvkDependencyKey());
+    if(record)mvkMarkGPUCounterCommit(record);
+}
 inline void mvkEndDependencyTrace(id<MTLCommandBuffer> cb) {
-    if (!mvkDependencyTraceEnabled()) return;
+    // Always release an existing record's counter budgets and registry entry,
+    // including when timed capture was disabled before this CB completed.
+    if (!cb) return;
     NSDictionary* record = objc_getAssociatedObject(cb, mvkDependencyKey());
     if (!record) return;
     auto& state = mvkPendingDependencies();

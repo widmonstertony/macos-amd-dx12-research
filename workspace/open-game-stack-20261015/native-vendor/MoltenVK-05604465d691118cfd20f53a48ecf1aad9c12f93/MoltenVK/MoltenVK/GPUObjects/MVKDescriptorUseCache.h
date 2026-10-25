@@ -2,6 +2,7 @@
 // Stores raw identities only: the encoder must still validate/retain each one.
 #pragma once
 #include <algorithm>
+#include "MVKStutterCoverage.h"
 #include <atomic>
 #include <array>
 #include <iterator>
@@ -186,6 +187,7 @@ public:
             };
             void finish() {
                 if (!_activeWrites) return;
+                MVK_CPU_SCOPE(DescriptorWriteCommit);
                 bool anyChanged = false;
                 for (const auto& range : _ranges) {
                     bool changed = false;
@@ -308,6 +310,7 @@ public:
     template<bool Contiguous> [[gnu::noinline]]
     Snapshot resourcesImpl(const char* src, uint32_t count, size_t stride, uint64_t* completedVersion,
                            SnapshotReuseToken* reuseToken = nullptr) {
+    MVK_CPU_SCOPE(DescriptorCacheRead);
         const size_t sourceBytes = count ? (count - 1) * stride + sizeof(id) : 0;
         auto key = std::make_tuple(src, count, stride);
         RangeLocks rangeLocks;
@@ -322,7 +325,9 @@ public:
             // holding _lock and before it modifies bytes, so the second check
             // below safely falls back to the full range if a write is active.
             {
+                MVKStutterCPUTrace::Scope cpuProbeLock(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::DescriptorCacheLock));
                 std::unique_lock<std::mutex> probe(_lock);
+                cpuProbeLock.finish();
                 auto hinted = _snapshots.find(key);
                 if (hinted != _snapshots.end() &&
                     !hinted->second->reuseState->activeWrites.load(std::memory_order_acquire)) {
@@ -391,6 +396,7 @@ public:
             if (reuseToken) *reuseToken = {entry.reuseState, entry.reuseState->completedVersion.load(std::memory_order_acquire)};
             return entry.snapshot;
         }
+        MVK_CPU_SCOPE(DescriptorCacheRebuild);
         entry.dirty.materialize(count);
         bool changed = !entry.snapshot;
         size_t dirtySlots = 0;
@@ -492,6 +498,7 @@ private:
     using DirtyRange = std::pair<uint32_t,uint32_t>;
     [[gnu::noinline]] static void trimUnchangedInterior(const char* src, const Resources& slots,
                                                        std::vector<DirtyRange>& dirty) {
+    MVK_CPU_SCOPE(DescriptorCacheScan);
         bool sparse = false;
         for (auto range : dirty) {
             uint32_t length=range.second-range.first;
@@ -530,6 +537,7 @@ private:
         return _usesWriteShards;
     }
     RangeLocks lockRange(const char* first, size_t bytes) {
+        MVK_CPU_SCOPE(DescriptorCacheLock);
         RangeLocks locks;
         std::array<bool, kWriteStripeCount> selected{};
         bool wide = !first || !bytes;
@@ -555,6 +563,7 @@ private:
         return locks;
     }
     RangeLocks lockStripeMask(uint64_t mask) {
+        MVK_CPU_SCOPE(DescriptorCacheLock);
         RangeLocks locks;
         if (mask == ~uint64_t(0)) {
             locks.wideGate = std::unique_lock<std::shared_mutex>(_writeRangeGate);

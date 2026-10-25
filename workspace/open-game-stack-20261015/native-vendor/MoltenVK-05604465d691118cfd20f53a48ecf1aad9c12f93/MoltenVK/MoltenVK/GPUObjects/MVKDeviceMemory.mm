@@ -17,6 +17,7 @@
  */
 
 #include "MVKDeviceMemory.h"
+#include "MVKMemoryTrace.h"
 #include "MVKBuffer.h"
 #include "MVKImage.h"
 #include "MVKQueue.h"
@@ -225,7 +226,9 @@ bool MVKDeviceMemory::ensureMTLHeap() {
 	// to untracked, since Vulkan uses explicit barriers anyway.
 	heapDesc.hazardTrackingMode = MTLHazardTrackingModeTracked;
 	heapDesc.size = _allocationSize;
+	auto heapTrace = mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Heap, _allocationSize, _mtlStorageMode, "MVKDeviceMemory.ensureMTLHeap.newHeap");
 	_mtlHeap = [getMTLDevice() newHeapWithDescriptor: heapDesc];	// retained
+	mvkStutterMemoryAllocationEnd(heapTrace, _mtlHeap != nil);
 	[heapDesc release];
 	if (!_mtlHeap) { return false; }
 
@@ -242,12 +245,17 @@ bool MVKDeviceMemory::ensureMTLBuffer() {
 
 	NSUInteger memLen = mvkAlignByteCount(_allocationSize, getMetalFeatures().mtlBufferAlignment);
 
-	if (memLen > getMetalFeatures().maxMTLBufferSize) { return false; }
+	if (memLen > getMetalFeatures().maxMTLBufferSize) {
+		mvkStutterMemoryAllocationRejected(MVKStutterMemoryKind::Buffer, memLen, _mtlStorageMode, "MVKDeviceMemory.ensureMTLBuffer.maximum", "configured-maxMTLBufferSize", getMetalFeatures().maxMTLBufferSize);
+		return false;
+	}
 
 	id<MTLBuffer> buf;
 	// If host memory was already allocated, it is copied into the new MTLBuffer, and then released.
 	if (_mtlHeap) {
+		auto allocationTrace = mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Buffer, memLen, _mtlStorageMode, "MVKDeviceMemory.ensureMTLBuffer.heap-placement");
 		buf = [_mtlHeap newBufferWithLength: memLen options: getMTLResourceOptions() offset: 0];	// retained
+		mvkStutterMemoryAllocationEnd(allocationTrace, buf != nil);
 		if (_pHostMemory) {
 			memcpy(buf.contents, _pHostMemory, memLen);
 			freeHostMemory();
@@ -256,13 +264,19 @@ bool MVKDeviceMemory::ensureMTLBuffer() {
 	} else if (_pHostMemory) {
 		auto rezOpts = getMTLResourceOptions();
 		if (_isHostMemImported) {
+			auto allocationTrace = mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Buffer, memLen, _mtlStorageMode, "MVKDeviceMemory.ensureMTLBuffer.host-no-copy");
 			buf = [getMTLDevice() newBufferWithBytesNoCopy: _pHostMemory length: memLen options: rezOpts deallocator: nil];	// retained
+			mvkStutterMemoryAllocationEnd(allocationTrace, buf != nil);
 		} else {
+			auto allocationTrace = mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Buffer, memLen, _mtlStorageMode, "MVKDeviceMemory.ensureMTLBuffer.host-copy");
 			buf = [getMTLDevice() newBufferWithBytes: _pHostMemory length: memLen options: rezOpts];     // retained
+			mvkStutterMemoryAllocationEnd(allocationTrace, buf != nil);
 		}
 		freeHostMemory();
 	} else {
+		auto allocationTrace = mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Buffer, memLen, _mtlStorageMode, "MVKDeviceMemory.ensureMTLBuffer.device-new");
 		buf = [getMTLDevice() newBufferWithLength: memLen options: getMTLResourceOptions()];     // retained
+		mvkStutterMemoryAllocationEnd(allocationTrace, buf != nil);
 	}
 	if (!buf) { return false; }
 	_device->makeResident(buf);
@@ -283,7 +297,9 @@ bool MVKDeviceMemory::ensureHostMemory() {
 	if ( !_pHostMemory) {
 		size_t memAlign = getMetalFeatures().mtlBufferAlignment;
 		NSUInteger memLen = mvkAlignByteCount(_allocationSize, memAlign);
+		auto hostTrace = mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Host, memLen, _mtlStorageMode, "MVKDeviceMemory.ensureHostMemory.posix_memalign");
 		int err = posix_memalign(&_pHostMemory, memAlign, memLen);
+		mvkStutterMemoryAllocationEnd(hostTrace, err == 0, err);
 		if (err) { return false; }
 	}
 

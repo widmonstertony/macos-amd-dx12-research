@@ -4,6 +4,8 @@
 #import <QuartzCore/QuartzCore.h>
 #include <map>
 #include "MVKTraceSnapshot.h"
+#include "MVKStutterNativeTrace.h"
+#include "MVKStutterCoverage.h"
 #include <mutex>
 #include <cstdio>
 
@@ -38,6 +40,10 @@ inline void mvkQueueTimingBegin(id<MTLCommandBuffer> cb, uint32_t family, uint32
     NSString* path = [NSString stringWithFormat:@"%s/queue-timing-%d.jsonl", directory, getpid()];
     NSString* currentPath = [NSString stringWithFormat:@"%s/queue-timing-current-%d-%u-%u.json", directory, getpid(), family, index];
     [cb addCompletedHandler:^(id<MTLCommandBuffer> completed) {
+        auto provenance=mvkStutterNativeSnapshot(completed);
+        MVKCPUContext context;context.domain=7;context.queueFamily=family;context.queueIndex=index;
+        context.submission=provenance.logical;context.nativeCB=provenance.nativeID;context.frame=provenance.frame;
+        MVKCPUContextGuard contextGuard(context);MVK_CPU_SCOPE_CPU(CallbackCompletion);
         struct Window {
             double start = 0, host = 0, gpu = 0, wait = 0, maxHost = 0, maxGPU = 0;
             uint64_t count = 0, valid = 0, errors = 0;

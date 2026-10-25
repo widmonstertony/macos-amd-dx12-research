@@ -17,6 +17,8 @@
  */
 
 #include "MVKCommandBuffer.h"
+#include "MVKStutterCoverage.h"
+#include "MVKStutterNativeTrace.h"
 #include "MVKFramebuffer.h"
 #include "MVKCommandPool.h"
 #include "MVKQueue.h"
@@ -302,6 +304,7 @@ void MVKCommandBuffer::addCommand(MVKCommand* command) {
 
 void MVKCommandBuffer::submit(MVKQueueCommandBufferSubmission* cmdBuffSubmit,
 							  MVKCommandEncodingContext* pEncodingContext) {
+    MVK_CPU_SCOPE(QueueSubmitWork);
 	if ( !canExecute() ) { return; }
 
 	if (_prefilledMTLCmdBuffer) {
@@ -413,6 +416,18 @@ void MVKCommandBuffer::recordBindPipeline(MVKCmdBindPipeline* mvkBindPipeline) {
 void MVKCommandEncoder::encode(id<MTLCommandBuffer> mtlCmdBuff,
 							   MVKCommandEncodingContext* pEncodingContext,
 							   MVKQueueCommandBufferSubmission* cmdBuffSubmit) {
+    auto cpuNative = mvkStutterNativeSnapshot(mtlCmdBuff);
+    auto cpuContext = mvkStutterContext();
+    cpuContext.nativeCB = cpuNative.nativeID;
+    if (cpuNative.logical) cpuContext.submission = cpuNative.logical;
+    if (cpuNative.nativeID) {
+        cpuContext.frame = cpuNative.frame;
+        cpuContext.queueFamily = cpuNative.family;
+        cpuContext.queueIndex = cpuNative.index;
+        cpuContext.domain = std::min(cpuNative.family+1,6u);
+    }
+    MVKCPUContextGuard cpuContextGuard(cpuContext);
+    MVK_CPU_SCOPE_CPU(HostEncode);
 	uint64_t startTime = getPerformanceTimestamp();
 
 	_cmdBuffSubmit = cmdBuffSubmit;
@@ -448,6 +463,7 @@ void MVKCommandEncoder::encodeCommands(MVKCommand* command) {
 }
 
 void MVKCommandEncoder::encodeCommandsImpl(MVKCommand* command) {
+    MVK_CPU_SCOPE(EncodeCommands);
     while(command) {
         uint32_t prevMVPassIdx = _multiviewPassIndex;
         command->encode(this);
@@ -478,6 +494,7 @@ void MVKCommandEncoder::encodeSecondary(MVKCommandBuffer* secondaryCmdBuffer) {
 }
 
 void MVKCommandEncoder::beginRendering(MVKCommand* rendCmd, const VkRenderingInfo* pRenderingInfo) {
+    MVK_CPU_SCOPE(RenderPassBegin);
 
 	VkSubpassContents contents = (mvkIsAnyFlagEnabled(pRenderingInfo->flags, VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT)
 								  ? VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
@@ -543,6 +560,7 @@ void MVKCommandEncoder::beginRenderpass(MVKCommand* passCmd,
 										MVKArrayRef<VkClearValue> clearValues,
 										MVKArrayRef<MVKImageView*> attachments,
 										MVKCommandUse cmdUse) {
+    MVK_CPU_SCOPE(RenderPassBegin);
 	_pEncodingContext->setRenderingContext(renderPass, framebuffer);
 	_renderArea = renderArea;
 	_isRenderingEntireAttachment = (mvkVkOffset2DsAreEqual(_renderArea.offset, {0,0}) &&
@@ -729,6 +747,7 @@ void MVKCommandEncoder::setBarrier(uint64_t sourceStageMask, uint64_t destStageM
 
 
 void MVKCommandEncoder::encodeBarrierWaits(MVKCommandUse use) {
+    MVK_CPU_SCOPE(EncodeBarrier);
 	if (_mtlRenderEncoder) {
 		[_mtlRenderEncoder insertDebugSignpost:@"Encoding waits"];
 		barrierWait(kMVKBarrierStageVertex, _mtlRenderEncoder, MTLRenderStageVertex);
@@ -749,6 +768,7 @@ void MVKCommandEncoder::encodeBarrierWaits(MVKCommandUse use) {
 }
 
 void MVKCommandEncoder::encodeBarrierUpdates() {
+    MVK_CPU_SCOPE(EncodeBarrier);
 	if (_mtlRenderEncoder) {
 		barrierUpdate(kMVKBarrierStageVertex, _mtlRenderEncoder, MTLRenderStageVertex);
 		barrierUpdate(kMVKBarrierStageFragment, _mtlRenderEncoder, MTLRenderStageFragment);
@@ -772,6 +792,7 @@ void MVKCommandEncoder::encodeBarrierUpdates() {
 
 // Creates _mtlRenderEncoder and marks cached render state as dirty so it will be set into the _mtlRenderEncoder.
 void MVKCommandEncoder::beginMetalRenderPass(MVKCommandUse cmdUse) {
+    MVK_CPU_SCOPE(NativeEncoderCreate);
 
     endCurrentMetalEncoding();
 
@@ -1029,6 +1050,7 @@ void MVKCommandEncoder::updateAttachmentInputIndices(const MVKArrayRef<uint32_t>
 }
 
 void MVKCommandEncoder::finalizeDrawState(MVKGraphicsStage stage) {
+    MVK_CPU_SCOPE(FinalizeDraw);
     if (stage == kMVKGraphicsStageVertex) {
         // Must happen before switching encoders.
         encodeStoreActions(true);
@@ -1085,6 +1107,7 @@ void MVKCommandEncoder::clearRenderArea(MVKCommandUse cmdUse) {
 }
 
 void MVKCommandEncoder::beginMetalComputeEncoding(MVKCommandUse cmdUse) {
+    MVK_CPU_SCOPE(NativeEncoderCreate);
 	getState().beginComputeEncoding();
 }
 
@@ -1114,6 +1137,7 @@ void MVKCommandEncoder::endRenderpass() {
 }
 
 void MVKCommandEncoder::endMetalRenderEncoding() {
+    MVK_CPU_SCOPE(RenderPassEnd);
     if (_mtlRenderEncoder == nil) { return; }
 
 	if (_cmdBuffer->_hasStageCounterTimestampCommand) { mvkRecordEncoderWork(_mtlRenderEncoder, @"timestamp-fence-update", [NSString stringWithFormat:@"%p",getStageCountersMTLFence()]); [_mtlRenderEncoder updateFence: getStageCountersMTLFence() afterStages: MTLRenderStageFragment]; }

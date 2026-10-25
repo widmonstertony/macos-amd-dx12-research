@@ -28,6 +28,9 @@
 
 #import <Metal/Metal.h>
 
+// No I/O: mark the actual submit call immediately before native commit.
+void mvkMarkTrackedCommandBufferCommit(id<MTLCommandBuffer> cb);
+
 class MVKQueue;
 class MVKQueueSubmission;
 class MVKPhysicalDevice;
@@ -180,6 +183,7 @@ public:
 	VkPipelineStageFlags2 stageMask;
 	uint32_t deviceIndex;
 	bool hostWaitSatisfied = false;
+	uint64_t diagnosticSubmission = 0; // Diagnostic identity only; never a semaphore value.
 
 	void encodeWait(id<MTLCommandBuffer> mtlCmdBuff);
 	void encodeSignal(id<MTLCommandBuffer> mtlCmdBuff);
@@ -227,6 +231,8 @@ protected:
 	MVKQueue* _queue;
 	MVKSmallVector<MVKSemaphoreSubmitInfo> _waitSemaphores;
 	uint64_t _creationTime;
+	uint64_t _stutterSubmissionID = 0, _stutterCreatedNS = 0;
+	uint32_t _stutterNativeSplit = 0;
 };
 
 

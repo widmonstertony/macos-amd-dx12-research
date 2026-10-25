@@ -1,99 +1,131 @@
-// Opt-in, timed public Metal counter diagnostics. No new waits or fences.
+// Opt-in bounded public Metal counters. No new waits, fences or shader changes.
 #pragma once
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#include <mach/mach_time.h>
 #include <atomic>
+#include <chrono>
+#include <memory>
+#include <mutex>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
+#include <cerrno>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "MVKTimedTraceArm.h"
-inline bool mvkGPUTimestampArmed() {
-    static const MVKTimedTraceArm arm(getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH"));
-    return arm.enabled();
+#include "MVKStutterCoverage.h"
+inline bool mvkGPUCounterBurstEnabled(){static const bool v=[] {auto x=getenv("MVK_AMD_GPU_COUNTER_BURST");return x&&!strcmp(x,"1");}();return v;}
+inline std::atomic<uint64_t>&mvkCounterArmDeadline(){static std::atomic<uint64_t>n{0};return n;}
+inline std::atomic<uint64_t>&mvkCounterArmRefreshDeadline(){static std::atomic<uint64_t>n{0};return n;}
+inline bool mvkCounterRefreshBurstArm(){struct stat st{};auto p=getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH");auto wall=std::time(nullptr);bool on=p&&stat(p,&st)==0&&S_ISREG(st.st_mode)&&st.st_mtime<=wall&&wall-st.st_mtime<30;uint64_t now=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();mvkCounterArmRefreshDeadline().store(now+250000000ull,std::memory_order_relaxed);mvkCounterArmDeadline().store(on?now+uint64_t(30-(wall-st.st_mtime))*1000000000ull:0,std::memory_order_relaxed);return on;}
+inline bool mvkGPUTimestampArmed(){if(mvkGPUCounterBurstEnabled()){auto now=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();if(uint64_t(now)>=mvkCounterArmRefreshDeadline().load(std::memory_order_relaxed))return mvkCounterRefreshBurstArm();return mvkCounterArmDeadline().load(std::memory_order_relaxed)>uint64_t(now);}static const MVKTimedTraceArm arm(getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH"));return arm.enabled();}
+inline const char*mvkGPUCounterPipelineLabel(){auto s=getenv("MVK_AMD_GPU_COUNTER_PIPELINE_LABEL");return s&&s[0]?s:getenv("MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL");}
+inline bool mvkGPUCounterAllDraws(){if(mvkGPUCounterBurstEnabled())return mvkGPUTimestampArmed();auto s=getenv("MVK_AMD_GPU_COUNTER_ALL_DRAWS");return s&&s[0]&&strcmp(s,"0");}
+inline uint64_t mvkCounterMonotonicNS(){return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();}
+inline uint64_t mvkCounterBoundedEnv(const char*name,uint64_t fallback,uint64_t low,uint64_t high){auto v=getenv(name);if(!v||!v[0]||v[0]=='-')return fallback;char*e=nullptr;auto n=strtoull(v,&e,10);return e&&!*e&&n>=low&&n<=high?n:fallback;}
+struct MVKCounterBurstConfig {
+ uint64_t commandBuffers=mvkCounterBoundedEnv("MVK_AMD_GPU_COUNTER_BURST_MAX_CBS",512,1,512),inFlight=mvkCounterBoundedEnv("MVK_AMD_GPU_COUNTER_BURST_MAX_IN_FLIGHT",16,1,64),perCB=mvkCounterBoundedEnv("MVK_AMD_GPU_COUNTER_BURST_SAMPLES_PER_CB",512,2,16384),samples=mvkCounterBoundedEnv("MVK_AMD_GPU_COUNTER_BURST_MAX_SAMPLES",262144,2,262144);
+ double seconds=[] {auto v=getenv("MVK_AMD_GPU_COUNTER_BURST_SECONDS");if(!v)return 5.0;char*e=nullptr;double n=strtod(v,&e);return e&&!*e&&n>=0.05&&n<=30.0?n:5.0;}();
+};
+inline const MVKCounterBurstConfig&mvkCounterBurstConfig(){static const MVKCounterBurstConfig c;return c;}
+struct MVKCounterClockAnchor {uint64_t cpu=0,gpu=0,hostBefore=0,hostAfter=0,hostCostNS=0;double caBefore=0,caAfter=0;uint32_t cpuDomain=0;bool attempted=false;};
+struct MVKCounterClockPair {MVKCounterClockAnchor begin,end;};
+inline bool mvkCounterPerCBCalibration(){static const bool v=[] {auto p=getenv("MVK_AMD_GPU_COUNTER_PER_CB_CALIBRATION");return p&&!strcmp(p,"1");}();return v;}
+struct MVKCounterBurstSession {
+ uint64_t id=0,armSignature=0,startedNS=0,deadlineNS=0;double startedCF=0;
+ std::mutex clockLock;MVKCounterClockPair clock;NSObject<MTLDevice>*clockDevice=nil;std::atomic<bool>closed{false};bool clockSidecarAttempted=false,clockSidecarWritten=false,clockDeviceConflict=false;
+ ~MVKCounterBurstSession(){[clockDevice release];}
+ std::atomic<uint64_t> observed{0},reserved{0},allocated{0},completed{0},inFlight{0},cbLimit{0},flightLimit{0},windowLimit{0},unsupported{0},allocationFailures{0},offered{0},encoded{0},eventCapacity{0},sampleBudget{0},liveBudget{0},eventWindow{0},unsupportedPoint{0};
+};
+inline void mvkCounterMaybeFinishSessionClock(const std::shared_ptr<MVKCounterBurstSession>&s);
+inline void mvkCounterBeginSessionClock(const std::shared_ptr<MVKCounterBurstSession>&s,id<MTLDevice>d);
+inline NSDictionary*mvkCounterSessionClockSnapshot(const std::shared_ptr<MVKCounterBurstSession>&s);
+inline std::atomic<unsigned>&mvkGPUTimestampInFlight(){static std::atomic<unsigned> n{0};return n;}
+inline std::atomic<uint64_t>&mvkCounterLiveSamples(){static std::atomic<uint64_t> n{0};return n;}
+inline std::atomic<bool>&mvkCounterHasOpenSession(){static std::atomic<bool>v{false};return v;}
+inline std::shared_ptr<MVKCounterBurstSession>mvkCounterCurrentSession(){
+ struct State{std::mutex lock;uint64_t sequence=0,signature=0;std::shared_ptr<MVKCounterBurstSession>current;};static State state;std::lock_guard<std::mutex>g(state.lock);uint64_t now=mvkCounterMonotonicNS();
+ {struct stat st{};auto path=getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH");auto wall=std::time(nullptr);if(!path||stat(path,&st)!=0||!S_ISREG(st.st_mode)||st.st_mtime>wall||wall-st.st_mtime>=30){if(state.current){state.current->closed=true;mvkCounterHasOpenSession()=false;mvkCounterMaybeFinishSessionClock(state.current);}return state.current;}state.signature=uint64_t(st.st_mtimespec.tv_sec)*1000000000ull+st.st_mtimespec.tv_nsec;
+  if(!state.current||state.current->armSignature!=state.signature){if(state.current){state.current->closed=true;mvkCounterHasOpenSession()=false;mvkCounterMaybeFinishSessionClock(state.current);}auto s=std::make_shared<MVKCounterBurstSession>();s->id=++state.sequence;s->armSignature=state.signature;s->startedNS=now;s->startedCF=[NSDate timeIntervalSinceReferenceDate];s->deadlineNS=now+uint64_t(mvkCounterBurstConfig().seconds*1e9);state.current=std::move(s);mvkCounterHasOpenSession()=true;}}
+ if(state.current&&now>=state.current->deadlineNS){state.current->closed=true;mvkCounterHasOpenSession()=false;mvkCounterMaybeFinishSessionClock(state.current);}return state.current;
 }
-inline const char* mvkGPUCounterPipelineLabel() {
-    const char* selected=getenv("MVK_AMD_GPU_COUNTER_PIPELINE_LABEL");
-    if(selected&&selected[0])return selected;
-    return getenv("MVK_AMD_GEOMETRY_DRAW_TRACE_LABEL");
+// A record owns its original session, including after rearming in the same process.
+inline std::shared_ptr<MVKCounterBurstSession>mvkCounterRecordSession(NSDictionary*r){NSData*d=r[@"gpuCounterSessionOwner"];return d?*static_cast<const std::shared_ptr<MVKCounterBurstSession>*>(d.bytes):nullptr;}
+inline void mvkCounterOwnSession(NSMutableDictionary*r,const std::shared_ptr<MVKCounterBurstSession>&s){auto*p=new std::shared_ptr<MVKCounterBurstSession>(s);NSData*d=[[NSData alloc]initWithBytesNoCopy:p length:sizeof(*p) deallocator:^(void*b,NSUInteger){delete static_cast<std::shared_ptr<MVKCounterBurstSession>*>(b);}];r[@"gpuCounterSessionOwner"]=d;[d release];}
+// Stable numeric skip reasons are consumed by the compact queue flight recorder.
+enum MVKCounterSkip:uint32_t{MVKCounterNotArmed=0,MVKCounterAllocated=1,MVKCounterQueueFiltered=2,MVKCounterPipelinePending=3,MVKCounterWindowCap=4,MVKCounterCBCap=5,MVKCounterFlightCap=6,MVKCounterUnsupported=7,MVKCounterAllocationFailed=8};
+struct MVKCounterAccounting {
+ uint64_t counterCBID=0,nativeCB=0,nativeQueue=0,createdNS=0;double createdCF=0;uint32_t family=0,index=0,skip=0,supportedPoints=0;bool attempted=false,observed=false,midCB=false,released=false,commitObserved=false,lastEncodedWasEncoderEnd=false;uint32_t suffixReasonMask=0;uint64_t commitNS=0,encoderBegins=0,encoderEnds=0;
+ uint64_t offered=0,encoded=0,filtered=0,noBuffer=0,capacity=0,window=0,budget=0,liveBudget=0,unsupportedPoint=0;
+};
+inline MVKCounterAccounting*mvkCounterAccounting(NSDictionary*r){NSData*d=r[@"gpuCounterAccounting"];return d?(MVKCounterAccounting*)d.bytes:nullptr;}
+inline MVKCounterAccounting*mvkCounterEnsureAccounting(NSMutableDictionary*r){auto*a=mvkCounterAccounting(r);if(a)return a;NSMutableData*d=[NSMutableData dataWithLength:sizeof(MVKCounterAccounting)];a=new(d.mutableBytes)MVKCounterAccounting;static std::atomic<uint64_t>seq{0};a->counterCBID=seq.fetch_add(1)+1;a->createdNS=mvkCounterMonotonicNS();a->createdCF=[NSDate timeIntervalSinceReferenceDate];a->family=[r[@"queueFamily"]unsignedIntValue];a->index=[r[@"queueIndex"]unsignedIntValue];r[@"gpuCounterAccounting"]=d;return a;}
+inline NSString*mvkCounterSkipName(uint32_t r){switch(r){case 1:return @"allocated";case 2:return @"legacy-queue-filter";case 3:return @"legacy-pipeline-pending";case 4:return @"duration-cap";case 5:return @"command-buffer-cap";case 6:return @"in-flight-cap";case 7:return @"unsupported-counter-sampling";case 8:return @"counter-buffer-allocation-failed";default:return @"not-armed";}}
+inline NSDictionary*mvkCounterSessionSnapshot(const std::shared_ptr<MVKCounterBurstSession>&s){if(!s)return @{@"enabled":@NO};auto&c=mvkCounterBurstConfig();return @{@"enabled":@YES,@"sessionID":@(s->id),@"armSignature":@(s->armSignature),@"startedMonotonicNS":@(s->startedNS),@"startedCF":@(s->startedCF),@"deadlineMonotonicNS":@(s->deadlineNS),@"maxSeconds":@(c.seconds),@"maxCommandBuffers":@(c.commandBuffers),@"maxInFlight":@(c.inFlight),@"samplesPerCommandBuffer":@(c.perCB),@"maxSamples":@(c.samples),@"commandBuffersObserved":@(s->observed.load()),@"commandBuffersReserved":@(s->reserved.load()),@"commandBuffersAllocated":@(s->allocated.load()),@"commandBuffersCompleted":@(s->completed.load()),@"commandBuffersInFlight":@(s->inFlight.load()),@"commandBuffersDroppedCap":@(s->cbLimit.load()),@"commandBuffersDroppedInFlight":@(s->flightLimit.load()),@"commandBuffersDroppedDuration":@(s->windowLimit.load()),@"commandBuffersUnsupported":@(s->unsupported.load()),@"allocationFailures":@(s->allocationFailures.load()),@"eventsOffered":@(s->offered.load()),@"samplesEncoded":@(s->encoded.load()),@"eventsDroppedCapacity":@(s->eventCapacity.load()),@"eventsDroppedSampleBudget":@(s->sampleBudget.load()),@"eventsDroppedLiveBudget":@(s->liveBudget.load()),@"eventsDroppedDuration":@(s->eventWindow.load()),@"eventsDroppedUnsupportedPoint":@(s->unsupportedPoint.load()),@"closed":@(s->closed.load()),@"clockCalibrationMode":mvkCounterPerCBCalibration()?@"per-command-buffer-deep":@"session-pair",@"clockCalibration":mvkCounterSessionClockSnapshot(s)};}
+inline NSDictionary*mvkGPUCounterBurstCoverage(){return mvkGPUCounterBurstEnabled()?mvkCounterSessionSnapshot(mvkCounterCurrentSession()):@{@"enabled":@NO};}
+// This never resolves GPU data. Parent IDs are read at snapshot time because
+// prefilled buffers may receive submission/frame association after creation.
+inline NSDictionary*mvkGPUCounterCaptureOutcome(NSDictionary*r){auto*a=mvkCounterAccounting(r);if(!a)return @{@"observed":@NO,@"allocated":@NO,@"skipReasonCode":@0};auto s=mvkCounterRecordSession(r);uint32_t suffix=a->suffixReasonMask;if(!a->commitObserved)suffix|=1;if(a->encoded&&!a->lastEncodedWasEncoderEnd)suffix|=16;if(a->encoderBegins>a->encoderEnds)suffix|=32;return @{@"observed":@(a->observed),@"allocated":@(r[@"gpuCounterBuffer"]!=nil),@"skipReasonCode":@(a->skip),@"skipReason":mvkCounterSkipName(a->skip),@"sessionID":@(s?s->id:0),@"counterCBID":@(a->counterCBID),@"nativeCBID":r[@"nativeCBID"]?:@0,@"logicalSubmissionID":r[@"logicalSubmissionID"]?:@0,@"nativeSplitIndex":r[@"nativeSplitIndex"]?:@0,@"presentFrameID":r[@"presentFrameID"]?:@0,@"nativeCommandBuffer":r[@"nativeCommandBuffer"]?:[NSString stringWithFormat:@"%p",(void*)a->nativeCB],@"nativeQueue":[NSString stringWithFormat:@"%p",(void*)a->nativeQueue],@"queueFamily":@(a->family),@"queueIndex":@(a->index),@"createdMonotonicNS":@(a->createdNS),@"createdCF":@(a->createdCF),@"captureStartedMidCommandBuffer":@(a->midCB),@"nativeCommitObserved":@(a->commitObserved),@"nativeCommitMonotonicNS":@(a->commitNS),@"mayHaveUnsampledSuffix":@(suffix!=0),@"suffixReasonMask":@(suffix),@"suffixProofUnavailable":@(!a->commitObserved||(suffix&48)),@"sampledEncoderBegins":@(a->encoderBegins),@"sampledEncoderEnds":@(a->encoderEnds),@"allocationAttempted":@(a->attempted),@"samplingPointSupportMask":@(a->supportedPoints),@"eligibleEventsOffered":@(a->offered),@"samplesEncoded":@(a->encoded),@"filteredEventKinds":@(a->filtered),@"eventsWithoutCounterBuffer":@(a->noBuffer),@"eventsDroppedCapacity":@(a->capacity),@"eventsDroppedDuration":@(a->window),@"eventsDroppedSampleBudget":@(a->budget),@"eventsDroppedLiveBudget":@(a->liveBudget),@"eventsDroppedUnsupportedPoint":@(a->unsupportedPoint),@"capHit":@(a->skip==4||a->skip==5||a->skip==6||a->capacity||a->window||a->budget||a->liveBudget)};}
+// Observe the host encoding boundary without adding GPU commands. The caller
+// places this before its final no-I/O commit timestamp. Reasons are conservative:
+// an encoder may already have ended before an external arm was removed.
+// mask: 1 no commit observation, 2 arm off, 4 different arm, 8 duration ended,
+//       16 last sample not encoder-end, 32 unmatched sampled encoder begins.
+struct MVKCounterErrnoGuard {int saved=errno;~MVKCounterErrnoGuard(){errno=saved;}};
+inline void mvkMarkGPUCounterCommit(NSDictionary*r){MVKCounterErrnoGuard preserveErrno;auto*a=mvkCounterAccounting(r);if(!a||!r[@"gpuCounterBuffer"])return;MVK_CPU_SCOPE(DiagnosticPublish);@synchronized(r){a->commitObserved=true;a->commitNS=mvkCounterMonotonicNS();auto s=mvkCounterRecordSession(r);if(!s)return;struct stat st{};auto path=getenv("MVK_AMD_GPU_COUNTER_TRACE_ARM_PATH");auto wall=std::time(nullptr);bool armed=path&&stat(path,&st)==0&&S_ISREG(st.st_mode)&&st.st_mtime<=wall&&wall-st.st_mtime<30;if(!armed)a->suffixReasonMask|=2;else{uint64_t signature=uint64_t(st.st_mtimespec.tv_sec)*1000000000ull+st.st_mtimespec.tv_nsec;if(signature!=s->armSignature)a->suffixReasonMask|=4;}if(a->commitNS>=s->deadlineNS)a->suffixReasonMask|=8;}}
+// Public paired CPU/GPU samples bracket the captured work. Raw GPU counter
+// values are never assumed to be nanoseconds or Core Animation timestamps.
+inline long double mvkCounterMachToNS(long double ticks){static const mach_timebase_info_data_t t=[] {mach_timebase_info_data_t v{};mach_timebase_info(&v);return v;}();return ticks*t.numer/t.denom;}
+inline MVKCounterClockPair*mvkCounterClockPair(NSDictionary*r){NSData*d=r[@"gpuCounterClockPair"];return d?(MVKCounterClockPair*)d.bytes:nullptr;}
+inline void mvkCounterSampleClock(id<MTLDevice>d,MVKCounterClockAnchor&a){
+ if(a.attempted)return;a.attempted=true;if(!d||![d respondsToSelector:@selector(sampleTimestamps:gpuTimestamp:)])return;
+ MVK_CPU_SCOPE(GPUCounterCalibration);a.hostBefore=mach_absolute_time();a.caBefore=CACurrentMediaTime();[d sampleTimestamps:&a.cpu gpuTimestamp:&a.gpu];a.hostAfter=mach_absolute_time();a.caAfter=CACurrentMediaTime();a.hostCostNS=uint64_t(mvkCounterMachToNS(a.hostAfter-a.hostBefore));
+ // Detect the public CPU timestamp domain against the bracketing host clock.
+ // On this Intel target Mach ticks are nanoseconds; both checks agree. On a
+ // different timebase, an unrecognized domain remains explicitly unavailable.
+ if(a.cpu>=a.hostBefore&&a.cpu<=a.hostAfter)a.cpuDomain=1;
+ else if((long double)a.cpu>=mvkCounterMachToNS(a.hostBefore)&&(long double)a.cpu<=mvkCounterMachToNS(a.hostAfter))a.cpuDomain=2;
 }
-inline bool mvkGPUCounterAllDraws() {
-    const char* enabled = getenv("MVK_AMD_GPU_COUNTER_ALL_DRAWS");
-    return enabled && enabled[0] && strcmp(enabled, "0");
+inline void mvkCounterBeginCalibration(NSMutableDictionary*r,id<MTLDevice>d){if(!mvkGPUCounterBurstEnabled()||!mvkCounterPerCBCalibration())return;NSMutableData*data=[NSMutableData dataWithLength:sizeof(MVKCounterClockPair)];auto*p=new(data.mutableBytes)MVKCounterClockPair;r[@"gpuCounterClockPair"]=data;r[@"gpuCounterClockDevice"]=d;mvkCounterSampleClock(d,p->begin);}
+inline void mvkCounterFinishCalibration(NSDictionary*r){auto*p=mvkCounterClockPair(r);if(p&&[r[@"nativeCompleted"]boolValue])mvkCounterSampleClock(r[@"gpuCounterClockDevice"],p->end);}
+inline bool mvkCounterCalibrationValid(MVKCounterClockPair*p){return p&&p->begin.cpuDomain&&p->begin.cpuDomain==p->end.cpuDomain&&p->begin.cpu&&p->begin.gpu&&p->end.cpu>p->begin.cpu&&p->end.gpu>p->begin.gpu&&p->begin.gpu!=MTLCounterErrorValue&&p->end.gpu!=MTLCounterErrorValue;}
+inline NSDictionary*mvkCounterClockAnchorSnapshot(const MVKCounterClockAnchor&a){return @{@"attempted":@(a.attempted),@"cpuRaw":@(a.cpu),@"gpuRaw":@(a.gpu),@"cpuDomain":a.cpuDomain==1?@"mach-absolute-ticks":a.cpuDomain==2?@"nanoseconds":@"unrecognized-or-unavailable",@"hostBeforeMachTicks":@(a.hostBefore),@"hostAfterMachTicks":@(a.hostAfter),@"hostBeforeCA":@(a.caBefore),@"hostAfterCA":@(a.caAfter),@"hostSamplingCostNS":@(a.hostCostNS)};}
+inline NSDictionary*mvkCounterPairSnapshot(MVKCounterClockPair*p){if(!p)return @{@"available":@NO,@"reason":@"per-command-buffer-calibration-disabled-use-session-sidecar"};return @{@"available":@(mvkCounterCalibrationValid(p)),@"before":mvkCounterClockAnchorSnapshot(p->begin),@"after":mvkCounterClockAnchorSnapshot(p->end),@"rawCounterDomain":@"device-GPU-clock",@"conversion":@"paired-sample-affine-to-public-CPU-then-detected-Mach-or-nanoseconds-to-CA",@"hostSamplingCostNS":@(p->begin.hostCostNS+p->end.hostCostNS),@"maxHostSamplingBracketNS":@(p->begin.hostCostNS>p->end.hostCostNS?p->begin.hostCostNS:p->end.hostCostNS),@"convertedCAIsEstimate":@YES,@"hardwareClockAccuracyGuaranteed":@NO};}
+inline NSDictionary*mvkCounterCalibrationSnapshot(NSDictionary*r){return mvkCounterPairSnapshot(mvkCounterClockPair(r));}
+inline NSDictionary*mvkCounterSessionClockSnapshot(const std::shared_ptr<MVKCounterBurstSession>&s){if(!s)return @{@"available":@NO};std::lock_guard<std::mutex>g(s->clockLock);return @{@"sessionID":@(s->id),@"pending":@(s->clock.begin.attempted&&!s->clock.end.attempted),@"closed":@(s->closed.load()),@"sidecarAttempted":@(s->clockSidecarAttempted),@"sidecarWritten":@(s->clockSidecarWritten),@"physicalDeviceRegistryID":@(s->clockDevice?s->clockDevice.registryID:0),@"physicalDeviceConflict":@(s->clockDeviceConflict),@"pairedClock":mvkCounterPairSnapshot(&s->clock)};}
+inline void mvkCounterBeginSessionClock(const std::shared_ptr<MVKCounterBurstSession>&s,id<MTLDevice>d){if(!s||mvkCounterPerCBCalibration())return;std::lock_guard<std::mutex>g(s->clockLock);if(s->clockDevice&&s->clockDevice!=d){s->clockDeviceConflict=true;return;}if(s->clock.begin.attempted)return;s->clockDevice=[d retain];mvkCounterSampleClock(d,s->clock.begin);}
+inline void mvkCounterMaybeFinishSessionClock(const std::shared_ptr<MVKCounterBurstSession>&s){
+ if(!s||mvkCounterPerCBCalibration()||!s->closed.load()||s->inFlight.load())return;
+ std::lock_guard<std::mutex>g(s->clockLock);if(!s->clock.begin.attempted||s->clockSidecarAttempted)return;mvkCounterSampleClock(s->clockDevice,s->clock.end);s->clockSidecarAttempted=true;
+ const char*dir=getenv("MVK_CONFIG_SHADER_DUMP_DIR");if(!dir||!*dir)return;char path[4096];int n=snprintf(path,sizeof(path),"%s/gpu-counter-clock-sessions-%d.jsonl",dir,getpid());if(n<=0||size_t(n)>=sizeof(path))return;
+ auto row=@{@"type":@"gpuCounterSessionClock",@"sessionID":@(s->id),@"armSignature":@(s->armSignature),@"closed":@YES,@"commandBuffersAllocated":@(s->allocated.load()),@"commandBuffersCompleted":@(s->completed.load()),@"physicalDeviceRegistryID":@(s->clockDevice?s->clockDevice.registryID:0),@"physicalDeviceConflict":@(s->clockDeviceConflict),@"clockCalibration":mvkCounterPairSnapshot(&s->clock)};NSData*data=[NSJSONSerialization dataWithJSONObject:row options:0 error:nil];if(!data)return;static std::mutex fileLock;std::lock_guard<std::mutex>fileGuard(fileLock);FILE*f=fopen(path,"a");if(!f)return;bool written=fwrite(data.bytes,1,data.length,f)==data.length&&fputc('\n',f)!=EOF;fflush(f);fclose(f);s->clockSidecarWritten=written;
 }
-inline std::atomic<unsigned>& mvkGPUTimestampInFlight() { static std::atomic<unsigned> n{0}; return n; }
-inline bool mvkAllocateGPUTimestampBuffer(NSMutableDictionary* record, id<MTLDevice> device) {
-    if (record[@"gpuCounterBuffer"] || !device || !mvkGPUTimestampArmed()) return record[@"gpuCounterBuffer"] != nil;
-    auto& n=mvkGPUTimestampInFlight();
-    // A full draw/batch trace is intentionally much larger than the ordinary
-    // pipeline trace.  Keep only one such command buffer instrumented at a
-    // time so the diagnostic cannot multiply its shared-memory and Objective-C
-    // event-array cost across the game's deep queue backlog.
-    const unsigned inFlightLimit = mvkGPUCounterAllDraws() ? 1 : 64;
-    if(n.fetch_add(1)>=inFlightLimit) { n.fetch_sub(1); return false; }
-    if (![device supportsCounterSampling:MTLCounterSamplingPointAtDrawBoundary] ||
-        ![device supportsCounterSampling:MTLCounterSamplingPointAtDispatchBoundary]) { n.fetch_sub(1);return false; }
-    id<MTLCounterSet>set=nil;
-    for(id<MTLCounterSet>s in device.counterSets)if([s.name isEqualToString:MTLCommonCounterSetTimestamp]){set=s;break;}
-    if(!set){n.fetch_sub(1);return false;}
-    // The first internal geometry-batch capture filled 512 samples after only
-    // 22.9 ms of a command buffer that ultimately ran for about seven seconds.
-    // 16K samples keep the capture bounded while covering the complete failing
-    // buffer in one run instead of repeatedly guessing a later pipeline hash.
-    const NSUInteger sampleCapacity = mvkGPUCounterAllDraws() ? 16384 : 128;
-    auto desc=[MTLCounterSampleBufferDescriptor new];desc.counterSet=set;desc.storageMode=MTLStorageModeShared;desc.sampleCount=sampleCapacity;
-    NSError* error=nil;auto buffer=[device newCounterSampleBufferWithDescriptor:desc error:&error];[desc release];
-    if(!buffer){n.fetch_sub(1);return false;}
-    record[@"gpuCounterBuffer"]=buffer;[buffer release];record[@"gpuCounterEvents"]=[NSMutableArray array];
-    record[@"gpuCounterCapacity"]=@(sampleCapacity);
-    record[@"gpuCounterAllDraws"]=@(mvkGPUCounterAllDraws());
-    return true;
+inline bool mvkCounterConvertTimestamp(MVKCounterClockPair*p,uint64_t gpu,long double&cpuNS,double&ca){
+ if(!mvkCounterCalibrationValid(p)||gpu<p->begin.gpu||gpu>p->end.gpu)return false;
+ long double cpu=(long double)p->begin.cpu+(long double)(gpu-p->begin.gpu)*(p->end.cpu-p->begin.cpu)/(p->end.gpu-p->begin.gpu);cpuNS=p->begin.cpuDomain==1?mvkCounterMachToNS(cpu):cpu;
+ auto offset=[](const MVKCounterClockAnchor&a){return (a.caBefore+a.caAfter)*.5-double(mvkCounterMachToNS(((long double)a.hostBefore+a.hostAfter)*.5)/1e9L);};ca=double(cpuNS/1e9L)+(offset(p->begin)+offset(p->end))*.5;return true;
 }
-inline void mvkBeginGPUTimestamps(NSMutableDictionary* record, id<MTLCommandBuffer> cb, uint32_t family) {
-    if (family != 0 || !mvkGPUTimestampArmed()) return;
-    const char* selected=mvkGPUCounterPipelineLabel();
-    if(selected&&selected[0]) {
-        // A busy game can have more than 64 ordinary command buffers in flight
-        // before the selected mesh pipeline is reached. Reserve the bounded
-        // counter budget for the command buffer that actually contains it.
-        record[@"gpuCounterLazyGeometryLabel"]=@(selected);
-        return;
-    }
-    mvkAllocateGPUTimestampBuffer(record, cb.commandQueue.device);
+inline bool mvkAllocateGPUTimestampBuffer(NSMutableDictionary*r,id<MTLDevice>d){
+ if(r[@"gpuCounterBuffer"]||!d||!mvkGPUTimestampArmed())return r[@"gpuCounterBuffer"]!=nil;auto*a=mvkCounterEnsureAccounting(r);bool burst=mvkGPUCounterBurstEnabled();if(burst&&a->attempted)return false;a->attempted=true;a->observed=true;std::shared_ptr<MVKCounterBurstSession>s;
+ if(burst){s=mvkCounterCurrentSession();if(!s){a->skip=0;return false;}mvkCounterOwnSession(r,s);++s->observed;if(mvkCounterMonotonicNS()>=s->deadlineNS){++s->windowLimit;a->skip=4;return false;}if(s->reserved.fetch_add(1)>=mvkCounterBurstConfig().commandBuffers){--s->reserved;++s->cbLimit;s->closed=true;mvkCounterHasOpenSession()=false;mvkCounterMaybeFinishSessionClock(s);a->skip=5;return false;}}
+ auto&f=mvkGPUTimestampInFlight();unsigned limit=burst?unsigned(mvkCounterBurstConfig().inFlight):(mvkGPUCounterAllDraws()?1:64);if(f.fetch_add(1)>=limit){--f;if(s){--s->reserved;++s->flightLimit;}a->skip=6;return false;}
+ bool draw=[d supportsCounterSampling:MTLCounterSamplingPointAtDrawBoundary],dispatch=[d supportsCounterSampling:MTLCounterSamplingPointAtDispatchBoundary],blit=[d supportsCounterSampling:MTLCounterSamplingPointAtBlitBoundary];a->supportedPoints=(draw?1:0)|(dispatch?2:0)|(blit?4:0);id<MTLCounterSet>set=nil;for(id<MTLCounterSet>x in d.counterSets)if([x.name isEqualToString:MTLCommonCounterSetTimestamp]){set=x;break;}
+ if(!set||(burst?!(draw||dispatch||blit):!(draw&&dispatch))){--f;if(s)++s->unsupported;a->skip=7;return false;}
+ NSUInteger capacity=burst?mvkCounterBurstConfig().perCB:(mvkGPUCounterAllDraws()?16384:128);auto desc=[MTLCounterSampleBufferDescriptor new];desc.counterSet=set;desc.storageMode=MTLStorageModeShared;desc.sampleCount=capacity;NSError*error=nil;auto buffer=[d newCounterSampleBufferWithDescriptor:desc error:&error];[desc release];
+ if(!buffer){--f;if(s)++s->allocationFailures;a->skip=8;r[@"gpuCounterAllocationError"]=error.localizedDescription?:@"";return false;}r[@"gpuCounterBuffer"]=buffer;[buffer release];r[@"gpuCounterEvents"]=[NSMutableArray array];r[@"gpuCounterCapacity"]=@(capacity);r[@"gpuCounterAllDraws"]=@(burst||mvkGPUCounterAllDraws());r[@"gpuCounterBurst"]=@(burst);a->skip=1;if(s){++s->allocated;++s->inFlight;mvkCounterBeginSessionClock(s,d);mvkCounterBeginCalibration(r,d);}return true;
 }
-inline void mvkSampleGPUTimestamp(NSMutableDictionary* record, id<MTLCommandEncoder> encoder, NSString* kind, NSString* label) {
-    if(!record[@"gpuCounterBuffer"]){
-        NSString* selected=record[@"gpuCounterLazyGeometryLabel"];
-        if(!selected||![kind containsString:@"pipeline"]||
-           (! [selected isEqualToString:@"*"] && ![label containsString:selected]))return;
-        if(!mvkAllocateGPUTimestampBuffer(record,encoder.device))return;
-        record[@"gpuCounterSelectedAt"] = label ?: @"";
-    }
-    bool render=[encoder respondsToSelector:@selector(setRenderPipelineState:)];
-    bool compute=[encoder respondsToSelector:@selector(setComputePipelineState:)];
-    if(!render&&!compute)return;
-    const bool selectedDraw = mvkGPUCounterAllDraws() &&
-        ([kind isEqualToString:@"draw"] || [kind isEqualToString:@"geometry-batch"]);
-    if(![kind containsString:@"pipeline"]&&![kind isEqualToString:@"encoder-end"]&&
-       ![kind isEqualToString:@"geometry-tail"]&&!selectedDraw)return;
-    @synchronized(record){
-        NSMutableArray* rows=record[@"gpuCounterEvents"];
-        const NSUInteger capacity=[record[@"gpuCounterCapacity"] unsignedIntegerValue];
-        if(rows.count>=capacity){record[@"gpuCountersTruncated"]=@YES;return;}
-        NSUInteger index=rows.count;
-        // Both public render/compute protocols have this identical selector.
-        [(id<MTLComputeCommandEncoder>)encoder sampleCountersInBuffer:record[@"gpuCounterBuffer"] atSampleIndex:index withBarrier:NO];
-        [rows addObject:@{@"index":@(index),@"encoder":[NSString stringWithFormat:@"%p",encoder],@"kind":kind?:@"",@"label":label?:@""}];
-    }
-}
-inline NSDictionary* mvkSnapshotGPUTimestamps(NSDictionary* record) {
-    if(!record[@"gpuCounterBuffer"])return @{@"enabled":@NO};
-    @synchronized(record){
-        NSArray* events=record[@"gpuCounterEvents"];bool completed=[record[@"nativeCompleted"]boolValue];
-        NSMutableArray* rows=[NSMutableArray array];NSData* data=nil;
-        // Never resolve data from an executing command buffer, nor submit any
-        // resolve commands to a lost device. Shared counters resolve on CPU.
-        if(completed&&events.count)data=[(id<MTLCounterSampleBuffer>)record[@"gpuCounterBuffer"] resolveCounterRange:NSMakeRange(0,events.count)];
-        bool resolved=data.length==events.count*sizeof(MTLCounterResultTimestamp)&&data!=nil;
-        auto values=(const MTLCounterResultTimestamp*)data.bytes;
-        for(NSUInteger i=0;i<events.count;++i){auto row=[events[i]mutableCopy];if(resolved){row[@"timestamp"]=@(values[i].timestamp);row[@"valid"]=@(values[i].timestamp!=MTLCounterErrorValue);}else row[@"valid"]=(id)[NSNull null];[rows addObject:row];[row release];}
-        return @{@"enabled":@YES,@"nativeCompleted":@(completed),@"CPUResolveSucceeded":@(resolved),@"truncated":record[@"gpuCountersTruncated"]?:@NO,@"withBarrier":@NO,@"allDraws":record[@"gpuCounterAllDraws"]?:@NO,@"capacity":record[@"gpuCounterCapacity"]?:@0,@"samples":rows};
-    }
-}
-inline void mvkEndGPUTimestamps(NSDictionary* record){if(record[@"gpuCounterBuffer"])mvkGPUTimestampInFlight().fetch_sub(1);}
+inline void mvkBeginGPUTimestamps(NSMutableDictionary*r,id<MTLCommandBuffer>cb,uint32_t family){bool burst=mvkGPUCounterBurstEnabled(),armed=burst?mvkCounterRefreshBurstArm():mvkGPUTimestampArmed();if(!armed&&!burst)return;if(burst&&!armed&&mvkCounterHasOpenSession().exchange(false))mvkCounterCurrentSession();auto*a=mvkCounterEnsureAccounting(r);a->family=family;a->nativeCB=(uintptr_t)cb;a->nativeQueue=(uintptr_t)cb.commandQueue;a->index=[r[@"queueIndex"]unsignedIntValue];if(!armed)return;if(!burst&&family!=0){a->observed=true;a->skip=2;return;}auto selected=mvkGPUCounterPipelineLabel();if(!burst&&selected&&selected[0]){r[@"gpuCounterLazyGeometryLabel"]=@(selected);a->observed=true;a->skip=3;return;}mvkAllocateGPUTimestampBuffer(r,cb.commandQueue.device);}
+inline void mvkSampleGPUTimestamp(NSMutableDictionary*r,id<MTLCommandEncoder>e,NSString*kind,NSString*label){@synchronized(r){bool burst=mvkGPUCounterBurstEnabled();if(!r[@"gpuCounterBuffer"]){if(burst){if(!mvkGPUTimestampArmed())return;auto*a=mvkCounterEnsureAccounting(r);if(!a->attempted)a->midCB=true;mvkAllocateGPUTimestampBuffer(r,e.device);}else{NSString*s=r[@"gpuCounterLazyGeometryLabel"];if(!s||![kind containsString:@"pipeline"]||(![s isEqualToString:@"*"]&&![label containsString:s]))return;if(!mvkAllocateGPUTimestampBuffer(r,e.device))return;r[@"gpuCounterSelectedAt"]=label?:@"";}}
+ {auto*a=mvkCounterEnsureAccounting(r);auto s=mvkCounterRecordSession(r);bool all=burst||mvkGPUCounterAllDraws();bool work=all&&([kind isEqualToString:@"draw"]||[kind isEqualToString:@"geometry-batch"]||[kind isEqualToString:@"dispatch"]||[kind isEqualToString:@"dispatch-indirect"]||[kind isEqualToString:@"dispatch-end"]);bool eligible=[kind containsString:@"pipeline"]||[kind isEqualToString:@"encoder-end"]||[kind isEqualToString:@"geometry-tail"]||work||(burst&&[kind isEqualToString:@"encoder-begin"]);if(!eligible){++a->filtered;return;}++a->offered;if(s)++s->offered;if(!r[@"gpuCounterBuffer"]){++a->noBuffer;return;}
+  bool render=[e respondsToSelector:@selector(setRenderPipelineState:)],compute=[e respondsToSelector:@selector(setComputePipelineState:)],blit=[e respondsToSelector:@selector(copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:)];uint32_t point=render?1:compute?2:4;if((!render&&!compute&&!blit)||!(a->supportedPoints&point)){++a->unsupportedPoint;if(s)++s->unsupportedPoint;return;}
+  NSMutableArray*rows=r[@"gpuCounterEvents"];NSUInteger capacity=[r[@"gpuCounterCapacity"]unsignedIntegerValue];if(rows.count>=capacity){++a->capacity;if(s)++s->eventCapacity;r[@"gpuCountersTruncated"]=@YES;return;}
+  if(s){if(mvkCounterMonotonicNS()>=s->deadlineNS){++a->window;++s->eventWindow;return;}if(s->encoded.fetch_add(1)>=mvkCounterBurstConfig().samples){--s->encoded;++a->budget;++s->sampleBudget;return;}if(mvkCounterLiveSamples().fetch_add(1)>=mvkCounterBurstConfig().samples){--mvkCounterLiveSamples();--s->encoded;++a->liveBudget;++s->liveBudget;return;}}
+  NSUInteger index=rows.count;[(id<MTLComputeCommandEncoder>)e sampleCountersInBuffer:r[@"gpuCounterBuffer"] atSampleIndex:index withBarrier:NO];[rows addObject:@{@"index":@(index),@"encoder":[NSString stringWithFormat:@"%p",e],@"kind":kind?:@"",@"label":label?:@"",@"encodedMonotonicNS":@(mvkCounterMonotonicNS()),@"encodedCF":@([NSDate timeIntervalSinceReferenceDate])}];++a->encoded;a->lastEncodedWasEncoderEnd=[kind isEqualToString:@"encoder-end"];if([kind isEqualToString:@"encoder-begin"])++a->encoderBegins;if(a->lastEncodedWasEncoderEnd)++a->encoderEnds;
+ }
+}}
+inline NSDictionary*mvkSnapshotGPUTimestamps(NSDictionary*r){@synchronized(r){mvkCounterFinishCalibration(r);auto coverage=mvkGPUCounterCaptureOutcome(r);if(!r[@"gpuCounterBuffer"])return @{@"enabled":@NO,@"coverage":coverage,@"captureSession":mvkCounterSessionSnapshot(mvkCounterRecordSession(r))};NSArray*events=r[@"gpuCounterEvents"];bool completed=[r[@"nativeCompleted"]boolValue];NSData*data=nil;if(completed&&events.count)data=[(id<MTLCounterSampleBuffer>)r[@"gpuCounterBuffer"]resolveCounterRange:NSMakeRange(0,events.count)];bool resolved=data!=nil&&data.length==events.count*sizeof(MTLCounterResultTimestamp);auto values=(const MTLCounterResultTimestamp*)data.bytes;NSMutableArray*rows=[NSMutableArray array];uint64_t valid=0,invalid=0;
+ for(NSUInteger i=0;i<events.count;++i){NSMutableDictionary*row=[events[i]mutableCopy];if(resolved){bool ok=values[i].timestamp!=MTLCounterErrorValue&&values[i].timestamp!=0;row[@"timestamp"]=@(values[i].timestamp);row[@"valid"]=@(ok);if(ok){++valid;long double ns=0;double ca=0;bool calibrated=mvkCounterConvertTimestamp(mvkCounterClockPair(r),values[i].timestamp,ns,ca);row[@"calibrated"]=@(calibrated);if(calibrated){row[@"cpuMonotonicNS"]=@((double)ns);row[@"timeCA"]=@(ca);}}else ++invalid;}else row[@"valid"]=[NSNull null];[rows addObject:row];[row release];}
+ return @{@"enabled":@YES,@"nativeCompleted":@(completed),@"CPUResolveSucceeded":@(resolved),@"validSamples":@(valid),@"invalidSamples":@(invalid),@"truncated":r[@"gpuCountersTruncated"]?:@NO,@"withBarrier":@NO,@"allDraws":r[@"gpuCounterAllDraws"]?:@NO,@"burst":r[@"gpuCounterBurst"]?:@NO,@"capacity":r[@"gpuCounterCapacity"]?:@0,@"coverage":coverage,@"captureSession":mvkCounterSessionSnapshot(mvkCounterRecordSession(r)),@"boundaryTimestampsAreExclusiveDurations":@NO,@"clockCalibration":mvkCounterCalibrationSnapshot(r),@"samples":rows};}}
+inline void mvkEndGPUTimestamps(NSDictionary*r){@synchronized(r){auto*a=mvkCounterAccounting(r);if(!r[@"gpuCounterBuffer"]||!a||a->released)return;mvkCounterFinishCalibration(r);a->released=true;--mvkGPUTimestampInFlight();auto s=mvkCounterRecordSession(r);if(s){++s->completed;--s->inFlight;mvkCounterLiveSamples().fetch_sub(a->encoded);mvkCounterMaybeFinishSessionClock(s);}}}

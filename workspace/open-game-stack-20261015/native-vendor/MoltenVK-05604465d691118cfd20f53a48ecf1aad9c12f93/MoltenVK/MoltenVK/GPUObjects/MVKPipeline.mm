@@ -17,6 +17,7 @@
  */
 
 #include "MVKPipeline.h"
+#include "MVKStutterCoverage.h"
 #include "MVKCommandBuffer.h"
 #include "MVKInlineObjectConstructor.h"
 #include "MVKImage.h"
@@ -3078,7 +3079,9 @@ MVKMTLFunction MVKGraphicsPipeline::getMTLFunction(SPIRVToMSLConversionConfigura
 }
 
 MVKGraphicsPipeline::~MVKGraphicsPipeline() {
+	MVKStutterCPUTrace::Scope cpuNativeMonitor1(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 	@synchronized (getMTLDevice()) {
+	    cpuNativeMonitor1.finish();
 		[_mtlTessVertexStageState release];
 		[_mtlTessVertexStageIndex16State release];
 		[_mtlTessVertexStageIndex32State release];
@@ -3272,7 +3275,9 @@ uint32_t MVKComputePipeline::getImplicitBufferIndex(uint32_t bufferIndexOffset) 
 }
 
 MVKComputePipeline::~MVKComputePipeline() {
+	MVKStutterCPUTrace::Scope cpuNativeMonitor2(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 	@synchronized (getMTLDevice()) {
+	    cpuNativeMonitor2.finish();
 		[_mtlPipelineState release];
 		if (_ownsModule) delete _module;
 	}
@@ -3288,6 +3293,7 @@ MVKShaderLibrary* MVKPipelineCache::getShaderLibrary(SPIRVToMSLConversionConfigu
 													 MVKPipeline* pipeline,
 													 VkPipelineCreationFeedback* pShaderFeedback,
 													 uint64_t startTime) {
+    MVK_CPU_SCOPE_TAG(PipelineLookup,shaderModule->getKey().codeHash);
 	const char* shardedOption = getenv("MVK_AMD_SHARDED_SHADER_CACHE_LOCKS");
 	bool sharded = shardedOption && !strcmp(shardedOption, "1") &&
 		getPhysicalDevice()->isAMDHardware() && !_isExternallySynchronized;
@@ -3297,14 +3303,18 @@ MVKShaderLibrary* MVKPipelineCache::getShaderLibrary(SPIRVToMSLConversionConfigu
 		// table here; each module cache serializes its own conversion variants.
 		MVKShaderLibraryCache* slCache;
 		{
+			MVKStutterCPUTrace::Scope cpuPipelineLockWait1(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::PipelineCacheLock));
 			lock_guard<mutex> lock(_shaderCacheLock);
+			cpuPipelineLockWait1.finish();
 			slCache = getShaderLibraryCache(shaderModule->getKey());
 		}
 		bool wasAdded = false;
 		MVKShaderLibrary* shLib = slCache->getShaderLibrary(pContext, shaderModule, pipeline,
 			&wasAdded, pShaderFeedback, startTime);
 		if (wasAdded) {
+			MVKStutterCPUTrace::Scope cpuPipelineLockWait2(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::PipelineCacheLock));
 			lock_guard<mutex> lock(_shaderCacheLock);
+			cpuPipelineLockWait2.finish();
 			markDirty();
 		} else if (pShaderFeedback) {
 			mvkEnableFlags(pShaderFeedback->flags,
@@ -3315,7 +3325,9 @@ MVKShaderLibrary* MVKPipelineCache::getShaderLibrary(SPIRVToMSLConversionConfigu
 	if (_isExternallySynchronized) {
 		return getShaderLibraryImpl(pContext, shaderModule, pipeline, pShaderFeedback, startTime);
 	} else {
+		MVKStutterCPUTrace::Scope cpuPipelineLockWait3(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::PipelineCacheLock));
 		lock_guard<mutex> lock(_shaderCacheLock);
+		cpuPipelineLockWait3.finish();
 		return getShaderLibraryImpl(pContext, shaderModule, pipeline, pShaderFeedback, startTime);
 	}
 }
@@ -3325,6 +3337,7 @@ MVKShaderLibrary* MVKPipelineCache::getShaderLibraryImpl(SPIRVToMSLConversionCon
 														 MVKPipeline* pipeline,
 														 VkPipelineCreationFeedback* pShaderFeedback,
 														 uint64_t startTime) {
+    MVK_CPU_SCOPE_TAG(PipelineShaderLookup,shaderModule->getKey().codeHash);
 	bool wasAdded = false;
 	MVKShaderLibraryCache* slCache = getShaderLibraryCache(shaderModule->getKey());
 	MVKShaderLibrary* shLib = slCache->getShaderLibrary(pContext, shaderModule, pipeline, &wasAdded, pShaderFeedback, startTime);
@@ -3384,7 +3397,9 @@ VkResult MVKPipelineCache::writeData(size_t* pDataSize, void* pData) {
 	if (_isExternallySynchronized) {
 		return writeDataImpl(pDataSize, pData);
 	} else {
+		MVKStutterCPUTrace::Scope cpuPipelineLockWait4(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::PipelineCacheLock));
 		lock_guard<mutex> lock(_shaderCacheLock);
+		cpuPipelineLockWait4.finish();
 		return writeDataImpl(pDataSize, pData);
 	}
 }
@@ -3394,6 +3409,7 @@ VkResult MVKPipelineCache::writeData(size_t* pDataSize, void* pData) {
 // returns the number of bytes required to serialize the contents of this pipeline cache.
 // This is the compliment of the readData() function. The two must be kept aligned.
 VkResult MVKPipelineCache::writeDataImpl(size_t* pDataSize, void* pData) {
+    MVK_CPU_SCOPE(BinaryArchivePublish);
 #if MVK_USE_CEREAL
 	try {
 
@@ -3477,6 +3493,7 @@ void MVKPipelineCache::writeData(ostream& outstream, bool isCounting) {
 // Loads any data indicated by the creation info.
 // This is the compliment of the writeData() function. The two must be kept aligned.
 void MVKPipelineCache::readData(const VkPipelineCacheCreateInfo* pCreateInfo) {
+    MVK_CPU_SCOPE(BinaryArchiveLoad);
 #if MVK_USE_CEREAL
 	try {
 
@@ -3567,7 +3584,9 @@ VkResult MVKPipelineCache::mergePipelineCaches(uint32_t srcCacheCount, const VkP
 	if (!_isMergeInternallySynchronized) {
 		return mergePipelineCachesImpl(srcCacheCount, pSrcCaches);
 	} else {
+		MVKStutterCPUTrace::Scope cpuPipelineLockWait5(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::PipelineCacheLock));
 		lock_guard<mutex> lock(_shaderCacheLock);
+		cpuPipelineLockWait5.finish();
 		return mergePipelineCachesImpl(srcCacheCount, pSrcCaches);
 	}
 }
@@ -3888,10 +3907,13 @@ static id<MTLBinaryArchive> mvkPrepareBinaryArchive(MVKBinaryArchiveState& state
 												 bool isAMD,
 												 const char* pathEnvironment,
 												 AddFunctions addFunctions) {
+    MVK_CPU_SCOPE(BinaryArchiveLookup);
 	if (!isAMD) { return nil; }
 	const char* archivePathC = getenv(pathEnvironment);
 	if (!archivePathC || archivePathC[0] != '/') { return nil; }
+	MVKStutterCPUTrace::Scope cpuPipelineLockWait11(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::PipelineCacheLock));
 	lock_guard<mutex> lock(state.lock);
+	cpuPipelineLockWait11.finish();
 
 	uint64_t maxBytes = 1024ull * 1024ull * 1024ull;
 	if (const char* maxC = getenv("MVK_AMD_BINARY_ARCHIVE_MAX_BYTES")) {
@@ -4078,19 +4100,26 @@ static id<MTLBinaryArchive> mvkPrepareRenderBinaryArchive(id<MTLDevice> mtlDev,
 #pragma mark MVKRenderPipelineCompiler
 
 id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLRenderPipelineDescriptor* mtlRPLDesc) {
+    const uint64_t cpuPipelineTag = mvkStutterCPU().enabled() ? mvkStutterStableTag(mtlRPLDesc.label.UTF8String) : 0;
+    MVK_CPU_SCOPE_CPU_TAG(NativePipelineCompile,cpuPipelineTag);
     // Function entry names (often "main0") do not identify shader content.
     // Keep the existing source identity in the opt-in failure label instead.
     // Labels are diagnostic only and are not included in archive recipes.
     if (mvkWorkTraceConfigured()) mtlRPLDesc.label = [NSString stringWithFormat:@"vs=%@;fs=%@", mtlRPLDesc.vertexFunction.label ?: mtlRPLDesc.vertexFunction.name ?: @"", mtlRPLDesc.fragmentFunction.label ?: mtlRPLDesc.fragmentFunction.name ?: @""];
 
+	MVKStutterCPUTrace::Scope cpuPipelineLockWait6(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
+
 	unique_lock<mutex> lock(_completionLock);
+
+	cpuPipelineLockWait6.finish();
 	const char* root = getenv("MVK_AMD_RENDER_ARCHIVE_DIR");
 	bool useShards = getPhysicalDevice()->isAMDHardware() && root && root[0] == '/';
 	NSString* shardPath = useShards && !mvkRenderBinaryArchiveDenied(mtlRPLDesc, true)
 		? mvkRenderShardPath(getMTLDevice(), mtlRPLDesc) : nil;
 	uint64_t started = mvkGetTimestamp();
-	bool loaded = shardPath && mvkLoadRenderShard(getMTLDevice(), mtlRPLDesc, shardPath);
+	bool loaded = shardPath && [&] { MVK_CPU_SCOPE(BinaryArchiveLoad); return mvkLoadRenderShard(getMTLDevice(), mtlRPLDesc, shardPath); }();
 	double loadMS = mvkGetElapsedNanoseconds(started) / 1e6;
+    if (shardPath) { MVKStutterCPUTrace::Scope outcome(mvkStutterCPU(),static_cast<size_t>(loaded ? MVKCPUPhase::ArchiveFileHit : MVKCPUPhase::ArchiveFileMiss),cpuPipelineTag); }
 	bool requireHit = useShards && getenv("MVK_AMD_RENDER_ARCHIVE_REQUIRE_HIT") &&
 		!strcmp(getenv("MVK_AMD_RENDER_ARCHIVE_REQUIRE_HIT"), "1");
 	__block bool strictHit = false;
@@ -4100,29 +4129,41 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 	double rehydrateMS = 0;
 	NSInteger rehydrateErrorCode = 0;
 
+    auto cpuCompileContext = mvkStutterContext(); cpuCompileContext.shader=cpuPipelineTag;
 	compile(lock, ^{
+        MVKCPUContextGuard cpuCompilerContext(cpuCompileContext);
 		auto mtlDev = getMTLDevice();
         // Archive preparation is synchronous driver compilation and already
         // serializes its own state. Do not hold the device-wide monitor while
         // waiting: unrelated library/function requests need that monitor.
         if (!useShards) mvkPrepareRenderBinaryArchive(mtlDev, mtlRPLDesc, getPhysicalDevice()->isAMDHardware());
 		uint64_t operation=mvkLinkOperationBegin(@"render-pipeline",mtlRPLDesc.label);
+		MVKStutterCPUTrace::Scope cpuNativeMonitor3(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 		@synchronized (mtlDev) {
+		    cpuNativeMonitor3.finish();
 			if (loaded || requireHit) {
 				// Loading a file alone does not prove reuse. Ask Metal to reject a
 				// miss before permitting the normal, correctness-preserving fallback.
 				[mtlDev newRenderPipelineStateWithDescriptor:mtlRPLDesc
 					options:MTLPipelineOptionFailOnBinaryArchiveMiss
 					completionHandler:^(id<MTLRenderPipelineState> ps, MTLRenderPipelineReflection*, NSError* error) {
+        MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
+        MVK_CPU_SCOPE(CallbackCompletion);
 						strictHit = ps != nil;
+                        { MVKStutterCPUTrace::Scope outcome(mvkStutterCPU(),static_cast<size_t>(ps ? MVKCPUPhase::ArchiveNativeHit : MVKCPUPhase::ArchiveNativeMiss),cpuPipelineTag); }
 						archiveErrorCode = error.code;
 						if (!ps && !requireHit) {
 							fallback = true;
+                            { MVK_CPU_SCOPE_TAG(ArchiveFallback,cpuPipelineTag); }
 							MTLRenderPipelineDescriptor* cold = [mtlRPLDesc copy];
 							cold.binaryArchives = nil;
+							MVKStutterCPUTrace::Scope cpuNativeMonitor4(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 							@synchronized (mtlDev) {
+							    cpuNativeMonitor4.finish();
 								[mtlDev newRenderPipelineStateWithDescriptor:cold
 									completionHandler:^(id<MTLRenderPipelineState> normal, NSError* normalError) {
+        MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
+        MVK_CPU_SCOPE(CallbackCompletion);
 										mvkLinkOperationEnd(operation);
 							bool isLate = compileComplete(normal, normalError);
 										if (isLate) destroy();
@@ -4137,6 +4178,8 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 					}];
 			} else [mtlDev newRenderPipelineStateWithDescriptor: mtlRPLDesc
 									   completionHandler: ^(id<MTLRenderPipelineState> ps, NSError* error) {
+        MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
+        MVK_CPU_SCOPE(CallbackCompletion);
 										   mvkLinkOperationEnd(operation);
 							bool isLate = compileComplete(ps, error);
 										   if (isLate) { destroy(); }
@@ -4153,12 +4196,15 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 		getenv("MVK_AMD_RENDER_ARCHIVE_REHYDRATE") &&
 		!strcmp(getenv("MVK_AMD_RENDER_ARCHIVE_REHYDRATE"), "1");
 	if (shouldRehydrate) {
+        MVK_CPU_SCOPE_CPU_TAG(ArchiveRehydrate,cpuPipelineTag);
 		MTLRenderPipelineDescriptor* detachedDesc = [mtlRPLDesc copy];
 		detachedDesc.binaryArchives = nil;
 		NSError* detachedError = nil;
 		uint64_t detachedStart = mvkGetTimestamp();
 		id<MTLRenderPipelineState> detachedState = nil;
+		MVKStutterCPUTrace::Scope cpuNativeMonitor5(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 		@synchronized (getMTLDevice()) {
+		    cpuNativeMonitor5.finish();
 			detachedState = [getMTLDevice() newRenderPipelineStateWithDescriptor:detachedDesc
 				error:&detachedError];
 		}
@@ -4186,7 +4232,7 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 	double pipelineMS = mvkGetElapsedNanoseconds(started) / 1e6 - loadMS;
 	uint64_t publishStart = mvkGetTimestamp();
 	bool published = shardPath && !loaded && !requireHit && _mtlRenderPipelineState &&
-		mvkStoreRenderShard(getMTLDevice(), mtlRPLDesc, shardPath);
+		[&] { MVK_CPU_SCOPE_TAG(BinaryArchivePublish,cpuPipelineTag); return mvkStoreRenderShard(getMTLDevice(), mtlRPLDesc, shardPath); }();
 	if (useShards && mvkRuntimeEnvFlagEnabled("MVK_AMD_RENDER_ARCHIVE_TRACE"))
 		mvkWriteRuntimeTrace(getMVKConfig(), @"render-archive", @{
 			@"shard":shardPath.lastPathComponent ?: @"", @"loaded":@(loaded),
@@ -4205,14 +4251,22 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 
 #if MVK_XCODE_14
 id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(MTLMeshRenderPipelineDescriptor* mtlRPLDesc) {
+    const uint64_t cpuPipelineTag = mvkStutterCPU().enabled() ? mvkStutterStableTag(mtlRPLDesc.label.UTF8String) : 0;
+    MVK_CPU_SCOPE_CPU_TAG(NativePipelineCompile,cpuPipelineTag);
     if (mvkWorkTraceConfigured()) mtlRPLDesc.label = [NSString stringWithFormat:@"obj=%@;mesh=%@;fs=%@", mtlRPLDesc.objectFunction.name ?: @"", mtlRPLDesc.meshFunction.name ?: @"", mtlRPLDesc.fragmentFunction.name ?: @""];
 	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_PIPELINES");
 	bool synchronousMesh = getPhysicalDevice()->isAMDHardware() && syncOption && !strcmp(syncOption, "1");
 
+	MVKStutterCPUTrace::Scope cpuPipelineLockWait7(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
+
 	unique_lock<mutex> lock(_completionLock);
+
+	cpuPipelineLockWait7.finish();
 	VkResult previousResult = _owner->getConfigurationResult();
 
+    auto cpuCompileContext = mvkStutterContext(); cpuCompileContext.shader=cpuPipelineTag;
 	compile(lock, ^{
+        MVKCPUContextGuard cpuCompilerContext(cpuCompileContext);
 		auto mtlDev = _owner->getMTLDevice();
 		// Waiting for another mesh link must not monopolize the device
 		// monitor needed by unrelated shader-library and compute work.
@@ -4240,10 +4294,14 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 			if (isLate) { destroy(); }
 			return;
 		}
+		MVKStutterCPUTrace::Scope cpuNativeMonitor6(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 		@synchronized (mtlDev) {
+		    cpuNativeMonitor6.finish();
 			[mtlDev newRenderPipelineStateWithMeshDescriptor: mtlRPLDesc
 													 options: MTLPipelineOptionNone
 										   completionHandler: ^(id<MTLRenderPipelineState> ps, MTLRenderPipelineReflection *refl, NSError* error) {
+        MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
+        MVK_CPU_SCOPE(CallbackCompletion);
 				if (linkGate) dispatch_semaphore_signal(linkGate);
 				bool isLate = compileComplete(ps, error);
 				if (isLate) { destroy(); }
@@ -4269,8 +4327,11 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
 #endif
 
 bool MVKRenderPipelineCompiler::compileComplete(id<MTLRenderPipelineState> mtlRenderPipelineState, NSError* compileError) {
+	MVKStutterCPUTrace::Scope cpuPipelineLockWait8(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	lock_guard<mutex> lock(_completionLock);
+	cpuPipelineLockWait8.finish();
 
+    if (!mtlRenderPipelineState) mvkStutterFailure(MVKCPUPhase::NativePipelineCompile,compileError ? compileError.code : -1);
 	_mtlRenderPipelineState = [mtlRenderPipelineState retain];		// retained
 	return endCompile(compileError);
 }
@@ -4286,32 +4347,44 @@ MVKRenderPipelineCompiler::~MVKRenderPipelineCompiler() {
 #pragma mark MVKComputePipelineCompiler
 
 id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineState(MTLComputePipelineDescriptor* plDesc) {
+    const uint64_t cpuPipelineTag = mvkStutterCPU().enabled() ? mvkStutterStableTag(plDesc.label.UTF8String) : 0;
+    MVK_CPU_SCOPE_CPU_TAG(NativePipelineCompile,cpuPipelineTag);
+	MVKStutterCPUTrace::Scope cpuPipelineLockWait9(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	unique_lock<mutex> lock(_completionLock);
+	cpuPipelineLockWait9.finish();
     if (mvkGPUTimeoutTraceEnabled()) mvkWriteRuntimeTrace(getMVKConfig(), @"compute-map", @{@"pipelineKey":plDesc.label ?: @"", @"function":mvkTraceFunction(plDesc.computeFunction), @"maxThreads":@(plDesc.maxTotalThreadsPerThreadgroup), @"fullSubgroups":@(plDesc.threadGroupSizeIsMultipleOfThreadExecutionWidth)});
 
 	static std::atomic<uint64_t> computeRequestSequence{0};
 	NSNumber* request = @(computeRequestSequence.fetch_add(1));
     NSString* shardPath = getPhysicalDevice()->isAMDHardware() ? mvkComputeShardPath(plDesc) : nil;
     uint64_t shardStart = shardPath ? mvkGetTimestamp() : 0;
-    bool shardLoaded = shardPath && mvkLoadComputeShard(getMTLDevice(), plDesc, shardPath);
+    bool shardLoaded = shardPath && [&] { MVK_CPU_SCOPE(BinaryArchiveLoad); return mvkLoadComputeShard(getMTLDevice(), plDesc, shardPath); }();
     double loadMS = shardPath ? mvkGetElapsedNanoseconds(shardStart) / 1e6 : 0;
+    if (shardPath) { MVKStutterCPUTrace::Scope outcome(mvkStutterCPU(),static_cast<size_t>(shardLoaded ? MVKCPUPhase::ArchiveFileHit : MVKCPUPhase::ArchiveFileMiss),cpuPipelineTag); }
     bool requireHit = shardPath && getenv("MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT") &&
         !strcmp(getenv("MVK_AMD_COMPUTE_ARCHIVE_REQUIRE_HIT"), "1");
 	bool rehydrated = false;
 	double rehydrateMS = 0;
 	NSInteger rehydrateErrorCode = 0;
 
+    auto cpuCompileContext = mvkStutterContext(); cpuCompileContext.shader=cpuPipelineTag;
 	compile(lock, ^{
+        MVKCPUContextGuard cpuCompilerContext(cpuCompileContext);
 		auto mtlDev = getMTLDevice();
         // Same lock ordering as render archives: private archive lock only
         // during synchronous add/serialize; device monitor for submission only.
         if (!shardPath) mvkPrepareComputeBinaryArchive(mtlDev, plDesc, getPhysicalDevice()->isAMDHardware());
 		uint64_t operation=mvkLinkOperationBegin(@"compute-pipeline",plDesc.label);
+		MVKStutterCPUTrace::Scope cpuNativeMonitor7(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 		@synchronized (mtlDev) {
+		    cpuNativeMonitor7.finish();
 			if (mvkRuntimeTraceEnabled(getMVKConfig()) && !mvkRuntimeReplayOnly()) mvkWriteRuntimeTrace(getMVKConfig(), @"compute-request", @{@"request":request,@"time":@([NSDate timeIntervalSinceReferenceDate]),@"function":mvkTraceFunction(plDesc.computeFunction),@"maxThreads":@(plDesc.maxTotalThreadsPerThreadgroup),@"fullSubgroups":@(plDesc.threadGroupSizeIsMultipleOfThreadExecutionWidth),@"descriptor":plDesc.description?:@""});
 			[mtlDev newComputePipelineStateWithDescriptor: plDesc
 												  options: requireHit ? MTLPipelineOptionFailOnBinaryArchiveMiss : MTLPipelineOptionNone
 										completionHandler: ^(id<MTLComputePipelineState> ps, MTLComputePipelineReflection*, NSError* error) {
+        MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
+        MVK_CPU_SCOPE(CallbackCompletion);
+                if (requireHit) { MVKStutterCPUTrace::Scope outcome(mvkStutterCPU(),static_cast<size_t>(ps ? MVKCPUPhase::ArchiveNativeHit : MVKCPUPhase::ArchiveNativeMiss),cpuPipelineTag); }
 				if (mvkRuntimeTraceEnabled(getMVKConfig()) && (!mvkRuntimeReplayOnly() || !ps)) mvkWriteRuntimeTrace(getMVKConfig(), mvkRuntimeReplayOnly() ? @"compute-failure" : @"compute-result", @{@"request":request,@"time":@([NSDate timeIntervalSinceReferenceDate]),@"function":mvkTraceFunction(plDesc.computeFunction),@"created":@(ps!=nil),@"error":error.localizedDescription?:@"",@"errorCode":@(error.code)});
 											mvkLinkOperationEnd(operation);
 				bool isLate = compileComplete(ps, error);
@@ -4323,12 +4396,15 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
         getenv("MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE") &&
         !strcmp(getenv("MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE"), "1");
     if (shouldRehydrate) {
+        MVK_CPU_SCOPE_CPU_TAG(ArchiveRehydrate,cpuPipelineTag);
         MTLComputePipelineDescriptor* detachedDesc = [plDesc copy];
         detachedDesc.binaryArchives = nil;
         NSError* detachedError = nil;
         uint64_t detachedStart = mvkGetTimestamp();
         id<MTLComputePipelineState> detachedState = nil;
+        MVKStutterCPUTrace::Scope cpuNativeMonitor8(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
         @synchronized (getMTLDevice()) {
+            cpuNativeMonitor8.finish();
             detachedState = [getMTLDevice() newComputePipelineStateWithDescriptor:detachedDesc
                 options:MTLPipelineOptionNone reflection:nil error:&detachedError];
         }
@@ -4348,7 +4424,7 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
     bool shardPublished = false;
     uint64_t publishStart = shardPath ? mvkGetTimestamp() : 0;
     if (shardPath && !shardLoaded && !requireHit && _mtlComputePipelineState)
-        shardPublished = mvkStoreComputeShard(getMTLDevice(), plDesc, shardPath);
+        shardPublished = [&] { MVK_CPU_SCOPE_TAG(BinaryArchivePublish,cpuPipelineTag); return mvkStoreComputeShard(getMTLDevice(), plDesc, shardPath); }();
     if (shardPath && mvkRuntimeEnvFlagEnabled("MVK_AMD_COMPUTE_ARCHIVE_TRACE"))
         mvkWriteRuntimeTrace(getMVKConfig(), @"compute-archive", @{
             @"request":request, @"key":plDesc.label ?: @"", @"loaded":@(shardLoaded),
@@ -4361,8 +4437,11 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
 }
 
 bool MVKComputePipelineCompiler::compileComplete(id<MTLComputePipelineState> mtlComputePipelineState, NSError* compileError) {
+	MVKStutterCPUTrace::Scope cpuPipelineLockWait10(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	lock_guard<mutex> lock(_completionLock);
+	cpuPipelineLockWait10.finish();
 
+    if (!mtlComputePipelineState) mvkStutterFailure(MVKCPUPhase::NativePipelineCompile,compileError ? compileError.code : -1);
 	_mtlComputePipelineState = [mtlComputePipelineState retain];		// retained
 	return endCompile(compileError);
 }

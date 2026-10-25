@@ -35,6 +35,7 @@
 #include <os/lock.h>
 #include "MVKRegistrationLog.h"
 #include "MVKDescriptorUseCache.h"
+#include "MVKBufferHeapReadPlan.h"
 #include <memory>
 
 #import <Metal/Metal.h>
@@ -592,7 +593,25 @@ public:
     struct RetainedSnapshot : std::vector<id<MTLResource>> {
         RetainedSnapshot() = default;
         RetainedSnapshot(const RetainedSnapshot&) = delete;
-        ~RetainedSnapshot() { for (id object : *this) [object release]; }
+        ~RetainedSnapshot() {
+            _bufferReadPlan.reset();
+            for (id object : *this) [object release];
+        }
+        // Only the buffer registry's immutable, owned lease may enter this path.
+        // The plan owns distinct heaps; this lease continues owning all children.
+        const BufferHeapReadPlan& bufferReadPlan() const {
+            std::call_once(_bufferPlanOnce, [this] {
+                auto plan = std::make_unique<const BufferHeapReadPlan>(*this);
+                _bufferReadPlan = std::move(plan);
+                bufferPlanBuilds.fetch_add(1, std::memory_order_relaxed);
+                bufferPlanHeapQueries.fetch_add(size(), std::memory_order_relaxed);
+            });
+            return *_bufferReadPlan;
+        }
+        inline static std::atomic<uint64_t> bufferPlanBuilds{0}, bufferPlanHeapQueries{0};
+    private:
+        mutable std::once_flag _bufferPlanOnce;
+        mutable std::unique_ptr<const BufferHeapReadPlan> _bufferReadPlan;
     };
     using SnapshotLease = std::shared_ptr<const RetainedSnapshot>;
 private:

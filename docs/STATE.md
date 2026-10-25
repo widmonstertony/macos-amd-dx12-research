@@ -1,3 +1,5 @@
+> 2026-10-25：优先补齐卡顿归因日志。v32 诊断候选完整构建、实际 GPU 控制通过，尚未完成原 Wine 和实际游戏覆盖；v31 heap-plan 仍未部署。旧版实测约 9.63 FPS，FSR3 两项未验证。详见 [Stutter coverage / 覆盖与限制](STUTTER-COVERAGE-2026-10-25.md)。
+
 > 2026-10-25 最新实际场景：v26 6.57 FPS → v28 7.92 FPS → v29 9.69 FPS；原应用宝 Wine / 正常 Steam、缓存和画质设置保留。v29 装备及纳米服列表可以打开，本轮暂未见 GPU 超时，但游戏仍不可正常玩。CPU 描述符脏区间位图已实际命中，减少大量未变化槽位扫描；剩余热点在资源快照重放、状态表及原生资源声明。v30 稳定值指针优化已通过 CPU/真实 GPU/原 Wine 回归，稳定场景实测 9.63 FPS，与 v29 基本持平，未证明整帧提速。FSR3 两项未验证。
 > Latest actual scene measurements: v26 6.57 → v28 7.92 → v29 9.69 FPS with original Tencent Wine / normal Steam and preserved caches/settings. Equipment and nano-suit lists opened without a watchdog record in this run, but gameplay remains too slow. Precise dirty-bit tracking is exercised in game; remaining CPU work is retained-snapshot replay, state-table work and native declarations. v30 stable-value pointers passed CPU/GPU/Wine qualification but measured 9.63 FPS, effectively unchanged from v29; no whole-frame gain is demonstrated. Neither FSR3 feature is qualified. [Measured scan repair](CPU-DIRTY-BITMAP-2026-10-25.md) · [Value-pointer candidate](CPU-RESOURCE-POINTER-2026-10-25.md).
 

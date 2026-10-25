@@ -18,6 +18,9 @@
 
 #include "MVKImage.h"
 #include "MVKPresentedFrameTrace.h"
+#include "MVKStutterNativeTrace.h"
+#include "MVKStutterCoverage.h"
+#include "MVKMemoryTrace.h"
 #include "MVKQueue.h"
 #include "MVKSwapchain.h"
 #include "MVKSurface.h"
@@ -60,15 +63,19 @@ id<MTLTexture> MVKImagePlane::getMTLTexture() {
         if (dvcMem && (dvcMem->_externalMemoryHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLTEXTURE_BIT_EXT) && dvcMem->_mtlTexture) {
             tex = dvcMem->_mtlTexture;
         } else if (_image->_ioSurface) {
+            auto allocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,0,mtlTexDesc.storageMode,"iosurface-texture",false);
             tex = [_image->getMTLDevice()
                    newTextureWithDescriptor: mtlTexDesc
                    iosurface: _image->_ioSurface
                    plane: _planeIndex];
+            mvkStutterMemoryAllocationEnd(allocation,tex!=nil);
         } else if (memoryBinding->_mtlTexelBuffer) {
+            auto allocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,0,mtlTexDesc.storageMode,"buffer-texture-view",false);
             tex = [memoryBinding->_mtlTexelBuffer
                    newTextureWithDescriptor: mtlTexDesc
                    offset: memoryBinding->_mtlTexelBufferOffset + _subresources[0].layout.offset
                    bytesPerRow: _subresources[0].layout.rowPitch];
+            mvkStutterMemoryAllocationEnd(allocation,tex!=nil);
         } else if (dvcMem && dvcMem->getMTLHeap() && !_image->getIsDepthStencil()) {
             // Metal support for depth/stencil from heaps is flaky
             _heapAllocation.heap = dvcMem->getMTLHeap();
@@ -76,9 +83,11 @@ id<MTLTexture> MVKImagePlane::getMTLTexture() {
             const auto texSizeAlign = [dvcMem->getMTLDevice() heapTextureSizeAndAlignWithDescriptor:mtlTexDesc];
             _heapAllocation.size = texSizeAlign.size;
             _heapAllocation.align = texSizeAlign.align;
+            auto allocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,texSizeAlign.size,mtlTexDesc.storageMode,"placement-texture");
             tex = [_heapAllocation.heap
                            newTextureWithDescriptor: mtlTexDesc
                            offset: _heapAllocation.offset];
+            mvkStutterMemoryAllocationEnd(allocation,tex!=nil);
             if (_image->_isAliasable) { [_mtlTexture makeAliasable]; }
         } else if (_image->_isAliasable && dvcMem && dvcMem->isDedicatedAllocation() &&
             !mvkContains(dvcMem->_imageMemoryBindings, memoryBinding)) {
@@ -88,7 +97,9 @@ id<MTLTexture> MVKImagePlane::getMTLTexture() {
             // to its memory: the memory object wouldn't allow it.
             tex = [dvcMem->_imageMemoryBindings[0]->_image->getMTLTexture(_planeIndex, mtlTexDesc.pixelFormat) retain];
         } else {
+            auto allocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,0,mtlTexDesc.storageMode,"device-texture",false);
             tex = [_image->getMTLDevice() newTextureWithDescriptor: mtlTexDesc];
+            mvkStutterMemoryAllocationEnd(allocation,tex!=nil);
         }
         if (tex.storageMode != MTLStorageModeMemoryless) {
             _image->_device->makeResident(tex);
@@ -113,7 +124,9 @@ id<MTLTexture> MVKImagePlane::getMTLTexture(MTLPixelFormat mtlPixFmt) {
         lock_guard<mutex> lock(_image->_lock);
         mtlTex = _mtlTextureViews[mtlPixFmt];
         if ( !mtlTex ) {
+            auto allocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,0,baseTexture.storageMode,"format-texture-view",false);
             mtlTex = [baseTexture newTextureViewWithPixelFormat: mtlPixFmt];    // retained
+            mvkStutterMemoryAllocationEnd(allocation,mtlTex!=nil);
             _image->_device->getLiveResources().add(mtlTex);
             _mtlTextureViews[mtlPixFmt] = mtlTex;
         }
@@ -793,7 +806,9 @@ VkResult MVKImage::copyImageToMemory(const VkCopyImageToMemoryInfo* pCopyImageTo
 			}
 
 			[mtlBlitEnc endEncoding];
-			[mtlCmdBuff commit];
+			mvkStutterNativePhase(mtlCmdBuff,"commitRequested");
+        mvkMarkTrackedCommandBufferCommit(mtlCmdBuff);
+        [mtlCmdBuff commit];
 			[mtlCmdBuff waitUntilCompleted];
 		}
 	}
@@ -1601,7 +1616,9 @@ VkResult MVKPresentableSwapchainImage::acquireAndSignalWhenAvailable(MVKSemaphor
 			}
 			signal(signaler.semaphore, signaler.semaphoreSignalToken, mtlCmdBuff);
 			signal(signaler.fence);
-			[mtlCmdBuff commit];
+			mvkStutterNativePhase(mtlCmdBuff,"commitRequested");
+        mvkMarkTrackedCommandBufferCommit(mtlCmdBuff);
+        [mtlCmdBuff commit];
 		}
 
 		_preSignaler = signaler;
@@ -1621,6 +1638,7 @@ id<CAMetalDrawable> MVKPresentableSwapchainImage::getCAMetalDrawable() {
 	if (_mtlTextureHeadless) { return nil; }	// If headless, there is no drawable.
 
 	if ( !_mtlDrawable ) {
+        MVK_CPU_SCOPE_CPU(DrawableAcquire);
 		@autoreleasepool {
 			bool hasInvalidFormat = false;
 			uint32_t attemptCnt = _swapchain->getImageCount();	// Attempt a resonable number of times
@@ -1657,10 +1675,23 @@ VkResult MVKPresentableSwapchainImage::presentCAMetalDrawable(id<MTLCommandBuffe
 	// But get current drawable now, intead of in handler, because a new drawable might be acquired by then.
 	// Attach present handler before presenting to avoid race condition.
 	id<CAMetalDrawable> mtlDrwbl = getCAMetalDrawable();
+    auto provenance=mvkStutterNativeSnapshot(mtlCmdBuff);
+    presentInfo.diagnosticNativeCB=provenance.nativeID;
+    if(!presentInfo.diagnosticFrameID)presentInfo.diagnosticFrameID=provenance.frame;
+    if(!presentInfo.diagnosticCaptureSession)presentInfo.diagnosticCaptureSession=provenance.session;
+    presentInfo.diagnosticPartialPrefix=presentInfo.diagnosticPartialPrefix||provenance.partialPrefix;
 	MVKSwapchainSignaler signaler = getPresentationSignaler();
 	[mtlCmdBuff addScheduledHandler: ^(id<MTLCommandBuffer> mcb) {
 
-		addPresentedHandler(mtlDrwbl, presentInfo, signaler);
+        // A counter/native capture may have been armed after creation.
+        // Re-read metadata at scheduling, without changing presentation timing.
+        auto actualPresentInfo=presentInfo;
+        mvkStutterNativePhase(mcb,"presentScheduled");
+        auto scheduledProvenance=mvkStutterNativeSnapshot(mcb);
+        if(scheduledProvenance.session)actualPresentInfo.diagnosticCaptureSession=scheduledProvenance.session;
+        if(scheduledProvenance.nativeID)actualPresentInfo.diagnosticNativeCB=scheduledProvenance.nativeID;
+        actualPresentInfo.diagnosticPartialPrefix=actualPresentInfo.diagnosticPartialPrefix||scheduledProvenance.partialPrefix;
+        addPresentedHandler(mtlDrwbl, actualPresentInfo, signaler);
 
 		// Try to do any present mode transitions as late as possible in an attempt
 		// to avoid visual disruptions on any presents already on the queue.
@@ -1727,6 +1758,9 @@ void MVKPresentableSwapchainImage::addPresentedHandler(id<CAMetalDrawable> mtlDr
 
 #if !MVK_OS_SIMULATOR
 	[mtlDrawable addPresentedHandler: ^(id<MTLDrawable> mtlDrwbl) {
+        MVKCPUContext context;context.domain=7;context.submission=presentInfo.diagnosticFrameID;
+        context.frame=presentInfo.diagnosticFrameID;context.nativeCB=presentInfo.diagnosticNativeCB;
+        MVKCPUContextGuard contextGuard(context);MVK_CPU_SCOPE_CPU(CallbackCompletion);
 		endPresentation(presentInfo, signaler, mtlDrwbl.presentedTime * 1.0e9);
 	}];
 #else
@@ -1762,6 +1796,8 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 		if (_device) { addPerformanceInterval(getPerformanceStats().queue.presentSwapchains, _presentationStartTime); }
 		if (_swapchain) {
             if (_device) mvkTracePresentedFrame(getMVKConfig(), _swapchain, nativePresentTime);
+            mvkStutterPresentedFrame(presentInfo.diagnosticFrameID,_swapchain,nativePresentTime,
+                presentInfo.presentId,presentInfo.diagnosticCaptureSession,presentInfo.diagnosticNativeCB,presentInfo.diagnosticPartialPrefix);
             _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime);
         }
 	}
@@ -1815,7 +1851,9 @@ MVKPresentableSwapchainImage::MVKPresentableSwapchainImage(MVKDevice* device,
 			mtlTexDesc.usage = MTLTextureUsageRenderTarget;
 			mtlTexDesc.storageMode = MTLStorageModePrivate;
 
+            auto allocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,0,mtlTexDesc.storageMode,"headless-texture",false);
 			_mtlTextureHeadless = [[getMTLDevice() newTextureWithDescriptor: mtlTexDesc] retain];	// retained
+            mvkStutterMemoryAllocationEnd(allocation,_mtlTextureHeadless!=nil);
 		}
 	}
 }
@@ -1958,9 +1996,11 @@ id<MTLTexture> MVKImageViewPlane::newMTLTexture() {
         }
 
         // Create a temporary texture that is backed by the original texture's memory
+        auto allocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,0,mtlTexDesc.storageMode,"alias-texture",false);
         aliasTex = [heapAllocation->heap
                           newTextureWithDescriptor: mtlTexDesc
                           offset: heapAllocation->offset + relativeAliasOffset];
+        mvkStutterMemoryAllocationEnd(allocation,aliasTex!=nil);
 
         [mtlTexDesc release]; // temp release
 
@@ -1968,6 +2008,7 @@ id<MTLTexture> MVKImageViewPlane::newMTLTexture() {
     }
 
     id<MTLTexture> texView = nil;
+    auto viewAllocation=mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind::Texture,0,mtlTex.storageMode,"subresource-texture-view",false);
     if (_useSwizzle) {
         texView = [mtlTex newTextureViewWithPixelFormat: _mtlPixFmt
                                             textureType: _imageView->_mtlTextureType
@@ -1980,6 +2021,7 @@ id<MTLTexture> MVKImageViewPlane::newMTLTexture() {
                                                  levels: levelRange
                                                  slices: sliceRange];    // retained
     }
+    mvkStutterMemoryAllocationEnd(viewAllocation,texView!=nil);
     [aliasTex release];
     return texView;
 }

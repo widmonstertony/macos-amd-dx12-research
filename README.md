@@ -8,6 +8,8 @@
 
 当前 CPU 瓶颈与实测见 [2026-10-25 位图修复](docs/CPU-DIRTY-BITMAP-2026-10-25.md) 和 [诊断开销修复](docs/DIAGNOSTIC-CPU-FIX-2026-10-25.md)。历史源码、精确候选哈希与实测限制见 [2026-10-23 检查点](docs/CHECKPOINT-2026-10-23.md) 和 [完整研究状态](docs/STATE.md)。公开下载包仍是实验基线，尚不承诺《剑星》可玩。
 
+卡顿采集优先：新增 CPU／多队列 GPU／同步／缓存／内存与系统关联日志，首轮保持运行行为；当前构建及独立回归通过，实际游戏采集待完成。见 [覆盖矩阵](docs/STUTTER-COVERAGE-2026-10-25.md)。
+
 ## 下载与测试
 
 [最新诊断版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)

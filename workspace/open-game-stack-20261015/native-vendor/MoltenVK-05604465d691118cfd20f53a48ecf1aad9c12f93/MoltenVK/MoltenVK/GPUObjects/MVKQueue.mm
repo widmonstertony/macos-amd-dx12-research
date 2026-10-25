@@ -27,8 +27,18 @@
 #include "MVKRuntimeTrace.h"
 #include "MVKQueueDependencyTrace.h"
 #include "MVKQueueTimingTrace.h"
+#include "MVKStutterNativeTrace.h"
+#include "MVKStutterCoverage.h"
+#include "MVKMemoryTrace.h"
 
 using namespace std;
+
+void mvkMarkTrackedCommandBufferCommit(id<MTLCommandBuffer> cb) {
+    mvkMarkDependencyCounterCommit(cb);
+    mvkQueueTimingCommit(cb);
+    mvkStutterMarkNativeCommit(cb);
+}
+
 
 
 #pragma mark -
@@ -167,6 +177,7 @@ VkResult MVKQueue::submit(const VkPresentInfoKHR* pPresentInfo) {
 }
 
 VkResult MVKQueue::waitIdle(MVKCommandUse cmdUse) {
+    MVK_CPU_SCOPE_CPU(HostFenceWait);
 	if (_execQueue) {
 		std::unique_lock lock(_execQueueMutex);
 		while (_execQueueJobCount)
@@ -175,7 +186,8 @@ VkResult MVKQueue::waitIdle(MVKCommandUse cmdUse) {
 	@autoreleasepool {
 		auto* mtlCmdBuff = getMTLCommandBuffer(cmdUse);
 		mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
-		mvkQueueTimingCommit(mtlCmdBuff);
+		mvkStutterNativePhase(mtlCmdBuff,"commitRequested");
+    mvkMarkTrackedCommandBufferCommit(mtlCmdBuff);
 		[mtlCmdBuff commit];
 		[mtlCmdBuff waitUntilCompleted];
 	}
@@ -183,6 +195,8 @@ VkResult MVKQueue::waitIdle(MVKCommandUse cmdUse) {
 }
 
 id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool retainRefs) {
+    MVK_CPU_SCOPE_CPU(CommandAllocation);
+    mvkStutterReportMetalMemory(_mtlQueue.device);
 	id<MTLCommandBuffer> mtlCmdBuff = nil;
 	uint64_t startTime = getPerformanceTimestamp();
 
@@ -194,6 +208,7 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
 	mtlCmdBuff = [_mtlQueue commandBufferWithDescriptor: mtlCmdBuffDesc];
 	[mtlCmdBuffDesc release];														// temp release
 	mvkQueueTimingBegin(mtlCmdBuff, _queueFamily->getIndex(), _index, getMVKConfig().shaderDumpDir);
+    mvkStutterBeginNativeCB(mtlCmdBuff,_queueFamily->getIndex(),_index);
 
 	addPerformanceInterval(getPerformanceStats().queue.retrieveMTLCommandBuffer, startTime);
 	NSString* mtlCmdBuffLabel = getMTLCommandBufferLabel(cmdUse);
@@ -201,10 +216,21 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
 	mvkBeginDependencyTrace(mtlCmdBuff, _queueFamily->getIndex(), _index, _device, this);
     if (mvkDependencyTraceEnabled()) [mtlCmdBuff addScheduledHandler:^(id<MTLCommandBuffer> cb) {
         mvkRecordDependencyPhase(cb, @"scheduled");
+        mvkStutterNativePhase(cb,"scheduled");
     }];
 	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) {
+        auto provenance=mvkStutterNativeSnapshot(mtlCB);
+        MVKCPUContext context;context.domain=7;context.queueFamily=provenance.family;context.queueIndex=provenance.index;
+        context.submission=provenance.logical;context.nativeCB=provenance.nativeID;context.frame=provenance.frame;
+        MVKCPUContextGuard contextGuard(context);MVK_CPU_SCOPE_CPU(CallbackCompletion);
         mvkRecordDependencyPhase(mtlCB, @"completed");
         NSDictionary* counterRecord=objc_getAssociatedObject(mtlCB,mvkDependencyKey());
+        if(mvkStutterNativeEnabled()) {
+            NSDictionary*outcome=mvkGPUCounterCaptureOutcome(counterRecord);
+            mvkStutterNativePhase(mtlCB,"completed",[outcome[@"sessionID"]unsignedLongLongValue],
+                [outcome[@"skipReasonCode"]intValue],[outcome[@"allocated"]boolValue],
+                [outcome[@"captureStartedMidCommandBuffer"]boolValue]);
+        }
         if(counterRecord[@"gpuCounterBuffer"])mvkWriteRuntimeTrace(getMVKConfig(), @"gpu-timestamps", mvkCommandBufferDependencies(mtlCB));
 		// A downstream present buffer may be the command that reports the
 		// watchdog even when the expensive upstream buffer completed normally.
@@ -220,9 +246,16 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
 		}();
 		double gpuMilliseconds = (mtlCB.GPUStartTime > 0.0 && mtlCB.GPUEndTime >= mtlCB.GPUStartTime)
 			? (mtlCB.GPUEndTime - mtlCB.GPUStartTime) * 1000.0 : 0.0;
-		if (slowTraceMilliseconds > 0.0 && gpuMilliseconds >= slowTraceMilliseconds) {
+        MVKQueueTimingRecord* timing=objc_getAssociatedObject(mtlCB,mvkQueueTimingKey());
+        double hostMilliseconds=timing&&timing->committed>=timing->created?(timing->committed-timing->created)*1000.0:0.0;
+        double waitMilliseconds=timing&&timing->committed>0&&mtlCB.GPUStartTime>=timing->committed?(mtlCB.GPUStartTime-timing->committed)*1000.0:0.0;
+        bool slowGPU=gpuMilliseconds>=slowTraceMilliseconds;
+        bool slowHost=mvkStutterNativeEnabled()&&hostMilliseconds>=slowTraceMilliseconds;
+        bool slowWait=mvkStutterNativeEnabled()&&waitMilliseconds>=slowTraceMilliseconds;
+		if (slowTraceMilliseconds > 0.0 && (slowGPU||slowHost||slowWait)) {
 			NSMutableDictionary* slow = [mvkCommandBufferDependencies(mtlCB) mutableCopy];
 			slow[@"gpuDurationMilliseconds"] = @(gpuMilliseconds);
+            slow[@"slowGPUExecution"]=@(slowGPU);slow[@"slowHostPrecommit"]=@(slowHost);slow[@"slowCommitWait"]=@(slowWait);
 			slow[@"nativeStatus"] = @(mtlCB.status);
 			slow[@"nativeError"] = mtlCB.error.localizedDescription ?: @"";
 			slow[@"thresholdMilliseconds"] = @(slowTraceMilliseconds);
@@ -464,7 +497,10 @@ void MVKSemaphoreSubmitInfo::encodeWait(id<MTLCommandBuffer> mtlCmdBuff) {
 	// into Metal: on the Intel-era AMD driver, an otherwise-satisfied shared
 	// event wait can still sit at the head of a native queue and block the queue
 	// that produces the next value.
-	if (_semaphore && !hostWaitSatisfied) { _semaphore->encodeWait(mtlCmdBuff, value); }
+    if (!mtlCmdBuff) {
+        MVK_CPU_SCOPE_CPU(HostSemaphoreWait);
+        if (_semaphore && !hostWaitSatisfied) _semaphore->encodeWait(mtlCmdBuff,value);
+    } else if (_semaphore && !hostWaitSatisfied) _semaphore->encodeWait(mtlCmdBuff,value);
 }
 
 // The AMD macOS driver can watchdog a Metal queue that contains an unsatisfied
@@ -474,6 +510,7 @@ void MVKSemaphoreSubmitInfo::encodeWait(id<MTLCommandBuffer> mtlCmdBuff) {
 // Once the value is visible on the host, the normal encoded wait remains in the
 // command buffer and is immediately satisfied.
 void MVKSemaphoreSubmitInfo::gateUnsignaledTimelineWaitOnHost() {
+    MVK_CPU_SCOPE_CPU(HostSemaphoreWait);
 	// Submission values distinguish the Vulkan timeline path here. Binary
 	// semaphore submit records carry zero and therefore return immediately. Do
 	// not depend on a late environment lookup or the concrete semaphore wrapper:
@@ -498,9 +535,11 @@ void MVKSemaphoreSubmitInfo::gateUnsignaledTimelineWaitOnHost() {
 		&vkSemaphore,
 		&value,
 	};
-	if (mvkWaitSemaphores(_semaphore->getDevice(), &waitInfo, UINT64_MAX) == VK_SUCCESS) {
-		hostWaitSatisfied = true;
-	}
+    auto diagnosticWaitArm=mvkStutterNativeArm();
+    mvkStutterNativeEvent(nil,(__bridge const void*)event,value,"hostWaitBegin",diagnosticSubmission,event.signaledValue,false,diagnosticWaitArm.session,true);
+    VkResult waitResult=mvkWaitSemaphores(_semaphore->getDevice(), &waitInfo, UINT64_MAX);
+    if (waitResult==VK_SUCCESS) hostWaitSatisfied=true;
+    mvkStutterNativeEvent(nil,(__bridge const void*)event,value,"hostWaitEnd",diagnosticSubmission,event.signaledValue,hostWaitSatisfied,diagnosticWaitArm.session,diagnosticWaitArm.active,!diagnosticWaitArm.active);
 }
 
 void MVKSemaphoreSubmitInfo::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff) {
@@ -529,7 +568,7 @@ MVKSemaphoreSubmitInfo::MVKSemaphoreSubmitInfo(const MVKSemaphoreSubmitInfo& oth
 	value(other.value),
 	stageMask(other.stageMask),
 	deviceIndex(other.deviceIndex),
-	hostWaitSatisfied(other.hostWaitSatisfied) {
+	hostWaitSatisfied(other.hostWaitSatisfied), diagnosticSubmission(other.diagnosticSubmission) {
 		if (_semaphore) { _semaphore->retain(); }
 }
 
@@ -543,6 +582,7 @@ MVKSemaphoreSubmitInfo& MVKSemaphoreSubmitInfo::operator=(const MVKSemaphoreSubm
 	stageMask = other.stageMask;
 	deviceIndex = other.deviceIndex;
 	hostWaitSatisfied = other.hostWaitSatisfied;
+    diagnosticSubmission = other.diagnosticSubmission;
 	return *this;
 }
 
@@ -566,10 +606,14 @@ MVKQueueSubmission::MVKQueueSubmission(MVKQueue* queue,
 
 	_queue->retain();	// Retain here and release in destructor. See note for MVKQueueCommandBufferSubmission::finish().
 	_creationTime = getPerformanceTimestamp();
+    _stutterSubmissionID=mvkStutterNextLogicalID();
+    _stutterCreatedNS=mvkStutterCoverageEnabled()?mvkStutterMonotonicNS():0;
+    mvkStutterSubmissionPhase(_stutterSubmissionID,_queue->_queueFamily->getIndex(),_queue->_index,"queued",_stutterCreatedNS);
 
 	_waitSemaphores.reserve(waitSemaphoreInfoCount);
 	for (uint32_t i = 0; i < waitSemaphoreInfoCount; i++) {
 		_waitSemaphores.emplace_back(pWaitSemaphoreSubmitInfos[i]);
+        _waitSemaphores.back().diagnosticSubmission=_stutterSubmissionID;
 	}
 }
 
@@ -582,10 +626,14 @@ MVKQueueSubmission::MVKQueueSubmission(MVKQueue* queue,
 
 	_queue->retain();	// Retain here and release in destructor. See note for MVKQueueCommandBufferSubmission::finish().
 	_creationTime = getPerformanceTimestamp();
+    _stutterSubmissionID=mvkStutterNextLogicalID();
+    _stutterCreatedNS=mvkStutterCoverageEnabled()?mvkStutterMonotonicNS():0;
+    mvkStutterSubmissionPhase(_stutterSubmissionID,_queue->_queueFamily->getIndex(),_queue->_index,"queued",_stutterCreatedNS);
 
 	_waitSemaphores.reserve(waitSemaphoreCount);
 	for (uint32_t i = 0; i < waitSemaphoreCount; i++) {
 		_waitSemaphores.emplace_back(pWaitSemaphores[i], pWaitDstStageMask ? pWaitDstStageMask[i] : 0);
+        _waitSemaphores.back().diagnosticSubmission=_stutterSubmissionID;
 	}
 }
 
@@ -598,6 +646,14 @@ MVKQueueSubmission::~MVKQueueSubmission() {
 #pragma mark MVKQueueCommandBufferSubmission
 
 VkResult MVKQueueCommandBufferSubmission::execute() {
+    MVKCPUContext context=mvkStutterContext();
+    context.domain=std::min(_queue->_queueFamily->getIndex()+1,6u);
+    context.queueFamily=_queue->_queueFamily->getIndex(); context.queueIndex=_queue->_index;
+    context.submission=_stutterSubmissionID; context.nativeCB=0; context.frame=0;
+    MVKCPUContextGuard contextGuard(context);
+    MVK_CPU_SCOPE_TAG(QueueExecute,_stutterSubmissionID);
+    if(_stutterCreatedNS)mvkStutterAsync(MVKCPUPhase::QueueDispatchDelay,mvkStutterMonotonicNS()-_stutterCreatedNS,_stutterSubmissionID);
+    mvkStutterSubmissionPhase(_stutterSubmissionID,context.queueFamily,context.queueIndex,"executing",_stutterCreatedNS);
 
 	_queue->_submissionCaptureScope->beginScope();
 
@@ -613,7 +669,7 @@ VkResult MVKQueueCommandBufferSubmission::execute() {
 	addPerformanceInterval(_queue->getPerformanceStats().queue.waitSubmitCommandBuffers, _creationTime);
 
 	// Submit each command buffer.
-	submitCommandBuffers();
+    { MVK_CPU_SCOPE_CPU(QueueSubmitWork); submitCommandBuffers(); }
 
 	// If using encoded semaphore signaling, do so now.
 	for (auto& ss : _signalSemaphores) { ss.encodeSignal(getActiveMTLCommandBuffer()); }
@@ -644,6 +700,13 @@ void MVKQueueCommandBufferSubmission::setActiveMTLCommandBuffer(id<MTLCommandBuf
 	if (_activeMTLCommandBuffer) { commitActiveMTLCommandBuffer(); }
 
 	_activeMTLCommandBuffer = [mtlCmdBuff retain];		// retained to handle prefilled
+    mvkStutterTagNativeCB(_activeMTLCommandBuffer,_stutterSubmissionID,_stutterNativeSplit++);
+    if(mvkStutterNativeEnabled())MVKStutterCPUTrace::currentContext.nativeCB=mvkStutterNativeID(_activeMTLCommandBuffer);
+    if(mvkStutterNativeEnabled()) {
+        NSMutableDictionary*record=objc_getAssociatedObject(_activeMTLCommandBuffer,mvkDependencyKey());
+        if(record)@synchronized(record){record[@"logicalSubmissionID"]=@(_stutterSubmissionID);record[@"nativeSplitIndex"]=@(_stutterNativeSplit-1);record[@"presentFrameID"]=@0;}
+    }
+    mvkStutterNativePhase(_activeMTLCommandBuffer,"enqueue");
 	mvkRecordDependencyPhase(_activeMTLCommandBuffer, @"enqueueRequested");
 	[_activeMTLCommandBuffer enqueue];
 }
@@ -653,6 +716,7 @@ void MVKQueueCommandBufferSubmission::setActiveMTLCommandBuffer(id<MTLCommandBuf
 // any semaphores. We have delayed signalling the semaphores as long as possible to
 // allow as much filling of the MTLCommandBuffer as possible before forcing a wait.
 VkResult MVKQueueCommandBufferSubmission::commitActiveMTLCommandBuffer(bool signalCompletion) {
+    MVK_CPU_SCOPE(NativeCommit);
 
 	// If using inline semaphore waiting, do so now.
 	// When prefilled command buffers are used, multiple commits will happen because native semaphore
@@ -686,6 +750,7 @@ VkResult MVKQueueCommandBufferSubmission::commitActiveMTLCommandBuffer(bool sign
 	// may destroy this instance before this function ends.
 	id<MTLCommandBuffer> mtlCmdBuff = signalCompletion ? getActiveMTLCommandBuffer() : _activeMTLCommandBuffer;
 	_activeMTLCommandBuffer = nil;
+    if(mvkStutterNativeEnabled())MVKStutterCPUTrace::currentContext.nativeCB=0;
 
 	uint64_t startTime = getPerformanceTimestamp();
 	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) {
@@ -696,7 +761,8 @@ VkResult MVKQueueCommandBufferSubmission::commitActiveMTLCommandBuffer(bool sign
 	// Retrieve the result before committing MTLCommandBuffer, because finish() will destroy this instance.
 	VkResult rslt = mtlCmdBuff ? getConfigurationResult() : VK_ERROR_OUT_OF_POOL_MEMORY;
 	mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
-	mvkQueueTimingCommit(mtlCmdBuff);
+	mvkStutterNativePhase(mtlCmdBuff,"commitRequested");
+    mvkMarkTrackedCommandBufferCommit(mtlCmdBuff);
 		[mtlCmdBuff commit];
 	[mtlCmdBuff release];		// retained
 
@@ -875,10 +941,24 @@ MVKQueueFullCommandBufferSubmission<N>::MVKQueueFullCommandBufferSubmission(MVKQ
 // If the semaphores are not encodable, wait on them inline after presenting.
 // The semaphores know what to do.
 VkResult MVKQueuePresentSurfaceSubmission::execute() {
+    MVKCPUContext context=mvkStutterContext();
+    context.domain=std::min(_queue->_queueFamily->getIndex()+1,6u);
+    context.queueFamily=_queue->_queueFamily->getIndex(); context.queueIndex=_queue->_index;
+    context.submission=_stutterSubmissionID; context.nativeCB=0; context.frame=_stutterSubmissionID;
+    MVKCPUContextGuard contextGuard(context);
+    MVK_CPU_SCOPE_TAG(QueueExecute,_stutterSubmissionID);
+    if(_stutterCreatedNS)mvkStutterAsync(MVKCPUPhase::QueueDispatchDelay,mvkStutterMonotonicNS()-_stutterCreatedNS,_stutterSubmissionID);
+    mvkStutterSubmissionPhase(_stutterSubmissionID,context.queueFamily,context.queueIndex,"executing",_stutterCreatedNS);
 	// MTLCommandBuffer retain references to avoid rare case where objects are destroyed too early.
 	// Although testing could not determine which objects were being lost, queue present MTLCommandBuffers
 	// are used only once per frame, and retain so few objects, that blanket retention is still performant.
 	id<MTLCommandBuffer> mtlCmdBuff = _queue->getMTLCommandBuffer(kMVKCommandUseQueuePresent, true);
+    mvkStutterTagNativeCB(mtlCmdBuff,_stutterSubmissionID,0,_stutterSubmissionID);
+    if(mvkStutterNativeEnabled())MVKStutterCPUTrace::currentContext.nativeCB=mvkStutterNativeID(mtlCmdBuff);
+    if(mvkStutterNativeEnabled()){
+        NSMutableDictionary*record=objc_getAssociatedObject(mtlCmdBuff,mvkDependencyKey());
+        if(record)@synchronized(record){record[@"logicalSubmissionID"]=@(_stutterSubmissionID);record[@"nativeSplitIndex"]=@0;record[@"presentFrameID"]=@(_stutterSubmissionID);}
+    }
 
 	// Present submissions run on the queue's same serial host executor as ordinary
 	// submissions. Apply the AMD cross-queue timeline gate here too, before an
@@ -896,6 +976,12 @@ VkResult MVKQueuePresentSurfaceSubmission::execute() {
 	addPerformanceInterval(getPerformanceStats().queue.waitPresentSwapchains, _creationTime);
 
 	for (int i = 0; i < _presentInfo.size(); i++ ) {
+        MVK_CPU_SCOPE(NativePresent);
+        _presentInfo[i].diagnosticFrameID=_stutterSubmissionID;
+        _presentInfo[i].diagnosticNativeCB=mvkStutterNativeID(mtlCmdBuff);
+        auto provenance=mvkStutterNativeSnapshot(mtlCmdBuff);
+        _presentInfo[i].diagnosticCaptureSession=provenance.session;
+        _presentInfo[i].diagnosticPartialPrefix=provenance.partialPrefix;
 		setConfigurationResult(_presentInfo[i].presentableImage->presentCAMetalDrawable(mtlCmdBuff, _presentInfo[i]));
 	}
 
@@ -914,7 +1000,8 @@ VkResult MVKQueuePresentSurfaceSubmission::execute() {
 	if (mtlCmdBuff) {
 		[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) { this->finish(); }];
 		mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
-		mvkQueueTimingCommit(mtlCmdBuff);
+		mvkStutterNativePhase(mtlCmdBuff,"commitRequested");
+    mvkMarkTrackedCommandBufferCommit(mtlCmdBuff);
 		[mtlCmdBuff commit];
 	} else {
 		finish();

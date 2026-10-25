@@ -59,14 +59,69 @@ public:
         uint64_t ranges = 0;
         uint64_t unchangedRanges = 0;
         uint64_t changedRanges = 0;
+        uint64_t bitmapBuilds = 0, bitmapReadSlots = 0, bitmapEnvelopeSlots = 0;
     };
     static WriteStats takeWriteStats() {
         return {
             _completedWriteRanges.exchange(0, std::memory_order_acq_rel),
             _unchangedWriteRanges.exchange(0, std::memory_order_acq_rel),
             _changedWriteRanges.exchange(0, std::memory_order_acq_rel),
+            _dirtyBitmapBuilds.exchange(0, std::memory_order_acq_rel),
+            _dirtyBitmapReadSlots.exchange(0, std::memory_order_acq_rel),
+            _dirtyBitmapEnvelopeSlots.exchange(0, std::memory_order_acq_rel),
         };
     }
+    // Preserve fragmented writes without widening their gaps into dirty slots.
+    // Total bitmap storage is bounded by the existing two-million-slot limit.
+    struct DirtyRanges : std::vector<std::pair<uint32_t,uint32_t>> {
+        using Base=std::vector<std::pair<uint32_t,uint32_t>>;
+        std::vector<uint64_t> blocks;
+        bool empty() const { return Base::empty() && blocks.empty(); }
+        void clear() { Base::clear(); blocks.clear(); }
+        void markBits(uint32_t begin,uint32_t end) {
+            if (begin>=end) return;
+            uint32_t first=begin/32,last=(end-1)/32;
+            uint32_t fw=first/64,lw=last/64;
+            uint64_t low=~uint64_t(0)<<(first%64);
+            uint64_t high=~uint64_t(0)>>(63-last%64);
+            if (fw==lw) { blocks[fw]|=low&high; return; }
+            blocks[fw]|=low;
+            for(uint32_t w=fw+1;w<lw;++w)blocks[w]=~uint64_t(0);
+            blocks[lw]|=high;
+        }
+        void mark(uint32_t begin,uint32_t end,uint32_t count) {
+            if(begin>=end)return;
+            if(!blocks.empty()){markBits(begin,end);return;}
+            if(!Base::empty()&&begin<=back().second&&end>=back().first)
+                back()={std::min(begin,back().first),std::max(end,back().second)};
+            else emplace_back(begin,end);
+            if(size()<=32)return;
+            _dirtyBitmapBuilds.fetch_add(1,std::memory_order_relaxed);
+            blocks.assign((size_t(count)+2047)/2048,0);
+            for(auto range:*this)markBits(range.first,range.second);
+            Base::clear();
+        }
+        void materialize(uint32_t count) {
+            if(blocks.empty())return;
+            uint64_t readSlots=0;uint32_t low=count,high=0;
+            auto append=[&](uint32_t begin,uint32_t end){
+                end=std::min(end,count);
+                if(begin>=end)return;
+                readSlots+=end-begin;low=std::min(low,begin);high=std::max(high,end);
+                if(!Base::empty()&&back().second==begin)back().second=end;
+                else emplace_back(begin,end);
+            };
+            for(uint32_t w=0;w<blocks.size();++w){
+                uint64_t bits=blocks[w];
+                if(bits==~uint64_t(0)){append(w*2048,(w+1)*2048);continue;}
+                while(bits){uint32_t bit=__builtin_ctzll(bits);uint32_t begin=(w*64+bit)*32;
+                    append(begin,begin+32);bits&=bits-1;}
+            }
+            blocks.clear();
+            _dirtyBitmapReadSlots.fetch_add(readSlots,std::memory_order_relaxed);
+            _dirtyBitmapEnvelopeSlots.fetch_add(high>low?high-low:0,std::memory_order_relaxed);
+        }
+    };
     struct RangeLocks {
         std::shared_lock<std::shared_mutex> narrowGate;
         std::unique_lock<std::shared_mutex> wideGate;
@@ -110,7 +165,7 @@ public:
                      const char* src, Resources* slots, size_t stride,
                      uint32_t begin, uint32_t end,
                      std::mutex* dirtyLock,
-                     std::vector<std::pair<uint32_t,uint32_t>>* dirty,
+                     DirtyRanges* dirty,
                      std::atomic<uint64_t>* dirtyStripeMask) {
                 state->activeWrites.fetch_add(1, std::memory_order_acq_rel);
                 _ranges.push_back({state, keepAlive, src, slots, stride, begin, end,
@@ -126,7 +181,7 @@ public:
                 size_t stride;
                 uint32_t begin, end;
                 std::mutex* dirtyLock;
-                std::vector<std::pair<uint32_t,uint32_t>>* dirty;
+                DirtyRanges* dirty;
                 std::atomic<uint64_t>* dirtyStripeMask;
             };
             void finish() {
@@ -143,20 +198,7 @@ public:
                         anyChanged = true;
                         _changedWriteRanges.fetch_add(1, std::memory_order_relaxed);
                         std::lock_guard<std::mutex> dirtyGuard(*range.dirtyLock);
-                        auto& dirty = *range.dirty;
-                        uint32_t begin = range.begin, end = range.end;
-                        if (!dirty.empty() && begin <= dirty.back().second && end >= dirty.back().first) {
-                            dirty.back() = {std::min(begin, dirty.back().first), std::max(end, dirty.back().second)};
-                        } else {
-                            dirty.emplace_back(begin, end);
-                        }
-                        if (dirty.size() > 32) {
-                            for (auto item : dirty) {
-                                begin = std::min(begin, item.first);
-                                end = std::max(end, item.second);
-                            }
-                            dirty.assign(1, {begin, end});
-                        }
+                        range.dirty->mark(range.begin,range.end,(uint32_t)range.slots->size());
                         range.dirtyStripeMask->fetch_or(stripeMask(range.src, range.stride,
                                                                   range.begin, range.end),
                                                         std::memory_order_release);
@@ -349,6 +391,7 @@ public:
             if (reuseToken) *reuseToken = {entry.reuseState, entry.reuseState->completedVersion.load(std::memory_order_acquire)};
             return entry.snapshot;
         }
+        entry.dirty.materialize(count);
         bool changed = !entry.snapshot;
         size_t dirtySlots = 0;
         for (auto range : entry.dirty) dirtySlots += range.second-range.first;
@@ -528,7 +571,7 @@ private:
         Resources slots;
         std::unordered_map<id<MTLResource>,uint32_t> counts;
         std::mutex dirtyLock;
-        std::vector<std::pair<uint32_t,uint32_t>> dirty;
+        DirtyRanges dirty;
         std::atomic<uint64_t> dirtyStripeMask{~uint64_t(0)};
         Snapshot snapshot;
         std::shared_ptr<SnapshotReuseState> reuseState = std::make_shared<SnapshotReuseState>();
@@ -555,4 +598,5 @@ private:
     inline static std::atomic<uint64_t> _completedWriteRanges{0};
     inline static std::atomic<uint64_t> _unchangedWriteRanges{0};
     inline static std::atomic<uint64_t> _changedWriteRanges{0};
+    inline static std::atomic<uint64_t> _dirtyBitmapBuilds{0}, _dirtyBitmapReadSlots{0}, _dirtyBitmapEnvelopeSlots{0};
 };

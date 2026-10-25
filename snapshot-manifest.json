@@ -2032,8 +2032,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 149254,
-      "sha256": "9af27a35eb89723f0212a0d6273b14a23df986bc88b7e5a90b912a7e13defb5f",
+      "bytes": 150209,
+      "sha256": "8738d8f5542e367ffdb3f68246da438b99907b7aa08581edefa4519100345279",
       "executable": false
     },
     {
@@ -2156,8 +2156,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDescriptorUseCache.h",
-      "bytes": 28682,
-      "sha256": "6179887c4c5a3e8c392aaf6848af3a9cfa190b933edfcb45b15bbb0f936381b4",
+      "bytes": 30949,
+      "sha256": "8112c879c59fc94aa55a24f6ffd8409ff855a4b62d9fc8236bf968ceda91f1a9",
       "executable": false
     },
     {
@@ -33730,6 +33730,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/descriptor_before_dirty_bitmap.h",
+      "bytes": 28682,
+      "sha256": "6179887c4c5a3e8c392aaf6848af3a9cfa190b933edfcb45b15bbb0f936381b4",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/controls/descriptor_pre_interior_filter.h",
       "bytes": 26756,
       "sha256": "44c4d2648786a23c74b0056dd165696873334eb4ea860a2a5b55876c22ea99d0",
@@ -33779,14 +33785,20 @@
     },
     {
       "path": "open-game-stack-20261015/src/descriptor_clean_blocks_gpu.mm",
-      "bytes": 5760,
-      "sha256": "8c40eecca49e756865c088998012f76e0c18df2e93d168aa90c6e7c660f76fc7",
+      "bytes": 6219,
+      "sha256": "81ad063a1bb34ca0b813f7e12f69580ffdf441e73c52a78e1f55644ad3fdbca7",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/src/descriptor_clean_blocks_paired.mm",
       "bytes": 3047,
       "sha256": "ffe7b802134f8e0d815475aed1c9a2e428d565a010a8273865314dcd83ae5edd",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/descriptor_fragmentation_control.mm",
+      "bytes": 5987,
+      "sha256": "8d5ae4eb541730b616a56932035d0e68a6da29ce2c098156dea2f185a946b648",
       "executable": false
     },
     {
@@ -34496,7 +34508,7 @@
     {
       "path": "open-game-stack-20261015/tools/control_stellar_pid.applescript",
       "bytes": 1597,
-      "sha256": "fe43c3d59297785db95002d6b518555aa2adcd8ab348a9d067ae71087359903c",
+      "sha256": "d93e14d819f05de72d63cdad30d916d27912b5231bb7e0aa93ea2c8aa2dda23e",
       "executable": false
     },
     {

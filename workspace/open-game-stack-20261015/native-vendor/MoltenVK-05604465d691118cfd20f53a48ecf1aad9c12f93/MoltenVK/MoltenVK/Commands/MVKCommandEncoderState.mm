@@ -1373,6 +1373,7 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
         uint64_t descriptorSnapshotFastHits=0, descriptorSnapshotMisses=0;
         uint64_t snapshotBulkFastHits=0, snapshotBulkResources=0;
         uint64_t descriptorWriteRanges=0, descriptorUnchangedWriteRanges=0, descriptorChangedWriteRanges=0;
+        uint64_t dirtyBitmapBuilds=0, dirtyBitmapReadSlots=0, dirtyBitmapEnvelopeSlots=0;
 		uint64_t bindCalls=0, inputRead=0, inputReadWrite=0;
 		uint64_t preciseRead=0, preciseReadWrite=0, collapsedRead=0, heapDeclarations=0, heapQueries=0;
 		uint64_t heapDeclarationNS=0, readDeclarationNS=0, writeDeclarationNS=0, declarationMaxNS=0;
@@ -1406,6 +1407,9 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     total.descriptorWriteRanges += descriptorWriteStats.ranges;
     total.descriptorUnchangedWriteRanges += descriptorWriteStats.unchangedRanges;
     total.descriptorChangedWriteRanges += descriptorWriteStats.changedRanges;
+    total.dirtyBitmapBuilds += descriptorWriteStats.bitmapBuilds;
+    total.dirtyBitmapReadSlots += descriptorWriteStats.bitmapReadSlots;
+    total.dirtyBitmapEnvelopeSlots += descriptorWriteStats.bitmapEnvelopeSlots;
     total.queuedSuperseded+=statsQueuedSuperseded;statsQueuedSuperseded=0;
 	total.bindCalls+=statsBindCalls; total.inputRead+=statsInputRead; total.inputReadWrite+=statsInputReadWrite;
 	total.preciseRead+=statsPreciseRead; total.preciseReadWrite+=statsPreciseReadWrite;
@@ -1438,6 +1442,17 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
             }
         }
         char path[4096];snprintf(path,sizeof(path),"%s/resource-use-%d.jsonl",directory,getpid());
+        char dirtyPath[4096];
+        snprintf(dirtyPath,sizeof(dirtyPath),"%s/descriptor-dirty-%d.jsonl",directory,getpid());
+        if (records < 1024) {
+            if (FILE* file=fopen(dirtyPath,"a")) {
+                fprintf(file,"{\"time\":%.6f,\"wallSeconds\":%.6f,\"bitmapBuilds\":%llu,\"bitmapReadSlots\":%llu,\"bitmapEnvelopeSlots\":%llu}\n",
+                        now,now-total.start,(unsigned long long)total.dirtyBitmapBuilds,
+                        (unsigned long long)total.dirtyBitmapReadSlots,
+                        (unsigned long long)total.dirtyBitmapEnvelopeSlots);
+                fclose(file);
+            }
+        }
         char residencyPath[4096];
         snprintf(residencyPath,sizeof(residencyPath),"%s/residency-cost-%d.jsonl",directory,getpid());
         if (records < 1024) {

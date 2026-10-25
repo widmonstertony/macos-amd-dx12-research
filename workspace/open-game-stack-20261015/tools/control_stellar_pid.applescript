@@ -19,7 +19,7 @@ on run argv
             set frontmost of gp to true
             if requestedAction is "return" then tell gp to key code 36
             if requestedAction is "back" then tell gp to key code 53
-            if requestedAction is "equipment" then tell gp to key code 48
+            if requestedAction is "equipment" then tell gp to key code 53
         end if
         return {unix id of gp, actualStart, windowTitles, position of window 1 of gp, size of window 1 of gp}
     end tell

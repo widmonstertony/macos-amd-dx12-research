@@ -52,3 +52,9 @@ state or launch the game executable directly.
 正常 Steam 启动工具现在会在原生游戏 PID 退出后，最多等待 20 秒让 Steam 清除旧的
 游戏跟踪状态，避免已复现的“立即重启请求被忽略”竞态；并统一 Wine 路径分隔符以
 检查残留实例。不修改 Steam 状态，也不直接启动游戏可执行文件。
+
+## Actual scene result / 实际场景结果
+
+The v28 foreground scene measured 7.19 FPS initially and 7.92 FPS after warming, compared with 6.57 FPS in v26 and 7.29 FPS in v27. All intervals used the existing 363×263-point Wine window, without a resolution setting change. Diagnostic formatting samples fell, but resource binding and descriptor snapshot rebuilding still dominated the serial graphics encoder. This remains unplayable. Neither FSR3 feature has been validated.
+
+v28 前台场景首次测得 7.19 FPS，稳定后 7.92 FPS；v26 为 6.57，v27 稳定后为 7.29。各次保留原有 363×263 点 Wine 窗口，未修改分辨率设置。诊断格式化采样占比降低，但资源绑定与描述符快照重建仍占据串行图形编码线程的主要时间。目前仍不可正常游玩，FSR3 两项均未验证。

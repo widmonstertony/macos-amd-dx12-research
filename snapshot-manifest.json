@@ -70575,7 +70575,7 @@
   "currentSourceState": {
     "label": "cpu-unattributed-v34-20261025",
     "gamePlayable": false,
-    "candidateDeployed": false,
+    "candidateDeployed": true,
     "actualGamePerformanceValidated": false,
     "humanGameTestingOnly": true,
     "newOptimizationHeapPlansEnabled": false,
@@ -70583,7 +70583,7 @@
     "sourceFilesUpdatedThisCheckpoint": 5,
     "nativeCandidateSHA256": "151af81c4674b8a005bafd2c7ebdfb0d251acb97e0119dcdb9737aaca9b589bf",
     "nativeBuildPassed": true,
-    "qualificationScope": "CPU concurrency/accounting controls and source-stable native build; GPU/game validation pending"
+    "qualificationScope": "CPU accounting, source-stable native build, owned GPU output and original Wine presentation/guard controls; human game performance pending"
   },
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-25T21:36:46.215191+00:00",

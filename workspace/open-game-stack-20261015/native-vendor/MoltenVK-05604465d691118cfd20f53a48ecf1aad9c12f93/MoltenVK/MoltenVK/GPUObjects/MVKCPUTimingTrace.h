@@ -56,8 +56,10 @@ public:
     using Kind=MVKCPUTimingKind;
     using StageInfo=MVKCPUStageInfo;
     static constexpr size_t HistogramBins=65, SlowCapacity=32, ActiveCapacity=64;
-    static constexpr size_t DetailedCapacity=1024,DetailedSlots=2048;
-    static constexpr size_t MaxDetailedShards=16;
+    // Eight stable domains retain the same 16,384 context-cell budget as the
+    // former sixteen thread tables. GCD thread churn cannot consume eligibility.
+    static constexpr size_t DetailedCapacity=2048,DetailedSlots=4096;
+    static constexpr size_t MaxDetailedShards=DomainCount;
     struct Context {
         uint32_t domain=0,queueFamily=UINT32_MAX,queueIndex=UINT32_MAX;
         uint64_t submission=0,nativeCB=0,frame=0,shader=0;
@@ -87,20 +89,22 @@ public:
     };
     struct SubmissionDetail {
         Context context{};
-        uint64_t thread=0,startNS=0,endNS=0,firstNativeCB=0,lastNativeCB=0,firstFrame=0,lastFrame=0,armEpoch=0;
-        bool mixedNativeCB=false,mixedFrame=false,mixedArm=false,beganBeforeArm=false,openAtReport=false;
+        uint64_t thread=0,lastThread=0,startNS=0,endNS=0,firstNativeCB=0,lastNativeCB=0,firstFrame=0,lastFrame=0,armEpoch=0;
+        bool mixedThread=false,mixedNativeCB=false,mixedFrame=false,mixedArm=false,beganBeforeArm=false,openAtReport=false;
         std::array<DetailCell,StageCount> phases{};
     };
     struct Report {
         uint64_t windowStartNS=0,windowEndNS=0,unixTimeNS=0,slowSpansDropped=0;
         uint64_t invalidIDs=0,badNesting=0,depthOverflow=0,publicationFailures=0;
-        uint64_t detailedOverflowEvents=0,detailedUnattributedEvents=0,detailedUnattributedSelfNS=0;
+        uint64_t detailedOverflowEvents=0,detailedOpenOverflowContexts=0,detailedUnattributedEvents=0,detailedUnattributedSelfNS=0;
         uint64_t detailedColdAllocations=0,detailedColdAllocationNS=0,detailedUnpreparedEvents=0;
         uint64_t diagnosticAllocationDrops=0,diagnosticSuppressedEvents=0,diagnosticUnavailableThreads=0;
         uint64_t detailedThreadBudgetDropEvents=0,registeredThreads=0,aggregateReservedBytes=0,detailedReservedBytes=0,threadShardReservedBytes=0;
         uint64_t detailedArmEpoch=0,detailedArmStartNS=0;
         bool detailedEnabled=false,captureEnabled=false;
         std::array<Metric,StageCount*DomainCount> rows{};
+        std::array<uint64_t,DomainCount> detailDomainEntries{},detailDomainOverflowEvents{};
+        std::array<bool,DomainCount> detailDomainAllocated{};
         std::vector<Span> slowSpans,inFlight;
         std::vector<SubmissionDetail> submissions;
     };
@@ -118,11 +122,13 @@ private:
         std::array<std::unique_ptr<Block>,DomainCount> domains{};
         std::array<Span,SlowCapacity> slow{};
         std::array<Span,ActiveCapacity> active{};
-        std::unique_ptr<DetailTable> detailed;
-        uint64_t detailedOverflowEvents=0,detailedUnattributedEvents=0,detailedUnattributedSelfNS=0;
-        uint64_t detailedColdAllocations=0,detailedColdAllocationNS=0,detailedUnpreparedEvents=0;
-        uint64_t detailedThreadBudgetDropEvents=0;
-        bool detailedBudgetRejected=false;
+    };
+    struct DetailShard {
+        std::mutex lock;
+        std::unique_ptr<DetailTable> table;
+        std::atomic<bool> prepared{false};
+        uint64_t overflowEvents=0,unattributedEvents=0,unattributedSelfNS=0;
+        uint64_t coldAllocations=0,coldAllocationNS=0,unpreparedEvents=0;
     };
     struct Registration {uint64_t uid=0;Shard* shard=nullptr;std::array<Block*,DomainCount> domains{};};
     std::array<StageInfo,StageCount> _info;
@@ -136,6 +142,7 @@ private:
     std::atomic<uint64_t> _aggregateBlockCount{0},_detailedShardCount{0};
     std::mutex _registryLock,_publishLock;
     std::vector<std::unique_ptr<Shard>> _shards;
+    std::array<DetailShard,DomainCount> _details;
     std::unique_ptr<Report> _pending;
     inline static std::atomic<uint64_t> nextUID{1};
     inline static thread_local std::vector<Registration> registrations{};
@@ -158,25 +165,33 @@ private:
         if(!create||table.count==DetailedCapacity)return nullptr;
         size_t index=table.count++;auto&entry=table.entries[index];entry=SubmissionDetail{};entry.context=context;table.slots[slot]=uint16_t(index+1);return &entry;
     }
-    void prepareDetail(Shard&shard,const Context&context){
+    void prepareDetail(const Context&context){
         if(!_detailedEnabled.load(std::memory_order_relaxed)||!context.submission)return;
-        // Only the owning event thread creates this once; reporting never
-        // replaces/frees it, so steady-state events avoid an extra shard lock.
-        if(shard.detailed||shard.detailedBudgetRejected)return;
-        std::lock_guard<std::mutex> guard(shard.lock);
-        if(!shard.detailed){if(_detailedShardCount.fetch_add(1)>=MaxDetailedShards){_detailedShardCount.fetch_sub(1);shard.detailedBudgetRejected=true;return;}uint64_t begin=Clock::ticks();try{beforeAllocation();shard.detailed.reset(new DetailTable);}catch(...){_detailedShardCount.fetch_sub(1);throw;}shard.detailedColdAllocationNS+=Clock::toNS(Clock::ticks()-begin);++shard.detailedColdAllocations;}
+        auto&domain=_details[context.domain];
+        if(domain.prepared.load(std::memory_order_acquire))return;
+        std::lock_guard<std::mutex> guard(domain.lock);
+        if(!domain.table){uint64_t begin=Clock::ticks();beforeAllocation();domain.table.reset(new DetailTable);domain.coldAllocationNS+=Clock::toNS(Clock::ticks()-begin);++domain.coldAllocations;++_detailedShardCount;domain.prepared.store(true,std::memory_order_release);}
     }
-    void recordDetail(Shard&shard,const Span&span,bool failure=false){
-        if(!_detailedEnabled.load(std::memory_order_relaxed))return;
-        if(!span.context.submission){++shard.detailedUnattributedEvents;shard.detailedUnattributedSelfNS+=span.selfNS;return;}
-        if(!shard.detailed){if(shard.detailedBudgetRejected)++shard.detailedThreadBudgetDropEvents;else ++shard.detailedUnpreparedEvents;return;}
-        auto*entry=findDetail(*shard.detailed,span.context,true);if(!entry){++shard.detailedOverflowEvents;return;}
+    void touchDetail(SubmissionDetail&entry,const Span&span){
         uint64_t armEpoch=_detailArmEpoch.load(std::memory_order_relaxed);
-        if(!entry->thread){entry->thread=shard.thread;entry->startNS=span.startNS;entry->armEpoch=armEpoch;}
-        entry->startNS=std::min(entry->startNS,span.startNS);entry->endNS=std::max(entry->endNS,span.endNS);
-        entry->beganBeforeArm|=span.startNS<_detailArmStartNS.load(std::memory_order_relaxed);entry->mixedArm|=entry->armEpoch!=armEpoch;
-        if(span.context.nativeCB){if(!entry->firstNativeCB)entry->firstNativeCB=span.context.nativeCB;else entry->mixedNativeCB|=entry->firstNativeCB!=span.context.nativeCB;entry->lastNativeCB=span.context.nativeCB;}
-        if(span.context.frame){if(!entry->firstFrame)entry->firstFrame=span.context.frame;else entry->mixedFrame|=entry->firstFrame!=span.context.frame;entry->lastFrame=span.context.frame;}
+        if(!entry.thread){entry.thread=span.thread;entry.startNS=span.startNS;entry.armEpoch=armEpoch;}
+        entry.mixedThread|=entry.thread!=span.thread;entry.lastThread=span.thread;
+        entry.startNS=std::min(entry.startNS,span.startNS);entry.endNS=std::max(entry.endNS,span.endNS);
+        entry.beganBeforeArm|=span.startNS<_detailArmStartNS.load(std::memory_order_relaxed);entry.mixedArm|=entry.armEpoch!=armEpoch;
+        if(span.context.nativeCB){if(!entry.firstNativeCB)entry.firstNativeCB=span.context.nativeCB;else entry.mixedNativeCB|=entry.firstNativeCB!=span.context.nativeCB;entry.lastNativeCB=span.context.nativeCB;}
+        if(span.context.frame){if(!entry.firstFrame)entry.firstFrame=span.context.frame;else entry.mixedFrame|=entry.firstFrame!=span.context.frame;entry.lastFrame=span.context.frame;}
+    }
+    // Never called while a per-thread shard lock is held. Reporter uses the
+    // same separation, so thread/domain lock-order inversion is impossible.
+    void recordDetail(const Span&span,bool failure=false){
+        if(!_detailedEnabled.load(std::memory_order_relaxed))return;
+        prepareDetail(span.context);
+        auto&domain=_details[span.context.domain];
+        std::lock_guard<std::mutex> guard(domain.lock);
+        if(!span.context.submission){++domain.unattributedEvents;domain.unattributedSelfNS+=span.selfNS;return;}
+        if(!domain.table){++domain.unpreparedEvents;return;}
+        auto*entry=findDetail(*domain.table,span.context,true);if(!entry){++domain.overflowEvents;return;}
+        touchDetail(*entry,span);
         auto&phase=entry->phases[span.stage];if(failure){++phase.failures;return;}++phase.count;phase.inclusiveNS+=span.inclusiveNS;phase.selfNS+=span.selfNS;phase.maxInclusiveNS=std::max(phase.maxInclusiveNS,span.inclusiveNS);phase.maxSelfNS=std::max(phase.maxSelfNS,span.selfNS);
     }
 
@@ -220,17 +235,27 @@ private:
             uint64_t first=shard->slowCount>SlowCapacity?shard->slowCount-SlowCapacity:0;out->slowSpansDropped+=first;
             for(uint64_t i=first;i<shard->slowCount;++i)out->slowSpans.push_back(shard->slow[i%SlowCapacity]);shard->slowCount=0;
             for(auto active:shard->active)if(active.active){active.endNS=now;active.inclusiveNS=now>=active.startNS?now-active.startNS:0;out->inFlight.push_back(active);}
-            if(shard->detailed){for(const auto&active:shard->active)if(active.active&&active.context.submission)if(auto*entry=findDetail(*shard->detailed,active.context,false))entry->openAtReport=true;for(size_t i=0;i<shard->detailed->count;++i)out->submissions.push_back(shard->detailed->entries[i]);shard->detailed->clear();}
-            out->detailedOverflowEvents+=shard->detailedOverflowEvents;shard->detailedOverflowEvents=0;
-            out->detailedUnattributedEvents+=shard->detailedUnattributedEvents;shard->detailedUnattributedEvents=0;
-            out->detailedUnattributedSelfNS+=shard->detailedUnattributedSelfNS;shard->detailedUnattributedSelfNS=0;
-            out->detailedColdAllocations+=shard->detailedColdAllocations;shard->detailedColdAllocations=0;
-            out->detailedColdAllocationNS+=shard->detailedColdAllocationNS;shard->detailedColdAllocationNS=0;
-            out->detailedUnpreparedEvents+=shard->detailedUnpreparedEvents;shard->detailedUnpreparedEvents=0;
-            out->detailedThreadBudgetDropEvents+=shard->detailedThreadBudgetDropEvents;shard->detailedThreadBudgetDropEvents=0;
+        }
+        // No thread-shard lock is held here. A report drains completed entries;
+        // active entries have zero new phase counts and explicit openAtReport.
+        for(size_t index=0;index<DomainCount;++index){auto&domain=_details[index];std::lock_guard<std::mutex> guard(domain.lock);
+            out->detailDomainAllocated[index]=bool(domain.table);
+            if(domain.table){
+                if(out->detailedEnabled)for(const auto&active:out->inFlight)if(active.context.domain==index&&active.context.submission){if(auto*entry=findDetail(*domain.table,active.context,true)){touchDetail(*entry,active);entry->openAtReport=true;}else ++out->detailedOpenOverflowContexts;}
+                out->detailDomainEntries[index]=domain.table->count;
+                for(size_t i=0;i<domain.table->count;++i)out->submissions.push_back(domain.table->entries[i]);domain.table->clear();
+            }
+            out->detailDomainOverflowEvents[index]=domain.overflowEvents;
+            out->detailedOverflowEvents+=domain.overflowEvents;domain.overflowEvents=0;
+            out->detailedUnattributedEvents+=domain.unattributedEvents;domain.unattributedEvents=0;
+            out->detailedUnattributedSelfNS+=domain.unattributedSelfNS;domain.unattributedSelfNS=0;
+            out->detailedColdAllocations+=domain.coldAllocations;domain.coldAllocations=0;
+            out->detailedColdAllocationNS+=domain.coldAllocationNS;domain.coldAllocationNS=0;
+            out->detailedUnpreparedEvents+=domain.unpreparedEvents;domain.unpreparedEvents=0;
         }
         out->invalidIDs=_invalidIDs.exchange(0);out->badNesting=_badNesting.exchange(0);out->depthOverflow=_depthOverflow.exchange(0);out->publicationFailures=_publicationFailures.exchange(0);out->diagnosticAllocationDrops=_diagnosticAllocationDrops.exchange(0);out->diagnosticSuppressedEvents=_diagnosticSuppressedEvents.exchange(0);out->diagnosticUnavailableThreads=_diagnosticUnavailableThreads.load();return out;
     }
+
     static void printString(FILE*f,const char*s){fputc('"',f);for(const unsigned char*p=reinterpret_cast<const unsigned char*>(s?s:"");*p;++p){if(*p=='"'||*p=='\\'){fputc('\\',f);fputc(*p,f);}else if(*p<32)fprintf(f,"\\u%04x",*p);else fputc(*p,f);}fputc('"',f);}
     static void printSpan(FILE*f,const Span&s){
         fprintf(f,"{\"domain\":%u,\"stage\":%u,\"thread\":%llu,\"queueFamily\":%u,\"queueIndex\":%u,\"submission\":%llu,\"nativeCB\":%llu,\"frame\":%llu,\"tag\":%llu,\"startNS\":%llu,\"endNS\":%llu,\"inclusiveNS\":%llu,\"selfNS\":%llu,\"threadCPUNS\":%llu,\"depth\":%u,\"failureCode\":%lld,\"active\":%s,\"async\":%s}",s.context.domain,s.stage,(unsigned long long)s.thread,s.context.queueFamily,s.context.queueIndex,(unsigned long long)s.context.submission,(unsigned long long)s.context.nativeCB,(unsigned long long)s.context.frame,(unsigned long long)s.tag,(unsigned long long)s.startNS,(unsigned long long)s.endNS,(unsigned long long)s.inclusiveNS,(unsigned long long)s.selfNS,(unsigned long long)s.threadCPUNS,s.depth,(long long)s.failureCode,s.active?"true":"false",s.async?"true":"false");
@@ -272,7 +297,7 @@ public:
             if(stage>=StageCount||trace._info[stage].kind==Kind::Async){++trace._invalidIDs;return;}
             _trace=&trace;_stage=uint32_t(stage);_tag=tag ? tag : currentContext.shader;_captureCPU=captureThreadCPU;_context=currentContext;_context.domain=trace.checkedDomain(_context.domain);
             auto local=trace.local(_context.domain);_shard=local.first;_block=local.second;_parent=top;_depth=_parent?_parent->_depth+1:0;top=this;
-            trace.prepareDetail(*_shard,_context);
+            trace.prepareDetail(_context);
             if(_captureCPU)_cpuStart=Clock::threadNS();_start=Clock::ticks();
             std::lock_guard<std::mutex> g(_shard->lock);
             if(_depth<ActiveCapacity){auto&s=_shard->active[_depth];s={};s.context=_context;s.thread=_shard->thread;s.tag=_tag;s.stage=_stage;s.depth=_depth;s.startNS=Clock::toNS(_start);s.active=true;}
@@ -290,36 +315,43 @@ public:
             if(_parent)_parent->_child+=elapsed;
             if(_child>elapsed)++trace->_badNesting;
             uint64_t inclusive=Clock::toNS(elapsed),self=Clock::toNS(elapsed>=_child?elapsed-_child:0),cpu=cpuEnd>=_cpuStart?cpuEnd-_cpuStart:0;
-            try{std::lock_guard<std::mutex> g(_shard->lock);if(unavailableUID!=trace->_uid)update(_block->stages[_stage],inclusive,self,cpu,_captureCPU&&_cpuStart&&cpuEnd);else ++trace->_diagnosticSuppressedEvents;
-                if(_depth<ActiveCapacity)_shard->active[_depth].active=false;
-                if(unavailableUID!=trace->_uid){Span s;s.context=_context;s.thread=_shard->thread;s.tag=_tag;s.stage=_stage;s.depth=_depth;s.startNS=Clock::toNS(_start);s.endNS=Clock::toNS(end);s.inclusiveNS=inclusive;s.selfNS=self;s.threadCPUNS=cpu;trace->recordDetail(*_shard,s);if(inclusive>=trace->_slowNS)trace->remember(*_shard,s);}}
-            catch(...){trace->disableCurrentThread();}
+            try{
+                Span s;s.context=_context;s.thread=_shard->thread;s.tag=_tag;s.stage=_stage;s.depth=_depth;s.startNS=Clock::toNS(_start);s.endNS=Clock::toNS(end);s.inclusiveNS=inclusive;s.selfNS=self;s.threadCPUNS=cpu;
+                {std::lock_guard<std::mutex> g(_shard->lock);if(unavailableUID!=trace->_uid)update(_block->stages[_stage],inclusive,self,cpu,_captureCPU&&_cpuStart&&cpuEnd);else ++trace->_diagnosticSuppressedEvents;
+                    if(_depth<ActiveCapacity)_shard->active[_depth].active=false;
+                    if(unavailableUID!=trace->_uid&&inclusive>=trace->_slowNS)trace->remember(*_shard,s);}
+                if(unavailableUID!=trace->_uid)trace->recordDetail(s);
+            }catch(...){trace->disableCurrentThread();}
             _trace=nullptr;errno=priorErrno;return inclusive;
         }
     };
     void recordAsync(size_t stage,uint64_t elapsedNS,uint64_t tag=0) noexcept {
         if(!enabled())return;if(stage>=StageCount||_info[stage].kind!=Kind::Async){++_invalidIDs;return;}
         if(unavailableUID==_uid){++_diagnosticSuppressedEvents;return;}int priorErrno=errno;try{
-        Context context=currentContext;context.domain=checkedDomain(context.domain);auto localPair=local(context.domain);auto*shard=localPair.first;prepareDetail(*shard,context);uint64_t end=Clock::toNS(Clock::ticks());
-        std::lock_guard<std::mutex> g(shard->lock);update(localPair.second->stages[stage],elapsedNS,0,0,false);
-        Span s;s.context=context;s.thread=shard->thread;s.tag=tag;s.stage=stage;s.startNS=end>=elapsedNS?end-elapsedNS:0;s.endNS=end;s.inclusiveNS=elapsedNS;s.async=true;recordDetail(*shard,s);if(elapsedNS>=_slowNS)remember(*shard,s);
+        Context context=currentContext;context.domain=checkedDomain(context.domain);auto localPair=local(context.domain);auto*shard=localPair.first;prepareDetail(context);uint64_t end=Clock::toNS(Clock::ticks());
+        Span s;s.context=context;s.thread=shard->thread;s.tag=tag;s.stage=stage;s.startNS=end>=elapsedNS?end-elapsedNS:0;s.endNS=end;s.inclusiveNS=elapsedNS;s.async=true;
+        {std::lock_guard<std::mutex> g(shard->lock);update(localPair.second->stages[stage],elapsedNS,0,0,false);if(elapsedNS>=_slowNS)remember(*shard,s);}
+        recordDetail(s);
         }catch(...){disableCurrentThread();}errno=priorErrno;
     }
     void recordFailure(size_t stage,int64_t code,uint64_t tag=0) noexcept {
-        if(!enabled())return;if(stage>=StageCount){++_invalidIDs;return;}if(unavailableUID==_uid){++_diagnosticSuppressedEvents;return;}int priorErrno=errno;try{Context context=currentContext;context.domain=checkedDomain(context.domain);auto localPair=local(context.domain);auto*shard=localPair.first;prepareDetail(*shard,context);
-        std::lock_guard<std::mutex> g(shard->lock);auto&m=localPair.second->stages[stage];++m.failures;m.lastFailureCode=code;Span s;s.context=context;s.thread=shard->thread;s.tag=tag;s.stage=stage;s.startNS=s.endNS=Clock::toNS(Clock::ticks());s.failureCode=code;recordDetail(*shard,s,true);remember(*shard,s);
+        if(!enabled())return;if(stage>=StageCount){++_invalidIDs;return;}if(unavailableUID==_uid){++_diagnosticSuppressedEvents;return;}int priorErrno=errno;try{Context context=currentContext;context.domain=checkedDomain(context.domain);auto localPair=local(context.domain);auto*shard=localPair.first;prepareDetail(context);
+        Span s;s.context=context;s.thread=shard->thread;s.tag=tag;s.stage=stage;s.startNS=s.endNS=Clock::toNS(Clock::ticks());s.failureCode=code;
+        {std::lock_guard<std::mutex> g(shard->lock);auto&m=localPair.second->stages[stage];++m.failures;m.lastFailureCode=code;remember(*shard,s);}
+        recordDetail(s,true);
         }catch(...){disableCurrentThread();}errno=priorErrno;
     }
+
     std::unique_ptr<Report> snapshot(){std::lock_guard<std::mutex> g(_publishLock);return snapshotLocked(Clock::toNS(Clock::ticks()));}
     void writeJSON(FILE*f,const Report&r)const{
-        fprintf(f,"{\"schema\":1,\"captureEnabled\":%s,\"time\":%.9f,\"unixTimeNS\":%llu,\"windowStartNS\":%llu,\"windowEndNS\":%llu,\"windowAssignment\":\"span completion\",\"selfMeaning\":\"same-thread measured-child subtraction; async self is zero; not process CPU utilization\",\"diagnosticOverheadNotSubtracted\":true,\"rows\":[",r.captureEnabled?"true":"false",double(r.unixTimeNS)/1e9-978307200.0,(unsigned long long)r.unixTimeNS,(unsigned long long)r.windowStartNS,(unsigned long long)r.windowEndNS);
+        fprintf(f,"{\"schema\":1,\"captureEnabled\":%s,\"time\":%.9f,\"unixTimeNS\":%llu,\"windowStartNS\":%llu,\"windowEndNS\":%llu,\"windowAssignment\":\"span completion\",\"selfMeaning\":\"same-thread measured-child subtraction; async self is zero; not process CPU utilization\",\"diagnosticOverheadNotSubtracted\":true,\"detailStorage\":\"stable-domain\",\"threadBudgetApplicable\":false,\"submissionSelfMeaning\":\"sum of same-thread self spans; mixed-thread entries are cumulative work, not one-thread wall or a critical path\",\"rows\":[",r.captureEnabled?"true":"false",double(r.unixTimeNS)/1e9-978307200.0,(unsigned long long)r.unixTimeNS,(unsigned long long)r.windowStartNS,(unsigned long long)r.windowEndNS);
         bool comma=false;for(size_t domain=0;domain<DomainCount;++domain)for(size_t stage=0;stage<StageCount;++stage){const auto&m=r.rows[domain*StageCount+stage];if(!m.count&&!m.failures)continue;if(comma)fputc(',',f);comma=true;fprintf(f,"{\"domain\":%zu,\"stage\":%zu,\"name\":",domain,stage);printString(f,_info[stage].name);fprintf(f,",\"kind\":\"%s\",\"count\":%llu,\"inclusiveWallNS\":%llu,\"selfWallNS\":%llu,\"maxInclusiveNS\":%llu,\"maxSelfNS\":%llu,\"threadCPUCount\":%llu,\"inclusiveThreadCPUNS\":%llu,\"failures\":%llu,\"lastFailureCode\":%lld,\"p50UpperNS\":%llu,\"p95UpperNS\":%llu,\"p99UpperNS\":%llu,\"inclusiveHistogram\":[",_info[stage].kind==Kind::Work?"work":(_info[stage].kind==Kind::Wait?"wait":"async"),(unsigned long long)m.count,(unsigned long long)m.inclusiveNS,(unsigned long long)m.selfNS,(unsigned long long)m.maxInclusiveNS,(unsigned long long)m.maxSelfNS,(unsigned long long)m.threadCPUCount,(unsigned long long)m.inclusiveThreadCPUNS,(unsigned long long)m.failures,(long long)m.lastFailureCode,(unsigned long long)quantileUpper(m.inclusiveHistogram,50),(unsigned long long)quantileUpper(m.inclusiveHistogram,95),(unsigned long long)quantileUpper(m.inclusiveHistogram,99));
             for(size_t i=0;i<HistogramBins;++i)fprintf(f,"%s%llu",i?",":"",(unsigned long long)m.inclusiveHistogram[i]);fputs("],\"selfHistogram\":[",f);for(size_t i=0;i<HistogramBins;++i)fprintf(f,"%s%llu",i?",":"",(unsigned long long)m.selfHistogram[i]);fputs("]}",f);}
         fprintf(f,"],\"slowSpansDropped\":%llu,\"invalidIDs\":%llu,\"badNesting\":%llu,\"depthOverflow\":%llu,\"publicationFailures\":%llu,\"slowSpans\":[",(unsigned long long)r.slowSpansDropped,(unsigned long long)r.invalidIDs,(unsigned long long)r.badNesting,(unsigned long long)r.depthOverflow,(unsigned long long)r.publicationFailures);for(size_t i=0;i<r.slowSpans.size();++i){if(i)fputc(',',f);printSpan(f,r.slowSpans[i]);}fputs("],\"inFlight\":[",f);for(size_t i=0;i<r.inFlight.size();++i){if(i)fputc(',',f);printSpan(f,r.inFlight[i]);}
         bool aggregateIncomplete=r.diagnosticUnavailableThreads||r.invalidIDs||r.badNesting||r.depthOverflow;
-        bool detailIncomplete=aggregateIncomplete||r.detailedOverflowEvents||r.detailedUnattributedEvents||r.detailedUnpreparedEvents||r.detailedThreadBudgetDropEvents;
-        fprintf(f,"],\"aggregateCoverageIncomplete\":%s,\"detailedCoverageIncomplete\":%s,\"diagnosticAllocationDrops\":%llu,\"diagnosticSuppressedEvents\":%llu,\"diagnosticUnavailableThreads\":%llu,\"registeredThreads\":%llu,\"aggregateReservedBytes\":%llu,\"threadShardReservedBytes\":%llu,\"detailedReservedBytes\":%llu,\"detailReportCopyBytes\":%llu,\"maxDetailedShards\":%zu,\"detailedThreadBudgetDropEvents\":%llu,\"detailedEnabled\":%s,\"detailedArmEpoch\":%llu,\"detailedArmStartNS\":%llu,\"detailedCapacityPerThread\":%zu,\"detailedOverflowEvents\":%llu,\"detailedUnattributedEvents\":%llu,\"detailedUnattributedSelfNS\":%llu,\"detailedColdAllocations\":%llu,\"detailedColdAllocationNS\":%llu,\"detailedUnpreparedEvents\":%llu,\"submissions\":[",aggregateIncomplete?"true":"false",detailIncomplete?"true":"false",(unsigned long long)r.diagnosticAllocationDrops,(unsigned long long)r.diagnosticSuppressedEvents,(unsigned long long)r.diagnosticUnavailableThreads,(unsigned long long)r.registeredThreads,(unsigned long long)r.aggregateReservedBytes,(unsigned long long)r.threadShardReservedBytes,(unsigned long long)r.detailedReservedBytes,(unsigned long long)(r.submissions.capacity()*sizeof(SubmissionDetail)),MaxDetailedShards,(unsigned long long)r.detailedThreadBudgetDropEvents,r.detailedEnabled?"true":"false",(unsigned long long)r.detailedArmEpoch,(unsigned long long)r.detailedArmStartNS,DetailedCapacity,(unsigned long long)r.detailedOverflowEvents,(unsigned long long)r.detailedUnattributedEvents,(unsigned long long)r.detailedUnattributedSelfNS,(unsigned long long)r.detailedColdAllocations,(unsigned long long)r.detailedColdAllocationNS,(unsigned long long)r.detailedUnpreparedEvents);
-        for(size_t i=0;i<r.submissions.size();++i){if(i)fputc(',',f);const auto&d=r.submissions[i];fprintf(f,"{\"domain\":%u,\"queueFamily\":%u,\"queueIndex\":%u,\"submission\":%llu,\"thread\":%llu,\"startNS\":%llu,\"endNS\":%llu,\"firstNativeCB\":%llu,\"lastNativeCB\":%llu,\"mixedNativeCB\":%s,\"firstFrame\":%llu,\"lastFrame\":%llu,\"mixedFrame\":%s,\"armEpoch\":%llu,\"mixedArm\":%s,\"beganBeforeArm\":%s,\"beganBeforeWindow\":%s,\"openAtReport\":%s,\"phases\":[",d.context.domain,d.context.queueFamily,d.context.queueIndex,(unsigned long long)d.context.submission,(unsigned long long)d.thread,(unsigned long long)d.startNS,(unsigned long long)d.endNS,(unsigned long long)d.firstNativeCB,(unsigned long long)d.lastNativeCB,d.mixedNativeCB?"true":"false",(unsigned long long)d.firstFrame,(unsigned long long)d.lastFrame,d.mixedFrame?"true":"false",(unsigned long long)d.armEpoch,d.mixedArm?"true":"false",d.beganBeforeArm?"true":"false",d.startNS<r.windowStartNS?"true":"false",d.openAtReport?"true":"false");bool phaseComma=false;for(size_t phase=0;phase<StageCount;++phase){const auto&c=d.phases[phase];if(!c.count&&!c.failures)continue;if(phaseComma)fputc(',',f);phaseComma=true;fprintf(f,"{\"stage\":%zu,\"count\":%llu,\"inclusiveWallNS\":%llu,\"selfWallNS\":%llu,\"maxInclusiveNS\":%llu,\"maxSelfNS\":%llu,\"failures\":%llu}",phase,(unsigned long long)c.count,(unsigned long long)c.inclusiveNS,(unsigned long long)c.selfNS,(unsigned long long)c.maxInclusiveNS,(unsigned long long)c.maxSelfNS,(unsigned long long)c.failures);}fputs("]}",f);}fputs("]}\n",f);
+        bool detailIncomplete=aggregateIncomplete||r.detailedOverflowEvents||r.detailedOpenOverflowContexts||r.detailedUnattributedEvents||r.detailedUnpreparedEvents||r.detailedThreadBudgetDropEvents;
+        fprintf(f,"],\"aggregateCoverageIncomplete\":%s,\"detailedCoverageIncomplete\":%s,\"diagnosticAllocationDrops\":%llu,\"diagnosticSuppressedEvents\":%llu,\"diagnosticUnavailableThreads\":%llu,\"registeredThreads\":%llu,\"aggregateReservedBytes\":%llu,\"threadShardReservedBytes\":%llu,\"detailedReservedBytes\":%llu,\"detailReportCopyBytes\":%llu,\"maxDetailedShards\":%zu,\"detailedThreadBudgetDropEvents\":%llu,\"detailedEnabled\":%s,\"detailedArmEpoch\":%llu,\"detailedArmStartNS\":%llu,\"detailedCapacityPerDomain\":%zu,\"detailedOverflowEvents\":%llu,\"detailedUnattributedEvents\":%llu,\"detailedUnattributedSelfNS\":%llu,\"detailedColdAllocations\":%llu,\"detailedColdAllocationNS\":%llu,\"detailedUnpreparedEvents\":%llu,\"submissions\":[",aggregateIncomplete?"true":"false",detailIncomplete?"true":"false",(unsigned long long)r.diagnosticAllocationDrops,(unsigned long long)r.diagnosticSuppressedEvents,(unsigned long long)r.diagnosticUnavailableThreads,(unsigned long long)r.registeredThreads,(unsigned long long)r.aggregateReservedBytes,(unsigned long long)r.threadShardReservedBytes,(unsigned long long)r.detailedReservedBytes,(unsigned long long)(r.submissions.capacity()*sizeof(SubmissionDetail)),MaxDetailedShards,(unsigned long long)r.detailedThreadBudgetDropEvents,r.detailedEnabled?"true":"false",(unsigned long long)r.detailedArmEpoch,(unsigned long long)r.detailedArmStartNS,DetailedCapacity,(unsigned long long)r.detailedOverflowEvents,(unsigned long long)r.detailedUnattributedEvents,(unsigned long long)r.detailedUnattributedSelfNS,(unsigned long long)r.detailedColdAllocations,(unsigned long long)r.detailedColdAllocationNS,(unsigned long long)r.detailedUnpreparedEvents);
+        for(size_t i=0;i<r.submissions.size();++i){if(i)fputc(',',f);const auto&d=r.submissions[i];fprintf(f,"{\"domain\":%u,\"queueFamily\":%u,\"queueIndex\":%u,\"submission\":%llu,\"thread\":%llu,\"firstThread\":%llu,\"lastThread\":%llu,\"mixedThread\":%s,\"startNS\":%llu,\"endNS\":%llu,\"firstNativeCB\":%llu,\"lastNativeCB\":%llu,\"mixedNativeCB\":%s,\"firstFrame\":%llu,\"lastFrame\":%llu,\"mixedFrame\":%s,\"armEpoch\":%llu,\"mixedArm\":%s,\"beganBeforeArm\":%s,\"beganBeforeWindow\":%s,\"openAtReport\":%s,\"phases\":[",d.context.domain,d.context.queueFamily,d.context.queueIndex,(unsigned long long)d.context.submission,(unsigned long long)d.thread,(unsigned long long)d.thread,(unsigned long long)d.lastThread,d.mixedThread?"true":"false",(unsigned long long)d.startNS,(unsigned long long)d.endNS,(unsigned long long)d.firstNativeCB,(unsigned long long)d.lastNativeCB,d.mixedNativeCB?"true":"false",(unsigned long long)d.firstFrame,(unsigned long long)d.lastFrame,d.mixedFrame?"true":"false",(unsigned long long)d.armEpoch,d.mixedArm?"true":"false",d.beganBeforeArm?"true":"false",d.startNS<r.windowStartNS?"true":"false",d.openAtReport?"true":"false");bool phaseComma=false;for(size_t phase=0;phase<StageCount;++phase){const auto&c=d.phases[phase];if(!c.count&&!c.failures)continue;if(phaseComma)fputc(',',f);phaseComma=true;fprintf(f,"{\"stage\":%zu,\"count\":%llu,\"inclusiveWallNS\":%llu,\"selfWallNS\":%llu,\"maxInclusiveNS\":%llu,\"maxSelfNS\":%llu,\"failures\":%llu}",phase,(unsigned long long)c.count,(unsigned long long)c.inclusiveNS,(unsigned long long)c.selfNS,(unsigned long long)c.maxInclusiveNS,(unsigned long long)c.maxSelfNS,(unsigned long long)c.failures);}fputs("]}",f);}fputs("],\"detailDomains\":[",f);for(size_t i=0;i<DomainCount;++i){if(i)fputc(',',f);fprintf(f,"{\"domain\":%zu,\"allocated\":%s,\"capacity\":%zu,\"entries\":%llu,\"overflowEvents\":%llu}",i,r.detailDomainAllocated[i]?"true":"false",DetailedCapacity,(unsigned long long)r.detailDomainEntries[i],(unsigned long long)r.detailDomainOverflowEvents[i]);}fprintf(f,"],\"detailedTotalCellBudget\":%zu,\"detailedOpenOverflowContexts\":%llu}\n",DomainCount*DetailedCapacity,(unsigned long long)r.detailedOpenOverflowContexts);
     }
     bool writeIfDue(const char*path,bool force=false){
         if(!force&&!enabled())return false;

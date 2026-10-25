@@ -132,6 +132,8 @@ class Analyzer:
         self.reference_cf = None
         self.timebase = None
         self.cpu_historical_skipped = 0
+        self.event_alias_counts = Counter()
+        self.cpu_report_provenance = []
 
     def issue(self, code, *, scope="global", severity="incomplete", **details):
         record = dict(code=code, scope=scope, severity=severity, **details)
@@ -319,9 +321,18 @@ class Analyzer:
                         cb[name] = integer(row[name])
                 if phase == "completed" or "nativeStatus" not in cb:
                     cb["nativeStatus"] = integer(row.get("nativeStatus"))
+                counter_fields = ("counterSession", "counterSkip", "counterAllocated", "counterMidCB", "nativeIntervalOnly", "counterReadbackExpected")
+                if any(name in row for name in counter_fields) and (phase == "completed" or "counterNativeObservation" not in cb):
+                    cb["counterNativeObservation"] = {name: row.get(name) for name in counter_fields}
+                    cb["counterNativeObservation"]["source"] = ref(row)
+                    cb["counterNativeObservation"]["phase"] = phase
                 cb["partialPrefix"] |= bool(row.get("partialPrefix"))
                 cb["counterMidCB"] = cb.get("counterMidCB", False) or bool(row.get("counterMidCB"))
             elif kind == "event":
+                aliases = {"signal": "signal-encoded", "wait": "wait-encoded"}
+                if row.get("phase") in aliases:
+                    self.event_alias_counts[row["phase"]] += 1
+                    row = dict(row, phase=aliases[row["phase"]], _originalEventPhase=row["phase"])
                 event_rows.append((pid, row))
             elif kind == "submission":
                 self.submission_rows.append(dict(row, _pid=pid))
@@ -548,6 +559,10 @@ class Analyzer:
                 self.issue("cpu-instrumentation-disabled", scope="cpu", **ref(report))
             if not report.get("detailedEnabled"):
                 self.issue("cpu-detail-disabled", scope="cpu", **ref(report))
+            self.cpu_report_provenance.append(dict(report=ref(report), pid=pid,
+                detailDomains=report.get("detailDomains"), detailedTotalCellBudget=report.get("detailedTotalCellBudget"),
+                detailedOpenOverflowContexts=report.get("detailedOpenOverflowContexts"),
+                meaning="Domain/submission detail may aggregate multiple threads; preserve first/last/mixed thread provenance."))
             for name in ("slowSpansDropped", "invalidIDs", "badNesting", "depthOverflow", "publicationFailures",
                          "detailedOverflowEvents", "detailedUnattributedEvents", "detailedUnattributedSelfNS", "detailedUnpreparedEvents",
                          "diagnosticAllocationDrops", "diagnosticSuppressedEvents", "diagnosticUnavailableThreads", "detailedThreadBudgetDropEvents"):
@@ -578,9 +593,13 @@ class Analyzer:
                 detail = dict(pid=pid, domain=integer(sub.get("domain")), submission=integer(sub.get("submission")),
                               queueFamily=integer(sub.get("queueFamily")), queueIndex=integer(sub.get("queueIndex")),
                               thread=integer(sub.get("thread")), startNS=integer(sub.get("startNS")), endNS=integer(sub.get("endNS")),
+                              firstThread=integer(sub.get("firstThread", sub.get("thread"))),
+                              lastThread=integer(sub.get("lastThread", sub.get("thread"))),
+                              mixedThread=bool(sub["mixedThread"]) if "mixedThread" in sub else None,
+                              threadFieldMeaning="Legacy/first thread identity; this domain/submission record is not guaranteed to be single-threaded.",
                               firstNativeCB=integer(sub.get("firstNativeCB")), lastNativeCB=integer(sub.get("lastNativeCB")),
                               firstFrame=integer(sub.get("firstFrame")), lastFrame=integer(sub.get("lastFrame")),
-                              report=ref(report), phases=[], flags=[k for k in ("mixedNativeCB", "mixedFrame", "mixedArm", "beganBeforeArm", "beganBeforeWindow", "openAtReport") if sub.get(k)])
+                              report=ref(report), phases=[], flags=[k for k in ("mixedThread", "mixedNativeCB", "mixedFrame", "mixedArm", "beganBeforeArm", "beganBeforeWindow", "openAtReport") if sub.get(k)])
                 for phase in sub.get("phases", []):
                     name, kind = stage_info.get((detail["domain"], integer(phase.get("stage"))), ("unknown", "unknown"))
                     if name == "unknown":
@@ -761,7 +780,7 @@ class Analyzer:
             wait_ns = sum(p["selfWallNS"] for p in phase_rows if p["kind"] == "wait")
             frame["CPU"] = dict(workSelfWallMs=D(work_ns) / 1000000, waitSelfWallMs=D(wait_ns) / 1000000,
                                  phaseRanking=phase_rows, submissionRecords=cpu_refs,
-                                 limits="Sum of measured same-thread self wall time over whole observed submission records, across threads. Inclusive times are never summed into the ranking. Async self is zero. Span-completion windows and mixed CB/frame records cannot be split exactly per present.")
+                                 limits="Sum of measured same-thread self wall time over whole domain/submission records, potentially aggregating multiple threads; firstThread/lastThread/mixedThread provenance is preserved. Inclusive times are never summed into the ranking. Async self is zero. Span-completion windows and mixed CB/frame records cannot be split exactly per present.")
             waits = [w for w in self.host_waits if w["pid"] == pid and any(k[0] == pid and k[1] == w["logicalSubmit"] for k in logicals)]
             wait_intervals = [v for w in waits if (v := clip(w["startCA"], w["endCA"], lo, hi))]
             frame["hostWaits"] = dict(records=waits, clippedIntervalUnionMs=interval_union(wait_intervals) * 1000,
@@ -940,8 +959,11 @@ class Analyzer:
                 coverage = snap.get("coverage", {})
                 session = snap.get("captureSession", {})
                 pid = self._pid_for(artifact)
-                arm = integer(session.get("armSignature"))
-                sid = integer(coverage.get("sessionID", session.get("sessionID")))
+                arm = integer(session.get("armSignature")) or integer(coverage.get("creationArmSignature"))
+                sid = integer(coverage.get("sessionID", session.get("sessionID"))) or integer(coverage.get("creationSessionID"))
+                native_only = (coverage.get("nativeIntervalOnly") is True or snap.get("nativeIntervalOnly") is True
+                               or enclosing.get("nativeIntervalOnly") is True or integer(coverage.get("skipReasonCode")) == 9)
+                readback_expected = bool(coverage.get("counterReadbackExpected", not native_only)) and not native_only
                 sidecar = sidecars.get((pid, arm, sid))
                 pair = sidecar.get("clockCalibration") if sidecar else snap.get("clockCalibration")
                 outcome = dict(source=ref(artifact), pid=pid, armSignature=arm, sessionID=sid,
@@ -953,6 +975,7 @@ class Analyzer:
                                rawCounterDomain="device-GPU-clock", exclusiveShaderDurationsAvailable=False,
                                convertedCAIsEstimate=True, hardwareClockAccuracyGuaranteed=False,
                                nativeGraphSessionMatched=(pid, arm) in self.calibrations,
+                               nativeIntervalOnly=native_only, counterReadbackExpected=readback_expected,
                                calibrationSource=ref(sidecar) if sidecar else ref(artifact),
                                boundaryIntervals=[], unconvertedSamples=0,
                                counterHostClockRaw=dict(
@@ -969,7 +992,29 @@ class Analyzer:
                                mayHaveUnsampledSuffix=bool(list(true_field_paths(snap, "mayHaveUnsampledSuffix")))
                                or enclosing.get("mayHaveUnsampledSuffix") is True
                                or artifact.get("mayHaveUnsampledSuffix") is True)
-                if not outcome["nativeGraphSessionMatched"]:
+                offered = integer(coverage.get("eligibleEventsOffered"))
+                encoded = integer(coverage.get("samplesEncoded"))
+                sample_count = len(snap.get("samples", []))
+                valid_count = integer(snap.get("validSamples"))
+                if native_only:
+                    outcome["sampleState"] = "native-interval-only"
+                elif not snap.get("enabled"):
+                    outcome["sampleState"] = "instrumentation-disabled"
+                elif not snap.get("CPUResolveSucceeded") and (encoded or sample_count or valid_count):
+                    outcome["sampleState"] = "resolve-failed-with-encoded-samples"
+                    self.issue("gpu-counter-resolve-failed", scope="gpu-counters", nativeCB=outcome["nativeCBID"],
+                               encodedSamples=encoded, sampleRows=sample_count, validSamples=valid_count)
+                elif not encoded and not sample_count and not valid_count:
+                    outcome["sampleState"] = "no-eligible-events" if not offered else "no-encoded-events"
+                    if offered:
+                        self.issue("gpu-offered-events-unsampled", scope="gpu-counters", nativeCB=outcome["nativeCBID"], offeredEvents=offered)
+                else:
+                    outcome["sampleState"] = "samples-resolved"
+                outcome["commandBufferRoleEvidence"] = self._gpu_role_evidence(enclosing, outcome)
+                if outcome["sampleState"] == "no-eligible-events" and outcome["commandBufferRoleEvidence"]["recordedWorkCount"]:
+                    self.issue("gpu-recorded-work-without-eligible-counter-events", scope="gpu-counters", nativeCB=outcome["nativeCBID"],
+                               recordedWorkCount=outcome["commandBufferRoleEvidence"]["recordedWorkCount"])
+                if not outcome["nativeGraphSessionMatched"] and not native_only:
                     self.issue("gpu-native-session-unmatched", scope="gpu-counters", pid=pid, armSignature=arm, sessionID=sid)
                 cb = self.cbs.get((pid, outcome["nativeCBID"]))
                 outcome["nativeCommandBufferMatched"] = cb is not None
@@ -983,7 +1028,9 @@ class Analyzer:
                 for name in ("capHit", "captureStartedMidCommandBuffer", "eventsDroppedCapacity", "eventsDroppedDuration", "eventsDroppedSampleBudget", "eventsDroppedLiveBudget", "eventsDroppedUnsupportedPoint", "eventsWithoutCounterBuffer"):
                     if coverage.get(name):
                         self.issue("gpu-coverage-" + name, scope="gpu-counters", nativeCB=outcome["nativeCBID"], count=coverage[name])
-                if not snap.get("enabled") or not snap.get("nativeCompleted") or not snap.get("CPUResolveSucceeded") or snap.get("truncated") or integer(snap.get("invalidSamples")):
+                if ((not snap.get("enabled") and not native_only) or (not snap.get("nativeCompleted") and not native_only)
+                        or outcome["sampleState"] == "resolve-failed-with-encoded-samples"
+                        or snap.get("truncated") or integer(snap.get("invalidSamples"))):
                     self.issue("gpu-snapshot-incomplete", scope="gpu-counters", nativeCB=outcome["nativeCBID"])
                 if sidecar and sidecar.get("physicalDeviceConflict"):
                     self.issue("gpu-clock-physical-device-conflict", scope="gpu-counters", sessionID=sid)
@@ -994,9 +1041,16 @@ class Analyzer:
                     if integer(session.get(name)):
                         self.issue("gpu-session-" + name, scope="gpu-counters", sessionID=sid, count=integer(session[name]))
                 converted = []
-                reason = None
+                reason = "CPU-counter-resolve-failed" if outcome["sampleState"] == "resolve-failed-with-encoded-samples" else None
                 for sample in snap.get("samples", []):
+                    if native_only:
+                        # Informational interval-only outcomes promise no stage
+                        # readback. Never convert possible stale counter rows.
+                        continue
                     if not sample.get("valid"):
+                        outcome["unconvertedSamples"] += 1
+                        continue
+                    if outcome["sampleState"] == "resolve-failed-with-encoded-samples":
                         outcome["unconvertedSamples"] += 1
                         continue
                     estimate, error = convert_gpu_clock(integer(sample.get("timestamp")), pair, self.timebase)
@@ -1021,14 +1075,115 @@ class Analyzer:
                                                             exclusiveShaderDuration=False))
                 outcome["boundaryIntervals"].sort(key=lambda x: x["observedMs"], reverse=True)
                 parsed.append(outcome)
-        if not self.gpu_artifacts:
+        native_coverage = self._native_counter_coverage(parsed)
+        if not self.gpu_artifacts and not (native_coverage["knownCaptureCBs"]
+                and native_coverage["nativeIntervalOnlyCBs"] == native_coverage["knownCaptureCBs"]):
             self.issue("gpu-stage-counters-unavailable", scope="gpu-counters")
-        return dict(artifacts=parsed, unparsed=unparsed,
+        return dict(artifacts=parsed, unparsed=unparsed, nativeCommandBufferCoverage=native_coverage,
                     limits=["Counter timestamps are converted only through a valid paired sample and the explicit host Mach timebase.",
                             "Sidecars join by armSignature and sessionID, never by sessionID alone.",
                             "Counter-host created/encoded/commit MonotonicNS fields use std::chrono::steady_clock and are retained raw; CPU/native Mach MonotonicNS anchors are never applied to them.",
+                            "Provided artifact completeness does not imply all-queue/all-CB coverage. Native counterSession/skip/allocated/midCB flags independently identify missed capture within the known window; explicitly unarmed future CBs are outside that scope.",
+                            "Native interval-only / skip9 outcomes promise no counter artifact or stage readback; they are not missing driver results and provide no shader timings.",
                             "Adjacent counter differences can contain overlapping encoders, barriers and other work; they are not exclusive shader durations.",
                             "Host bracket width is reported; GPU clock hardware accuracy is not guaranteed."])
+
+    def _gpu_role_evidence(self, enclosing, outcome):
+        label = str(enclosing.get("nativeCommandBufferLabel", ""))
+        events = enclosing.get("events", [])
+        work = enclosing.get("workEvents", [])
+        operations = Counter(str(row.get("operation", "unknown")) for row in events if isinstance(row, dict))
+        kinds = Counter(str(row.get("kind", row.get("operation", "unknown"))) for row in work if isinstance(row, dict))
+        known_count = "workCount" in enclosing
+        count = integer(enclosing.get("workCount")) if known_count else None
+        truncated = bool(integer(enclosing.get("truncatedWorkEvents")) or integer(enclosing.get("truncatedEvents")))
+        present_native_ids = {(row["_pid"], integer(row.get("nativeCB"))) for row in self.presents}
+        present_evidence = "vkQueuePresent" in label or (outcome["pid"], outcome["nativeCBID"]) in present_native_ids
+        role = "unclassified"
+        if truncated:
+            role = "unknown-truncated-record"
+        elif known_count and count == 0:
+            if present_evidence:
+                role = "present-with-no-recorded-work"
+            elif set(operations) == {"wait"}:
+                role = "wait-events-only-with-no-recorded-work"
+            elif set(operations) == {"signal"}:
+                role = "signal-events-only-with-no-recorded-work"
+            elif operations and set(operations) <= {"wait", "signal"}:
+                role = "wait-and-signal-with-no-recorded-work"
+            else:
+                role = "no-recorded-work-role-unknown"
+        elif known_count and count:
+            role = "recorded-work"
+        return dict(role=role, nativeCommandBufferLabel=label or None,
+                    recordedWorkCount=count, workCountKnown=known_count,
+                    observedWorkKinds=dict(kinds), observedEventOperations=dict(operations),
+                    workOrEventRecordTruncated=truncated, presentEvidence=present_evidence,
+                    limits="Observed enclosing work/event records and label/native present association only. Zero samples alone never proves wait-only, present, empty work or driver readback failure.")
+
+    def _native_counter_coverage(self, artifacts):
+        names = {0: "not-armed", 1: "allocated", 2: "legacy-queue-filter", 3: "legacy-pipeline-pending",
+                 4: "duration-cap", 5: "command-buffer-cap", 6: "in-flight-cap",
+                 7: "unsupported-counter-sampling", 8: "counter-buffer-allocation-failed", 9: "no-eligible-GPU-events-observed"}
+        by_native = defaultdict(list)
+        for artifact in artifacts:
+            by_native[(artifact["pid"], artifact["nativeCBID"])].append(artifact)
+        records, unarmed, unknown = [], [], []
+        for key, cb in sorted(self.cbs.items(), key=lambda pair: str(pair[0])):
+            observation = cb.get("counterNativeObservation")
+            if observation is None:
+                unknown.append(cb["key"])
+                continue
+            session = integer(observation.get("counterSession"))
+            skip = integer(observation.get("counterSkip"), -1)
+            allocated = observation.get("counterAllocated") is True
+            mid = cb.get("counterMidCB", False) or observation.get("counterMidCB") is True
+            native_only = skip == 9 or observation.get("nativeIntervalOnly") is True
+            known_capture = session > 0 or allocated or mid or skip > 0
+            if not known_capture:
+                # A later unarmed CB can have a native graph record. It must not
+                # turn one finite counter arm into a permanent capture failure.
+                unarmed.append(cb["key"])
+                continue
+            matches = by_native.get(key, [])
+            issues = []
+            row = dict(pid=cb["pid"], nativeCB=cb["nativeCB"], logicalSubmit=integer(cb.get("logicalSubmit")),
+                       split=integer(cb.get("split")), nativeSessions=sorted(cb["sessions"]),
+                       counterSession=session, counterSkip=skip, counterSkipMeaning=names.get(skip, "unknown"),
+                       counterAllocated=allocated, counterMidCB=mid, source=observation["source"],
+                       nativeIntervalOnly=native_only,
+                       counterReadbackExpected=False if native_only else observation.get("counterReadbackExpected", allocated),
+                       matchedArtifactCount=len(matches), nativeCompleted="completed" in cb["phases"],
+                       captureExpectedFrom="counterSession>0 or explicit counter capture/skip flag")
+            def gap(code, **details):
+                issues.append(code)
+                self.issue(code, scope="gpu-counters", pid=cb["pid"], nativeCB=cb["nativeCB"],
+                           counterSession=session, **details)
+            if skip not in (0, 1, 9):
+                gap("gpu-native-counter-skipped", counterSkip=skip, reason=names.get(skip, "unknown"))
+            if not allocated and not native_only:
+                gap("gpu-native-counter-not-allocated", counterSkip=skip)
+            if mid:
+                gap("gpu-native-counter-mid-command-buffer")
+            if not matches and not native_only:
+                gap("gpu-native-artifact-missing")
+            elif matches and not native_only:
+                if session and any(artifact["sessionID"] != session for artifact in matches):
+                    gap("gpu-native-counter-session-mismatch", artifactSessions=sorted({artifact["sessionID"] for artifact in matches}))
+                if any(artifact.get("unconvertedSamples") or artifact.get("mayHaveUnsampledSuffix") for artifact in matches):
+                    gap("gpu-native-artifact-incomplete")
+            if "completed" not in cb["phases"]:
+                gap("gpu-native-counter-completion-missing")
+            row["coverageIssues"] = issues
+            row["observedCoverageComplete"] = not issues
+            records.append(row)
+        return dict(scope="Native CBs with explicit counterSession>0 or allocated/midCB/skip>0 flags; not all future/unarmed CBs.",
+                    knownCaptureCBs=len(records), completeKnownCaptureCBs=sum(r["observedCoverageComplete"] for r in records),
+                    nativeIntervalOnlyCBs=sum(r["nativeIntervalOnly"] for r in records),
+                    incompleteKnownCaptureCBs=sum(not r["observedCoverageComplete"] for r in records),
+                    observedCoverageComplete=bool(records) and all(r["observedCoverageComplete"] for r in records),
+                    records=records, knownUnarmedNativeCBs=unarmed, nativeCounterEligibilityUnknownCBs=unknown,
+                    limits="A complete provided artifact set only covers its known sampled portion; unknown native eligibility is not assumed captured and finite arms do not promise capture of future CBs.")
 
     def report(self):
         self.build_native()
@@ -1062,11 +1217,11 @@ class Analyzer:
         for scope, available, detail in (
             ("native", bool(self.cbs), "Native split IDs, logical submissions, enqueue/commit/scheduled/completed and per-queue/event-value DAG."),
             ("clock", bool(self.calibrations), "Sequential public CF/CA/monotonic anchors; no guaranteed calibration error bound."),
-            ("cpu", bool(self.cpu_details), "Self-time-only measured phases per logical submission/thread, plus deduplicated report totals."),
+            ("cpu", bool(self.cpu_details), "Self-time-only phases per domain/submission, with first/last/mixed thread provenance, plus deduplicated report totals."),
             ("wait", bool(self.native_rows), "Encoded event-value dependencies and paired host waits; external producers remain unknown."),
             ("presentation", bool(self.presents), "Actual native timestamps where valid; callback time is never substituted for frame pacing."),
             ("system", bool(self.system_rows), "PID/start identity, threads, faults, memory/IO/pressure and graphics/compiler progress polls."),
-            ("gpu-counters", bool(gpu["artifacts"]), "Optional paired-clock boundary samples, not exclusive shader costs.")):
+            ("gpu-counters", bool(gpu["artifacts"]) or bool(gpu["nativeCommandBufferCoverage"]["knownCaptureCBs"]), "Optional paired-clock boundaries plus native per-CB skip/allocated/session/midCB checks within the known counter window; not an all-queue capture promise.")):
             problems = sorted({r["code"] for r in self.issues if r["scope"] in (scope, "global")})
             matrix.append(dict(layer=scope, available=available, observedCoverageComplete=available and not problems,
                                issues=problems, detail=detail))
@@ -1080,8 +1235,10 @@ class Analyzer:
                     clockCorrelation=clocks,
                     nativeGraph=dict(commandBuffers=len(self.cbs), edges=len(self.edges), hostWaits=len(self.host_waits),
                                      presents=len(self.presents), topologicallyOrderedNodes=len(self.topological),
+                                     eventPhaseAliasesNormalized=dict(self.event_alias_counts),
                                      scope="captured nativeCB and event IDs in one PID, not a complete host/device scheduler trace"),
-                    CPUPhaseRanking=ranking, CPUHistoricalReportWindowsSkipped=self.cpu_historical_skipped,
+                    CPUPhaseRanking=ranking, CPUReportProvenance=self.cpu_report_provenance,
+                    CPUHistoricalReportWindowsSkipped=self.cpu_historical_skipped,
                     frames=frames, system=system, GPUCounterArtifacts=gpu,
                     inputs=self.sources, inputBytesRead=self.bytes_read, inputRowsRead=self.rows_read,
                     limitations=["CPU self wall time across threads can overlap GPU execution and other threads. Contributor columns must not be added into a frame budget.",

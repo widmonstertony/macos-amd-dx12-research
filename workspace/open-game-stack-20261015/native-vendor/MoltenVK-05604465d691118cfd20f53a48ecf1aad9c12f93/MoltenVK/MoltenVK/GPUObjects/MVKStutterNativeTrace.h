@@ -72,7 +72,7 @@ inline MVKStutterNativeSnapshot mvkStutterNativeSnapshot(id<MTLCommandBuffer> cb
 }
 inline uint64_t mvkStutterNativeID(id<MTLCommandBuffer> cb){return mvkStutterNativeSnapshot(cb).nativeID;}
 struct MVKStutterNativeWriter {
-    struct Budget {uint64_t rows=0,dropped=0;};
+    struct Budget {uint64_t rows=0,dropped=0,slowOffered=0,slowAdmitted=0,slowDropped=0,slowSecond=0,slowInSecond=0;};
     std::mutex lock;std::map<uint64_t,Budget> sessions;FILE* file=nullptr;
     uint64_t evictedThrough=0,lateSessionDrops=0;
     ~MVKStutterNativeWriter(){if(file)fclose(file);}
@@ -111,8 +111,29 @@ struct MVKStutterNativeWriter {
     }
 };
 inline MVKStutterNativeWriter& mvkStutterNativeWriter(){static MVKStutterNativeWriter writer;return writer;}
-// Set the real pre-commit timestamp without logger locks, allocation or I/O.
-// The request row is flushed earlier; scheduled/completed rows expose this value.
+// Full successful-CB snapshots are opt-in and bounded BEFORE constructing
+// dependency dictionaries. The compact armed graph still records every CB.
+inline bool mvkStutterAdmitSlowSnapshot(){
+    auto arm=mvkStutterNativeArm();if(!arm.active)return false;
+    MVKStutterErrnoGuard preserveErrno;
+    auto&w=mvkStutterNativeWriter();std::lock_guard<std::mutex>g(w.lock);
+    // Never recreate an evicted session or bypass its original budget.
+    auto found=w.sessions.find(arm.session);if(found==w.sessions.end())return false;
+    auto&b=found->second;++b.slowOffered;
+    uint64_t second=mvkStutterNativeMonotonicNS()/1000000000ULL;
+    if(b.slowSecond!=second){b.slowSecond=second;b.slowInSecond=0;}
+    if(b.slowAdmitted>=64||b.slowInSecond>=4){
+        ++b.slowDropped;
+        if((b.slowDropped==1||b.slowDropped%1024==0)&&w.output()){
+            fprintf(w.file,"{\"type\":\"coverageLoss\",\"session\":%llu,\"reason\":\"full-snapshot-budget\",\"offered\":%llu,\"admitted\":%llu,\"droppedSnapshotsLowerBound\":%llu,\"maxPerArm\":64,\"maxPerSecond\":4,\"compactNativeGraphStillRecorded\":true,\"complete\":false}\n",
+                (unsigned long long)arm.session,(unsigned long long)b.slowOffered,
+                (unsigned long long)b.slowAdmitted,(unsigned long long)b.slowDropped);fflush(w.file);
+        }
+        return false;
+    }
+    ++b.slowAdmitted;++b.slowInSecond;return true;
+}
+// No logger lock/allocation/I/O between this timestamp and native commit.
 inline void mvkStutterMarkNativeCommit(id<MTLCommandBuffer> cb){
     if(!mvkStutterNativeEnabled())return;
     auto*r=mvkStutterNativeRecord(cb);if(!r)return;

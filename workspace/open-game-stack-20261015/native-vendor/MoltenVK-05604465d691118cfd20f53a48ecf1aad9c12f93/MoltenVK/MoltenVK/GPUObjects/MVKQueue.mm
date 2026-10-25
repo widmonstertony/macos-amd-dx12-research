@@ -252,7 +252,7 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
         bool slowGPU=gpuMilliseconds>=slowTraceMilliseconds;
         bool slowHost=mvkStutterNativeEnabled()&&hostMilliseconds>=slowTraceMilliseconds;
         bool slowWait=mvkStutterNativeEnabled()&&waitMilliseconds>=slowTraceMilliseconds;
-		if (slowTraceMilliseconds > 0.0 && (slowGPU||slowHost||slowWait)) {
+		if (slowTraceMilliseconds > 0.0 && (slowGPU||slowHost||slowWait) && mvkStutterAdmitSlowSnapshot()) {
 			NSMutableDictionary* slow = [mvkCommandBufferDependencies(mtlCB) mutableCopy];
 			slow[@"gpuDurationMilliseconds"] = @(gpuMilliseconds);
             slow[@"slowGPUExecution"]=@(slowGPU);slow[@"slowHostPrecommit"]=@(slowHost);slow[@"slowCommitWait"]=@(slowWait);

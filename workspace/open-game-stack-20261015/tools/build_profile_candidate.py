@@ -41,6 +41,11 @@ for name,value in [('MVK_AMD_SHARED_LIVE_SNAPSHOTS',a.shared_live_snapshots),('M
 if a.stutter_coverage:
  for name,value in [('MVK_AMD_STUTTER_CPU_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_DETAIL_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_ARM_PATH',str(evidence/('gpu-counter.arm' if a.gpu_counters else 'stutter.arm')))]:
   config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("{name}", "{value}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
+if a.stutter_coverage:
+ # A user-initiated game launch starts one bounded 90-second CPU window.
+ # GPU bursts remain separately armed only for the requested reproduction.
+ marker=str(evidence/'cpu-stutter.arm')
+ config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    FILE* mvkCPUArmFile = fopen("{marker}", "w");\n    if (mvkCPUArmFile) fclose(mvkCPUArmFile);\n    setenv("MVK_AMD_QUEUE_TIMING"',1)
 if a.armed_work_trace:
  config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("MVK_AMD_GPU_WORK_TRACE_ARM_PATH", "{evidence}/gpu-work-trace.arm", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
 if a.gpu_counters:

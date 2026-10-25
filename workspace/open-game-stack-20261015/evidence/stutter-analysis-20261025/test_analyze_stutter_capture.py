@@ -202,6 +202,12 @@ def run_tests(out):
                                   requested=7, observed=0, satisfied=False, droppedRows=0, **stamp(D("100.0001")))]
     _, report = analyze(out, "event-value", event_data)
     checks["eventThresholdProducerMapped"] = any(e["kind"] == "event-value" and e["requested"] == 7 and e["producerSignalValue"] == 9 and e["before"].endswith(":1") for e in report["frames"][-1]["dependencyEdges"])
+    actual_aliases = deepcopy(event_data)
+    for row in actual_aliases["native"]:
+        if row.get("type") == "event" and row["phase"] in ("signal-encoded", "wait-encoded"):
+            row["phase"] = {"signal-encoded":"signal", "wait-encoded":"wait"}[row["phase"]]
+    _, alias_report = analyze(out, "actual-event-signal-wait-aliases", actual_aliases)
+    checks["actualSignalWaitAliasesProduceSameDependency"] = any(e["kind"] == "event-value" and e["requested"] == 7 for e in alias_report["frames"][-1]["dependencyEdges"]) and alias_report["nativeGraph"]["eventPhaseAliasesNormalized"] == {"signal":1,"wait":1} and "event-phase-unparsed" not in alias_report["coverage"]["issueCounts"]
     event_data["native"] += [dict(type="event", phase=phase, nativeCB=0, logicalSubmit=2, event=123,
                                   requested=7, observed=7, satisfied=phase == "hostWaitEnd", droppedRows=0, **stamp(t))
                             for phase, t in (("hostWaitBegin", D("100.00001")), ("hostWaitEnd", D("100.00002")))]
@@ -309,6 +315,86 @@ def run_tests(out):
     raw_clock = wrapper_result["artifacts"][0]["counterHostClockRaw"]
     checks["counterSteadyMonotonicRetainedRawNeverMappedToMach"] = raw_clock["createdMonotonicNS"] == 79170103100796 and raw_clock["nativeCommitMonotonicNS"] == 79170109549159 and raw_clock["samples"][0]["encodedMonotonicNS"] == 79170107501680 and raw_clock["comparableToCPUTraceMonotonicNS"] is False and raw_clock["mappedToCPUTrace"] is False
     checks["counterRawGPUMappedOnlyThroughOwnPairedClock"] = wrapper_result["artifacts"][0]["boundaryIntervals"][0]["startCA"] == D("1000.000000001")
+    # Completion flags copied from the real v32 control's native CB9:
+    # counterSession=1, counterSkip=5, counterAllocated=false, counterMidCB=false.
+    real_cb9 = fixture()
+    extra = cb(9, 8, 1002, D("100.002"), D("100.003"), D("100.004"), D("100.005"))
+    for row in extra:
+        if row["phase"] == "completed":
+            row.update(counterSession=1, counterSkip=5, counterAllocated=False, counterMidCB=False)
+    real_cb9["native"] += extra
+    _, report = analyze(out, "native-only-real-cb9-skip5", real_cb9)
+    counter = report["GPUCounterArtifacts"]["nativeCommandBufferCoverage"]
+    cb9 = next(row for row in counter["records"] if row["nativeCB"] == 9)
+    checks["realNativeOnlyCB9CommandBufferCapExplicitlyIncomplete"] = cb9["counterSkip"] == 5 and cb9["counterSkipMeaning"] == "command-buffer-cap" and not cb9["counterAllocated"] and "gpu-native-artifact-missing" in cb9["coverageIssues"] and not cb9["observedCoverageComplete"] and not counter["observedCoverageComplete"]
+    checks["nativeCounterFlagsTakenFromCompletionNotInitialZero"] = cb9["counterSession"] == 1 and cb9["source"]["line"] > 1 and counter["knownCaptureCBs"] == 1
+    counter_data = fixture()
+    for row in counter_data["native"]:
+        if row.get("type") == "nativeCB" and row.get("nativeCB") == 2 and row["phase"] == "completed":
+            row.update(counterSession=1, counterSkip=1, counterAllocated=True, counterMidCB=False)
+    counter_data["native"] += cb(3, 3, 0, D("101.0"), D("101.001"), D("101.002"), D("101.003"))
+    counter_native = gpu_dir / f"stutter-native-{PID}.jsonl"
+    write(counter_native, counter_data["native"], True)
+    counter_a = M.Analyzer(target_pid=PID)
+    counter_a.timebase = dict(numer=1, denom=1)
+    counter_a.load_native([counter_native])
+    counter_a.load_gpu([artifact], [sidecar])
+    counter_a.build_native()
+    counter_result = counter_a.gpu_report()
+    scope = counter_result["nativeCommandBufferCoverage"]
+    checks["unarmedFutureCBDoesNotPermanentlyInvalidateCounterWindow"] = scope["knownCaptureCBs"] == 1 and scope["observedCoverageComplete"] and f"{PID}:3" in scope["knownUnarmedNativeCBs"] and not scope["nativeCounterEligibilityUnknownCBs"]
+    missing_a = M.Analyzer(target_pid=PID)
+    missing_a.load_native([counter_native]);missing_a.build_native()
+    missing_result = missing_a.gpu_report()
+    checks["nativeAllocatedButMissingProvidedArtifactIncomplete"] = "gpu-native-artifact-missing" in missing_a.issue_counts and missing_result["nativeCommandBufferCoverage"]["incompleteKnownCaptureCBs"] == 1
+    mid_data = deepcopy(counter_data)
+    for row in mid_data["native"]:
+        if row.get("nativeCB") == 2 and row.get("phase") == "completed":
+            row["counterMidCB"] = True
+    mid_path = gpu_dir / f"stutter-native-mid-{PID}.jsonl"
+    write(mid_path, mid_data["native"], True)
+    mid_a = M.Analyzer(target_pid=PID)
+    mid_a.timebase = dict(numer=1, denom=1)
+    mid_a.load_native([mid_path]);mid_a.load_gpu([artifact], [sidecar]);mid_a.build_native()
+    mid_result = mid_a.gpu_report()
+    checks["nativeCounterMidCBPrefixExplicitlyIncomplete"] = "gpu-native-counter-mid-command-buffer" in mid_a.issue_counts and mid_result["nativeCommandBufferCoverage"]["incompleteKnownCaptureCBs"] == 1
+    interval_only_data=fixture()
+    for row in interval_only_data["native"]:
+        if row.get("nativeCB")==2 and row.get("phase")=="completed":
+            row.update(counterSession=1,counterSkip=9,counterAllocated=False,counterMidCB=False)
+    _,interval_only_report=analyze(out,"native-skip9-no-artifact-expected",interval_only_data)
+    interval_scope=interval_only_report["GPUCounterArtifacts"]["nativeCommandBufferCoverage"]
+    checks["nativeSkip9RequiresNoArtifactOrReadback"] = interval_scope["knownCaptureCBs"]==1 and interval_scope["nativeIntervalOnlyCBs"]==1 and interval_scope["observedCoverageComplete"] and all(k not in interval_only_report["coverage"]["issueCounts"] for k in ("gpu-native-artifact-missing","gpu-native-counter-not-allocated","gpu-stage-counters-unavailable"))
+    native_only_path=gpu_dir/"native-interval-only-outcome.json"
+    write(native_only_path,dict(gpuTimestamps=dict(enabled=False,coverage=dict(nativeCBID=2,sessionID=1,skipReasonCode=9,nativeIntervalOnly=True,counterReadbackExpected=False),samples=[]),workCount=0,events=[dict(operation="signal")]))
+    native_only_a=M.Analyzer(target_pid=PID);native_only_a.load_gpu([native_only_path]);native_only_result=native_only_a.gpu_report()
+    checks["nativeIntervalOnlyOutcomeDoesNotRequireGPUResolveOrClock"] = native_only_result["artifacts"][0]["sampleState"]=="native-interval-only" and not native_only_result["artifacts"][0]["counterReadbackExpected"] and all(k not in native_only_a.issue_counts for k in ("gpu-counter-resolve-failed","gpu-snapshot-incomplete","gpu-native-session-unmatched","gpu-counter-clock-unavailable"))
+    mixed_data=fixture();mixed_data["cpu"]["submissions"][0].update(firstThread=222,lastThread=333,mixedThread=True)
+    mixed_data["cpu"].update(detailDomains=[dict(domain=0,allocated=True,capacity=1024,entries=1,overflowEvents=0)],detailedTotalCellBudget=8192,detailedOpenOverflowContexts=0)
+    _,mixed_report=analyze(out,"stable-domain-mixed-thread-provenance",mixed_data)
+    provenance=mixed_report["frames"][-1]["CPU"]["submissionRecords"][0]
+    checks["stableDomainDetailPreservesMixedThreadProvenance"] = provenance["firstThread"]==222 and provenance["lastThread"]==333 and provenance["mixedThread"] is True and "mixedThread" in provenance["flags"] and mixed_report["CPUReportProvenance"][0]["detailDomains"][0]["domain"]==0
+    empty_snap = deepcopy(wrapper_snapshot)
+    empty_snap.update(CPUResolveSucceeded=False, validSamples=0, invalidSamples=0, samples=[])
+    empty_snap["coverage"].update(eligibleEventsOffered=0,samplesEncoded=0)
+    roles = {}
+    for role_name,operations,label in (("wait-only",["wait"],"vkQueueSubmit MTLCommandBuffer"),
+                                       ("signal-only",["signal"],"vkQueueSubmit MTLCommandBuffer"),
+                                       ("present",["wait","signal"],"vkQueuePresentKHR MTLCommandBuffer")):
+        path=gpu_dir/(role_name+"-no-eligible.json")
+        write(path,dict(gpuTimestamps=empty_snap,workCount=0,workEvents=[],truncatedWorkEvents=0,truncatedEvents=0,
+                        events=[dict(operation=op) for op in operations],nativeCommandBufferLabel=label))
+        role_a=M.Analyzer(target_pid=PID);role_a.timebase=dict(numer=1,denom=1)
+        role_a.load_gpu([path],[sidecar]);role_result=role_a.gpu_report();roles[role_name]=role_result["artifacts"][0]
+        checks[role_name+"NoEligibleIsNotReadbackFailure"] = roles[role_name]["sampleState"] == "no-eligible-events" and "gpu-counter-resolve-failed" not in role_a.issue_counts and "gpu-snapshot-incomplete" not in role_a.issue_counts
+    checks["zeroSamplesRoleUsesEnclosingEvidence"] = roles["wait-only"]["commandBufferRoleEvidence"]["role"] == "wait-events-only-with-no-recorded-work" and roles["signal-only"]["commandBufferRoleEvidence"]["role"] == "signal-events-only-with-no-recorded-work" and roles["present"]["commandBufferRoleEvidence"]["role"] == "present-with-no-recorded-work"
+    fail_snap=deepcopy(wrapper_snapshot);fail_snap["CPUResolveSucceeded"]=False;fail_snap["coverage"]["samplesEncoded"]=2
+    fail_path=gpu_dir/"encoded-counter-resolve-failure.json";write(fail_path,dict(gpuTimestamps=fail_snap,workCount=1,workEvents=[dict(kind="draw")]))
+    fail_a=M.Analyzer(target_pid=PID);fail_a.timebase=dict(numer=1,denom=1);fail_a.load_gpu([fail_path],[sidecar]);fail_result=fail_a.gpu_report()
+    checks["encodedResolveFailureExplicitNoConvertedBoundaries"] = "gpu-counter-resolve-failed" in fail_a.issue_counts and fail_result["artifacts"][0]["sampleState"] == "resolve-failed-with-encoded-samples" and not fail_result["artifacts"][0]["boundaryIntervals"]
+    work_without_counter=gpu_dir/"recorded-work-no-counter-events.json";write(work_without_counter,dict(gpuTimestamps=empty_snap,workCount=1,workEvents=[dict(kind="draw")]))
+    no_event_a=M.Analyzer(target_pid=PID);no_event_a.load_gpu([work_without_counter],[sidecar]);no_event_result=no_event_a.gpu_report()
+    checks["recordedWorkWithoutCounterEventsIsCoverageGapNotReadbackFailure"] = "gpu-recorded-work-without-eligible-counter-events" in no_event_a.issue_counts and "gpu-counter-resolve-failed" not in no_event_a.issue_counts and no_event_result["artifacts"][0]["commandBufferRoleEvidence"]["role"] == "recorded-work"
     checks["CPUGPUIntervalsNotAdded"] = "exclusiveFrameCost" in normal["frames"][-1]["observedContributors"][0] and not normal["frames"][-1]["observedContributors"][0]["exclusiveFrameCost"]
     metrics["normalFrameIntervalMs"] = frame["intervalMs"]
     metrics["cpuBoundTop"] = cpu["frames"][-1]["observedContributors"][0]

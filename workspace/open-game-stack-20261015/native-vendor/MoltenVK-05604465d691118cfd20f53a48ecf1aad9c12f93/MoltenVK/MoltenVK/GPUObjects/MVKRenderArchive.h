@@ -90,6 +90,9 @@ static bool mvkLoadRenderShard(id<MTLDevice> device, MTLRenderPipelineDescriptor
 // collection. Existing files are immutable, including stale/invalid ones.
 static bool mvkStoreRenderShard(id<MTLDevice> device, MTLRenderPipelineDescriptor* descriptor, NSString* path) {
     if (!path || [[NSFileManager defaultManager] fileExistsAtPath:path]) return false;
+    auto reservation=mvkReserveArchiveShard(path,@"rs1-","MVK_AMD_RENDER_ARCHIVE_MAX_TOTAL_BYTES",
+                                           "MVK_AMD_RENDER_ARCHIVE_MAX_SHARD_BYTES");
+    if(!reservation)return false;
     MTLBinaryArchiveDescriptor* ad = [MTLBinaryArchiveDescriptor new];
     NSError* error = nil;
     id<MTLBinaryArchive> archive = [device newBinaryArchiveWithDescriptor:ad error:&error];
@@ -106,11 +109,10 @@ static bool mvkStoreRenderShard(id<MTLDevice> device, MTLRenderPipelineDescripto
     bool published = false;
     if (serialized) {
         struct stat info {};
-        uint64_t limit = mvkComputeArchiveLimit("MVK_AMD_RENDER_ARCHIVE_MAX_SHARD_BYTES", 16ull << 20);
+        uint64_t limit = reservation.reservedBytes();
         if (!lstat(temporary.fileSystemRepresentation, &info) && S_ISREG(info.st_mode) &&
             info.st_size > 0 && (uint64_t)info.st_size < limit)
-            published = mvkPublishComputeShard(temporary, path, (uint64_t)info.st_size,
-                @"rs1-", "MVK_AMD_RENDER_ARCHIVE_MAX_TOTAL_BYTES");
+            published = mvkPublishComputeShard(reservation,temporary,path,(uint64_t)info.st_size);
     }
     unlink(temporary.fileSystemRepresentation);
     [writer release]; [archive release];

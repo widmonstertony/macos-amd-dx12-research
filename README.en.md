@@ -8,7 +8,7 @@ Open-source D3D12 → Vulkan → Metal compatibility research for Intel Macs wit
 
 See the [2026-10-25 CPU scan fix](docs/CPU-DIRTY-BITMAP-2026-10-25.md) and [diagnostic CPU fix](docs/DIAGNOSTIC-CPU-FIX-2026-10-25.md) for current measurements. See the historical [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and [full research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
 
-Stutter attribution now takes priority: bounded CPU, multi-queue GPU, synchronization, cache, memory and host telemetry, with baseline runtime behavior preserved. Build and isolated controls pass; actual game captures remain pending. See [coverage and limits](docs/STUTTER-COVERAGE-2026-10-25.md).
+Scene and equipment captures are available. Candidate v33 fixes wasted archive builds at quota and diagnostic self-interference; build and isolated controls pass, but game performance awaits human testing. The human operates the game; the agent instruments, analyzes and fixes code. See [coverage and limits](docs/STUTTER-COVERAGE-2026-10-25.md).
 
 ## Download and test
 

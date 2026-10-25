@@ -4,7 +4,108 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <mutex>
+#include <memory>
+#include <string>
+#include <utility>
+#include <cstdint>
+#include <limits>
+
+// Process-local reservation ledger, shared by compute/render writers. No Metal
+// work is needed when admission is impossible. Reserve the maximum accepted
+// shard size before construction: this may leave a tail smaller than one shard
+// limit unused, but never predicts opaque Metal output or enlarges the budget.
+class MVKArchiveAdmissionLedger {
+public:
+    enum class Decision { Accepted, Budget, Pending, Invalid };
+    struct Stats {
+        uint64_t committed=0,reserved=0,pending=0,inventoryRuns=0;
+        uint64_t accepted=0,budgetSkipped=0,pendingSkipped=0,invalid=0,published=0,failed=0;
+    };
+private:
+    struct State {
+        std::mutex lock;
+        bool initialized=false;
+        uint64_t maximum=0;
+        Stats stats;
+        std::unordered_set<std::string> pending;
+    };
+    std::mutex _rootsLock;
+    std::unordered_map<std::string,std::shared_ptr<State>> _roots;
+public:
+    class Reservation {
+        friend class MVKArchiveAdmissionLedger;
+        std::shared_ptr<State> _state;
+        std::string _key;
+        uint64_t _bytes=0;
+        Decision _decision=Decision::Invalid;
+        explicit Reservation(Decision decision):_decision(decision){}
+        Reservation(std::shared_ptr<State> state,std::string key,uint64_t bytes):
+            _state(std::move(state)),_key(std::move(key)),_bytes(bytes),_decision(Decision::Accepted){}
+        void settleLocked(bool published,uint64_t actual){
+            auto&stats=_state->stats;
+            stats.reserved-=_bytes;
+            _state->pending.erase(_key);
+            stats.pending=_state->pending.size();
+            if(published){stats.committed+=actual;++stats.published;}else ++stats.failed;
+            _bytes=0;
+        }
+    public:
+        Reservation()=default;
+        Reservation(const Reservation&)=delete;
+        Reservation&operator=(const Reservation&)=delete;
+        Reservation(Reservation&&other)noexcept:
+            _state(std::move(other._state)),_key(std::move(other._key)),_bytes(other._bytes),_decision(other._decision){other._bytes=0;}
+        Reservation&operator=(Reservation&&other)noexcept {
+            if(this!=&other){cancel();_state=std::move(other._state);_key=std::move(other._key);_bytes=other._bytes;_decision=other._decision;other._bytes=0;}return *this;
+        }
+        ~Reservation(){cancel();}
+        explicit operator bool()const{return _bytes!=0;}
+        uint64_t reservedBytes()const{return _bytes;}
+        Decision decision()const{return _decision;}
+        void cancel(){
+            if(!_bytes)return;
+            {std::lock_guard<std::mutex> guard(_state->lock);settleLocked(false,0);}
+            _state.reset();
+        }
+        template<class Link> bool publish(uint64_t actual,Link&&atomicLink){
+            if(!_bytes)return false;
+            bool published=false;
+            {std::lock_guard<std::mutex> guard(_state->lock);
+                // The pre-reserved maximum covers every accepted actual size.
+                // Hold this short lock through create-only publication/accounting.
+                if(actual&&actual<_bytes)published=atomicLink();
+                settleLocked(published,actual);
+            }
+            _state.reset();return published;
+        }
+    };
+    template<class Inventory> Reservation reserve(const std::string&root,std::string key,
+                                                  uint64_t maximum,uint64_t shardMaximum,
+                                                  Inventory&&inventory){
+        std::shared_ptr<State> state;
+        {std::lock_guard<std::mutex> guard(_rootsLock);auto&slot=_roots[root];if(!slot)slot=std::make_shared<State>();state=slot;}
+        std::lock_guard<std::mutex> guard(state->lock);
+        if(!state->initialized){++state->stats.inventoryRuns;state->stats.committed=inventory();state->maximum=maximum;state->initialized=true;}
+        auto&stats=state->stats;
+        if(!maximum||!shardMaximum||maximum!=state->maximum){++stats.invalid;return Reservation(Decision::Invalid);}
+        if(state->pending.find(key)!=state->pending.end()){++stats.pendingSkipped;return Reservation(Decision::Pending);}
+        if(stats.committed>maximum||stats.reserved>maximum-stats.committed||
+           shardMaximum>maximum-stats.committed-stats.reserved){++stats.budgetSkipped;return Reservation(Decision::Budget);}
+        state->pending.insert(key);stats.reserved+=shardMaximum;stats.pending=state->pending.size();++stats.accepted;
+        return Reservation(state,std::move(key),shardMaximum);
+    }
+    Stats snapshot(const std::string&root){
+        std::shared_ptr<State> state;
+        {std::lock_guard<std::mutex> guard(_rootsLock);auto found=_roots.find(root);if(found==_roots.end())return {};state=found->second;}
+        std::lock_guard<std::mutex> guard(state->lock);return state->stats;
+    }
+};
+
+inline MVKArchiveAdmissionLedger& mvkArchiveAdmissionLedger(){static MVKArchiveAdmissionLedger ledger;return ledger;}
+
+#if !defined(MVK_ARCHIVE_ADMISSION_CPU_CONTROL)
 #include "MVKMeshLinkDifferential.h"
 
 // Wine drives pipeline creation from long-lived worker threads that do not
@@ -66,38 +167,38 @@ static bool mvkLoadComputeShard(id<MTLDevice> device,
 // A process-local admission budget includes existing owned shard files. No cache
 // eviction or deletion is performed. Separate processes sharing one directory
 // can exceed this admission budget, so callers should use a per-game directory.
-static bool mvkPublishComputeShard(NSString* temporary, NSString* path, uint64_t bytes,
-                                  NSString* prefix = @"cs2-",
-                                  const char* budgetName = "MVK_AMD_COMPUTE_ARCHIVE_MAX_TOTAL_BYTES") {
-    static std::mutex budgetLock;
-    static std::unordered_map<std::string, uint64_t> usage;
-    std::lock_guard<std::mutex> lock(budgetLock);
+static MVKArchiveAdmissionLedger::Reservation mvkReserveArchiveShard(NSString* path,
+                                  NSString* prefix,const char* budgetName,const char* shardName) {
     NSString* root = path.stringByDeletingLastPathComponent;
     std::string rootKey = std::string(root.fileSystemRepresentation) + ":" + prefix.UTF8String;
-    auto entry = usage.find(rootKey);
-    if (entry == usage.end()) {
+    return mvkArchiveAdmissionLedger().reserve(rootKey,path.fileSystemRepresentation,
+        mvkComputeArchiveLimit(budgetName,2ull<<30),mvkComputeArchiveLimit(shardName,16ull<<20),[&] {
         uint64_t existing = 0;
         for (NSString* name in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:root error:nil]) {
             if (![name hasPrefix:prefix] || ![name hasSuffix:@".metalar"]) continue;
             struct stat info {};
             NSString* file = [root stringByAppendingPathComponent:name];
             if (!lstat(file.fileSystemRepresentation, &info) && S_ISREG(info.st_mode) && info.st_size > 0)
-                existing += (uint64_t)info.st_size;
+                existing = (uint64_t)info.st_size>std::numeric_limits<uint64_t>::max()-existing ?
+                    std::numeric_limits<uint64_t>::max() : existing+(uint64_t)info.st_size;
         }
-        entry = usage.emplace(rootKey, existing).first;
-    }
-    uint64_t maximum = mvkComputeArchiveLimit(budgetName, 2ull << 30);
-    if (entry->second > maximum || bytes > maximum - entry->second) return false;
+        return existing;
+    });
+}
+
+static bool mvkPublishComputeShard(MVKArchiveAdmissionLedger::Reservation& reservation,
+                                  NSString* temporary,NSString* path,uint64_t bytes) {
     // Atomic create-only publication. Concurrent writers never overwrite an
     // existing archive, including an incompatible one retained for diagnosis.
-    if (link(temporary.fileSystemRepresentation, path.fileSystemRepresentation)) return false;
-    entry->second += bytes;
-    return true;
+    return reservation.publish(bytes,[&] {return link(temporary.fileSystemRepresentation,path.fileSystemRepresentation)==0;});
 }
 
 static bool mvkStoreComputeShard(id<MTLDevice> device,
                                 MTLComputePipelineDescriptor* descriptor, NSString* path) {
     if (!path || [[NSFileManager defaultManager] fileExistsAtPath:path]) return false;
+    auto reservation=mvkReserveArchiveShard(path,@"cs2-","MVK_AMD_COMPUTE_ARCHIVE_MAX_TOTAL_BYTES",
+                                           "MVK_AMD_COMPUTE_ARCHIVE_MAX_SHARD_BYTES");
+    if(!reservation)return false;
     MTLBinaryArchiveDescriptor* archiveDescriptor = [MTLBinaryArchiveDescriptor new];
     NSError* error = nil;
     id<MTLBinaryArchive> archive = [device newBinaryArchiveWithDescriptor:archiveDescriptor error:&error];
@@ -112,10 +213,10 @@ static bool mvkStoreComputeShard(id<MTLDevice> device,
     bool published = false;
     if (serialized) {
         struct stat info {};
-        uint64_t limit = mvkComputeArchiveLimit("MVK_AMD_COMPUTE_ARCHIVE_MAX_SHARD_BYTES", 16ull << 20);
+        uint64_t limit = reservation.reservedBytes();
         if (!lstat(temporary.fileSystemRepresentation, &info) && S_ISREG(info.st_mode) &&
             info.st_size > 0 && (uint64_t)info.st_size < limit)
-            published = mvkPublishComputeShard(temporary, path, (uint64_t)info.st_size);
+            published = mvkPublishComputeShard(reservation,temporary,path,(uint64_t)info.st_size);
     }
     // Only this call's unique unpublished temporary is removed. Existing cache
     // files and all user assets are preserved, even when admission is refused.
@@ -123,3 +224,4 @@ static bool mvkStoreComputeShard(id<MTLDevice> device,
     [archive release];
     return published;
 }
+#endif // !MVK_ARCHIVE_ADMISSION_CPU_CONTROL

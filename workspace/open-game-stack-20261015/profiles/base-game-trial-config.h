@@ -1,4 +1,5 @@
 // Game-only qualified submission profile. Original asset guard remains unchanged.
+#include "@MVK_STACK_ROOT@/profiles/os-scoped-archive-config.h"
 static void append_record(const char *message);
 static void mvk_apply_game_trial_config(void) {
     unsetenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL");
@@ -32,6 +33,14 @@ static void mvk_apply_game_trial_config(void) {
     setenv("MVK_AMD_COMPUTE_ARCHIVE_DIR", "@MVK_STACK_ROOT@/build/game-metal-binary-cache/compute-shards-v3", 1);
     setenv("MVK_AMD_COMPUTE_ARCHIVE_TRACE", "1", 1);
     setenv("MVK_AMD_COMPUTE_ARCHIVE_REHYDRATE", "1", 1);
+    // Kernel build changes across OS updates. Old archives are preserved and
+    // cannot consume the new compiler generation's bounded write allowance.
+    if (!mvk_configure_os_archive_dirs("@MVK_STACK_ROOT@/build/game-metal-binary-cache")) {
+        // Do not silently reuse a saturated legacy write budget on failure.
+        unsetenv("MVK_AMD_RENDER_ARCHIVE_DIR");
+        unsetenv("MVK_AMD_COMPUTE_ARCHIVE_DIR");
+        append_record("step=os-scoped-archive-unavailable");
+    } else append_record("step=os-scoped-archive-ready");
     setenv("VKD3D_DEBUG", "info", 1);
     setenv("VKD3D_LOG_FILE", "Z:\\Documents\\GitHub\\gptk-intel-research-20261011\\open-game-stack-20261015\\evidence\\effective-submission-profile-20261020\\vkd3d-game.log", 1);
     setenv("YYB_OPEN_GUARD_RECORD", "@MVK_PROFILE_EVIDENCE_DIR@/guard-proxy.trace", 1);

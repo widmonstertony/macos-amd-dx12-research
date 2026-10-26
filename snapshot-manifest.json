@@ -33316,8 +33316,8 @@
     },
     {
       "path": "open-game-stack-20261015/profiles/base-game-trial-config.h",
-      "bytes": 2401,
-      "sha256": "9a6d1fa43365a3b1af0c6e7543a99dd74c4e64556d806786c7d2b574ccb9e232",
+      "bytes": 3005,
+      "sha256": "d6ea26555048dcd187124afb42ded759f5b4b6e7f5ea803e06c6859af13a18e6",
       "executable": false
     },
     {
@@ -33330,6 +33330,12 @@
       "path": "open-game-stack-20261015/profiles/full-forensics-v36.json",
       "bytes": 1677,
       "sha256": "7a843583470ef5cf57d8f01c107fdbf8c0160ee8fbc24a8b2ee14b0baaf4fd3f",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/profiles/os-scoped-archive-config.h",
+      "bytes": 2139,
+      "sha256": "3cc1faa9de68f875fe3d4da215cc3e91f69ea7cf061aa94e5b4680a486a2de9b",
       "executable": false
     },
     {
@@ -34055,6 +34061,12 @@
       "path": "open-game-stack-20261015/src/controls/heap_plan_precise_identity_control.mm",
       "bytes": 12900,
       "sha256": "78f80957545997175a6f825cb711d4ef846541d759b66aa5d5a871fe5565683a",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/controls/os_archive_config_control.c",
+      "bytes": 2006,
+      "sha256": "d5c3a23a6da724e159f41e707bab7e54f046b387852c3d4ca10a9d2eab57a776",
       "executable": false
     },
     {

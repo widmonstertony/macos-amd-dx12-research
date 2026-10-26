@@ -50,3 +50,28 @@ Terminal 诊断会在 commit 或可能销毁 submission 的路径之前保存标
 33 项 CPU mock 控制与两项独立审查修复通过，尚未证明实际游戏中的栈展开质量、触发灵敏度或性能改善。此更新只改变取证工具与诊断路径，图形库和性能配置未变；原始日志、崩溃文件和栈内容不公开。
 
 本次只复制源码，不包含私有检查点、原始游戏日志、着色器、二进制或运行包，也不创建新 release。历史检查点数据保持不变；原有历史结果仍按各自的证据范围解释，新增诊断不会追认其已经通过。
+
+## v39：精确回退的堆身份修复（2026-10-26）
+
+本轮实际游戏的线程栈与提交链定位到开源资源分组路径：`queuePreciseRead` 因 retained heap identity 不一致抛出 `logic_error`，当前 native command buffer 尚未 commit，其他队列和上层渲染线程随后等待。这是新增分组优化中的回归，不能外推为所有历史 OOM 或帧率问题的唯一原因。
+
+`nilHeapResources` 这个历史名称下也存放实际有 heap、但必须精确声明的纹理（例如 writable、attachment、view 或 placement overlap）。调用者错误地传入 nil 并设置 `heapKnown=true`。修复改为 `addPrecise(resource, resource.heap)`，保持精确 residency、stage/write 重放与真实 heap 身份变化检查。Native 构建的 223 个源文件中仅此调用文件发生变化。
+
+验证结果：
+
+- 旧库在真实 helper 中重现同一异常。反向顺序的旧库虽然像素正确，heap 元数据和 write 重放仍错误，按失败保留。
+- 新库两种顺序共读回 1,290 个 GPU 像素/word，零差异；包含 128 个 bulk eligible 纹理和一个实际 heap-backed 的 writable 排除项，覆盖 Vertex/Fragment、reset 与 write 重放。
+- CPU 新回归 12,368 checks；既有 ledger 1,292,945 checks；10 个真实 heap 身份变化负例仍被拒绝。
+- 现有纹理、几何及原应用宝 Wine 自有 compute/present 回归通过；旧 Vulkan fixture cache 保持不变。
+
+上一轮已发布 stats 的零 applications 是旧报告窗口：真实 heap API 应用发生在最后 stats 之后。现场另有实际 heap 调用记录，不能再把旧窗口的零值解释为计划从未生效。原始取证有 writer 丢项，连续已写序号不等于完整覆盖；具体卡死判定同时依据重复线程栈和提交归属。
+
+修复库已在本机换入，游戏操作仍由用户完成。实际场景帧率改善、攻击/装备/纳米服稳定性、呈现延迟和 FSR3 两项功能仍待验证。公开更新只备份源码与复现工具，下载运行包未更新，也不声明已可玩。
+
+复现 CPU 控制：
+
+```sh
+python3 tools/qualify_heap_plan_precise_identity.py --output evidence/owned-precise-identity
+```
+
+GPU 对照工具为 `tools/qualify_heap_texture_exception_gpu.py`，需要先构建正确的新/旧 Native 库；仅运行自有资源与着色器，不启动游戏。

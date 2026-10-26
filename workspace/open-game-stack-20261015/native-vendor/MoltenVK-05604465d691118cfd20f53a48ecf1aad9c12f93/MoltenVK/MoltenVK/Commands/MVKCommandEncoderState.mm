@@ -1341,7 +1341,10 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
         entry.first->heap = heap; entry.first->heapKnown = true;
         addRetainedSnapshotResource({resource,entry.first},encoder,func,stage,false);
     };
-    for (id<MTLResource> resource : plan.nilHeapResources) addPrecise(resource,nil);
+    // This bucket also contains heap-backed textures excluded from bulk
+    // preparation. Precise residency does not change their physical heap:
+    // preserve it so later draws agree with the encoder's retained ledger.
+    for (id<MTLResource> resource : plan.nilHeapResources) addPrecise(resource,resource.heap);
     for (const auto& group : plan.groups)
         if (group.resources.size() < heapBatchThreshold)
             for (id<MTLResource> resource : group.resources) addPrecise(resource,group.heap);

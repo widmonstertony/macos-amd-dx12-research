@@ -50,3 +50,28 @@ Add `watch_render_stall_stacks.py`: wait for the human to launch one uniquely id
 Thirty-three CPU mock controls and fixes from independent review passed. Actual game stack quality, trigger sensitivity and performance gains remain unverified. Only observation tools and diagnostic paths change; the graphics library and performance configuration are unchanged. Raw local logs, crash files and stacks remain private.
 
 This update copies source only. It contains no private checkpoints, raw game logs, shaders, binaries or runtime packages, and creates no new release. Historical checkpoint data is unchanged. Existing historical results retain their original scope; the new diagnostics do not retroactively validate them.
+
+## v39: precise-fallback heap identity fix (2026-10-26)
+
+Actual game stacks and submission ownership locate this stall in the open-source resource grouping path: `queuePreciseRead` throws a retained heap identity `logic_error` before the current native command buffer is committed. Other queues and the upper render thread then wait. This is a regression in the added grouping optimization; it does not explain every historical OOM or low-FPS case.
+
+The historically named `nilHeapResources` bucket also holds physically heap-backed textures requiring precise declarations, including writable/attachment/view and placement-overlap exclusions. The caller incorrectly supplied nil and marked `heapKnown=true`. The fix passes `resource.heap`, preserving precise residency, stage/write replay and genuine identity-change checks. Only that Native caller file changed among the stable 223-source-file build.
+
+Validation:
+
+- The old library reproduces the same exception through the real helper. In the reverse order its pixels are correct but heap metadata and write replay are wrong; that case remains a failure.
+- Both candidate orders pass 1,290 actual GPU pixel/word comparisons with zero mismatches. The fixture includes 128 bulk-eligible textures and one physically heap-backed writable exception, plus Vertex/Fragment, encoder reset and write replay.
+- New CPU regression: 12,368 checks; existing ledger: 1,292,945 checks. Ten genuine identity-change negative cases remain rejected.
+- Existing texture, geometry and original-Tencent-Wine owned compute/present controls pass; the old owned Vulkan fixture cache is unchanged.
+
+Earlier published zero-application statistics predate actual heap API applications. They cannot establish that the plan never ran. The trace has writer drops; contiguous emitted sequence numbers do not prove complete coverage. Repeated stacks and submission ownership support the specific stall diagnosis.
+
+The candidate is installed locally; the human continues to operate the game. Actual scene FPS improvement, attack/equipment/nanosuit stability, presentation delays and both FSR3 features remain unvalidated. This public update contains source and reproduction tools only; downloadable runtimes are unchanged, with no playability claim.
+
+CPU reproduction:
+
+```sh
+python3 tools/qualify_heap_plan_precise_identity.py --output evidence/owned-precise-identity
+```
+
+The GPU comparison runner is `tools/qualify_heap_texture_exception_gpu.py`, requiring separately built old/new Native libraries. It runs authored resources and shaders, never the game.

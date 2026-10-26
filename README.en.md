@@ -16,6 +16,8 @@ The one-process diagnostic plan covers known submit, resource, compilation, GPU 
 
 2026-10-26: [v38 causal diagnostic source](docs/CAUSAL_DIAGNOSTICS_V38.en.md) adds resource batches, submission tails, presentation lifecycle and capture coverage auditing. Bounded GPU controls passed; the game's presentation delay still needs causal evidence. Downloadable runtimes are unchanged.
 
+2026-10-26: [v39 precise-fallback heap identity fix](docs/CAUSAL_DIAGNOSTICS_V38.en.md#v39-precise-fallback-heap-identity-fix-2026-10-26). The old library reproduces the exception and candidate GPU controls pass; actual game regression and playable FPS remain unverified.
+
 ## Download and test
 
 [Latest diagnostic download](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [Testing](docs/TESTING.en.md) · [Known issues](docs/KNOWN_ISSUES.en.md) · [Contributing](CONTRIBUTING.md)

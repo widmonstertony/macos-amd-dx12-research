@@ -2200,8 +2200,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 176930,
-      "sha256": "d0f53171ae8b305bc4e6c741df75125a6480a7a661d92754f527f2fba8be90a2",
+      "bytes": 177164,
+      "sha256": "a8293f6f5ae52bf86080cbc67c12f4bf7d4ce1d6a9d52f2855d6044956876c37",
       "executable": false
     },
     {
@@ -34028,6 +34028,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/heap_plan_precise_identity_control.mm",
+      "bytes": 12900,
+      "sha256": "78f80957545997175a6f825cb711d4ef846541d759b66aa5d5a871fe5565683a",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/controls/stable_use_before_pointer_return.h",
       "bytes": 2913,
       "sha256": "bd8952dfdef8fe69331f217a029d3550c1af0212813f59220908ebf898bd9656",
@@ -34294,6 +34300,12 @@
       "path": "open-game-stack-20261015/src/heap_residency_cost_gpu.mm",
       "bytes": 4423,
       "sha256": "536e6cb7d67cbc9130a20decda6c3754eb64b13a86dac9a6cb180649a999083b",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/heap_texture_exception_gpu.mm",
+      "bytes": 14503,
+      "sha256": "bf045110b316ff41232f2f3e80ddc69fec051655e769db7ce3d34cf0b7369292",
       "executable": false
     },
     {
@@ -35027,6 +35039,18 @@
       "path": "open-game-stack-20261015/tools/qualify_geometry_specialization.py",
       "bytes": 12974,
       "sha256": "3f74a78d61f6d3f4160bb5cb4f7ce38a60f8276375357b1c5f6d986d9f2c8777",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_heap_plan_precise_identity.py",
+      "bytes": 6474,
+      "sha256": "4b5004fa859f66fff49afb1c4d161a15139f32e55633559243ec82f87ee51fe1",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_heap_texture_exception_gpu.py",
+      "bytes": 6423,
+      "sha256": "aa195915984dc3440a4bc30f0bb397806abded2c7f8b79b1d9e5ca9cd9d363cf",
       "executable": false
     },
     {

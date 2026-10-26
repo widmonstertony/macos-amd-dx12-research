@@ -16,6 +16,8 @@
 
 2026-10-26：[v38 因果诊断源码](docs/CAUSAL_DIAGNOSTICS_V38.zh-CN.md)补齐资源批次、提交尾部、呈现生命周期与采集覆盖审计。限定 GPU 回归通过；游戏呈现延迟根因仍待取证，下载运行包未更新。
 
+2026-10-26：[v39 修复精确纹理回退的堆身份错误](docs/CAUSAL_DIAGNOSTICS_V38.zh-CN.md#v39精确回退的堆身份修复2026-10-26)。旧库复现异常、新库真实 GPU 对照通过；实际游戏回归与可玩帧率仍待验证。
+
 ## 下载与测试
 
 [最新诊断版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)

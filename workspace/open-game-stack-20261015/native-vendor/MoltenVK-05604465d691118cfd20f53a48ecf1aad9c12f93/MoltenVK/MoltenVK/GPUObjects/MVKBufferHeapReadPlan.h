@@ -1,6 +1,6 @@
 // Immutable read-residency plan for an owned, validated resource lease.
-// Texture mode additionally requires pipeline-proven sample-only image access;
-// resource-level exclusions remain precise. Encoder/stage/write coverage and
+// Texture mode admits readonly native resources for both sample and read;
+// writes and resource-level exclusions remain precise. Encoder/stage/write coverage and
 // strong child ownership are independent of this immutable grouping.
 #pragma once
 #import <Foundation/Foundation.h>
@@ -41,7 +41,8 @@ public:
     // Input identities are valid known buffers, normally unique after liveness
     // filtering. Resource identity/heap assignment must remain fixed while the
     // lease is owned. The default mode is unchanged and accepts known buffers;
-    // texture mode never treats a registry/type hint alone as access proof.
+    // texture mode additionally checks native usage, storage, views and overlap.
+    // Caller must use a read-only binding; sampleOnlyTextures is a legacy name.
     explicit BufferHeapReadPlan(const std::vector<id<MTLResource>>& knownBuffers,
                                 bool sampleOnlyTextures = false) {
         std::unordered_map<id<MTLHeap>, size_t> groupIndex;

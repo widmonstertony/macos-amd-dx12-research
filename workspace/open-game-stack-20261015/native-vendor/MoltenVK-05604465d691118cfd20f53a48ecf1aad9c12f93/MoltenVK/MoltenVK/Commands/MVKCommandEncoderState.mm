@@ -796,10 +796,13 @@ static void bindMetalResources(id<MTLCommandEncoder> encoder,
                                MVKStageResourceBindings& bindings,
                                const MVKResourceBinder& RESTRICT binder) {
     MVK_CPU_SCOPE(BindMetalResources);
-    const bool sampledReads = resources.sampleOnlyImageAccess &&
-        mvkEncoder.getState().mtlShared()._useResource.encoderSampledHeapPlans;
+    // useHeaps prepares readonly argument-buffer access, including texture.read().
+    // Access safety follows the binding's read/write target and immutable native
+    // resource exclusions, rather than a whole-shader sampling-only predicate.
+    // Keep the historical field name for internal/cache compatibility.
+    const bool sampledReads = mvkEncoder.getState().mtlShared()._useResource.encoderSampledHeapPlans;
     if (bindings.sampleOnlyImageAccess && !sampledReads) {
-        // A prior useHeap prepares textures for sampling, not texture.read().
+        // If bulk readonly preparation is disabled, replay precise use decisions.
         // Preserve descriptor/Metal buffer bindings; repeat only use decisions.
         for (size_t idx : resources.resources.descriptorSetData) {
             const auto* layout = common._layout->getDescriptorSetLayout(idx);
@@ -1249,9 +1252,9 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
     id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
     MVKResourceUsageStages stage, bool sampledTextures) {
     MVK_CPU_SCOPE(HeapPlanReuse);
-    // Small tables retain the direct path. Texture plans require proven
-    // sample-only pipeline access and immutable per-resource exclusions;
-    // texture.read(), writes, attachments and unknown access stay precise.
+    // Small tables retain the direct path. Readonly texture plans use immutable
+    // native-resource exclusions. Writes, attachments, views, buffer-backed
+    // textures and unknown/overlapping placement ranges stay precise.
     if (snapshot->size() < 128) { resourceForensics.add(MVKResourceForensics::RejectSmall); return false; }
     if (resourceUseStats) ++statsHeapPlanCalls;
     uint64_t additions = list.additionGeneration();

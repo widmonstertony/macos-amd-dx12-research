@@ -89,3 +89,13 @@ Offline qualification passed:
 - Headless owned compute cold/warm controls in original Tencent Wine pass with strict compute archive-hit verification.
 
 v40 is **not deployed to the game**. The human continues to operate the same game process with preserved caches. Actual startup speedup, mapping-retention counts and game FPS improvement remain unproven. A stricter eligible-2D access contract is under investigation: representative 3D/buffer reads disqualify an entire stage, potentially excluding otherwise sampled 2D images. It is not integrated; keyword matching or allowing a whole aliased binding is insufficient. Remaining PSO-label coverage is incomplete, so overall benefit is unknown.
+
+## v41: reduce per-resource readonly texture declarations
+
+The v39 scene identified read declarations and grouping as major CPU costs. A whole-stage sampling-only gate unnecessarily excluded physically readonly 2D textures whenever a shader also used Buffer/3D/2D fetch. Metal useHeaps declares readonly argument-buffer access, including texture.read; real 5600M output controls confirm that behavior without shader rewriting.
+
+v41 reuses the existing heap plan for readonly bindings. Native usage/storage/view/overlap exclusions, ownership, stage/reset coverage and precise write replay remain. Writable textures, attachments, views, buffer-backed textures and unknown/overlapping ranges do not gain bulk eligibility. Generated shaders and cache formats are unchanged. Historical sampled/sampleOnly internal names remain for compatibility. The separate typed-2D classifier prototype is preserved but inactive; no optional validator is required.
+
+Eight mixed Vulkan cases checked 24,576 pixels with zero mismatches, covering BC1 sample/fetch/query, actual 3D/texel-buffer reads, stage transitions and encoder resets. For the identical switch workload, precise readonly references fell from 1,040 to 16, with eight heap calls; this is not a game FPS multiplier. The unchanged older cache yielded eight shader-stage cache hits. Existing texture/archive, heap-backed write-exception and 8,192-primitive geometry regressions pass.
+
+v41 also includes the previously offline-qualified v40 async detached-PSO repair and is installed in the original local launch chain. The human operates the game and existing caches are preserved. A headless D3D12 control in original Tencent Wine timed out before the candidate/proxy mapped; that failure is retained and is neither a pass nor evidence against this graphics change. Actual Steam startup, scene FPS, combat/equipment stability and both FSR3 features remain unverified. This is a source/tool update, not a new playable runtime release.

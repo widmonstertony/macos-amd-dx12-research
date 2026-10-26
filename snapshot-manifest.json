@@ -2200,8 +2200,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 177164,
-      "sha256": "a8293f6f5ae52bf86080cbc67c12f4bf7d4ce1d6a9d52f2855d6044956876c37",
+      "bytes": 177449,
+      "sha256": "77819a7fea4cd8d2e848f3001078d273700d4670b5f19c9684496923030580d8",
       "executable": false
     },
     {
@@ -2314,8 +2314,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKBufferHeapReadPlan.h",
-      "bytes": 5896,
-      "sha256": "feb6fab47e1a94be05fea6d2d11aa6bbfc1caf4343d107976e1bfc88710e62dd",
+      "bytes": 5988,
+      "sha256": "81bb27d041ed43f18db2f38b2397c91767e3ffe082de46bb6065562bcafa1e95",
       "executable": false
     },
     {
@@ -3036,6 +3036,18 @@
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVConversion.mm",
       "bytes": 3001,
       "sha256": "7600056054bb368cff8267327b7b64813077bb25bdb159954be836c4793c9050",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVEligible2DAccess.h",
+      "bytes": 21492,
+      "sha256": "33f54c47df3c9648f68d7f5c6b93465d800cb77121ebdbfc06a3883904a32fe1",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVOptionalValidator.h",
+      "bytes": 5239,
+      "sha256": "bcafe79fa55fb818fbea9e34baf31dbd5fb38763ab0369d79846d92a97c7427b",
       "executable": false
     },
     {
@@ -34141,6 +34153,60 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/eligible_2d_access/control.cpp",
+      "bytes": 11736,
+      "sha256": "1c39c53f9eb02976cc37923d1139f3326a3b3be76286f544e9a1e67542f2fe14",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access/eligible_2d_access.h",
+      "bytes": 21481,
+      "sha256": "e4bac33def6f1a499b3c16f789e446c5fb7122902f5babe232c6b59c07325a86",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access/qualify.py",
+      "bytes": 8480,
+      "sha256": "d09e3facead5f3b6b7f5d383bd0314c8f68e87a0c5f2df8ab743d8a173554801",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access_gpu.cpp",
+      "bytes": 36966,
+      "sha256": "fcbc2d5c56bfeac6c3c52bdf06b91cb91c8899f8a9bed53577ef64048931f3a9",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access_shaders/fetch-query-negative.frag",
+      "bytes": 852,
+      "sha256": "b985de1845ad1edf8817510789b0d47e56d66c98aa20573d3506e7a2d5de4cf3",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access_shaders/fullscreen-mixed.vert",
+      "bytes": 862,
+      "sha256": "ba977c2d2810fae37caec1ef46ad73d26311907231d40952abf7ee1940bf5a76",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access_shaders/fullscreen.vert",
+      "bytes": 144,
+      "sha256": "7cc0effdbd4e1f49fedd369c01317576f9d81c0432b2637d9be8d990f719ddee",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access_shaders/mixed.frag",
+      "bytes": 795,
+      "sha256": "646fc2a125360cf8c02d9f65b21ce0cd40bbbe282a30f28d4fbee9585f79e10d",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/eligible_2d_access_shaders/sample.frag",
+      "bytes": 347,
+      "sha256": "78ff22739bc1d76a5e727c1ccb9f946818b0a904a0a0fb36f67ac1892128851c",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/encoded_work_ring_control.mm",
       "bytes": 4564,
       "sha256": "da173e13fe8b69ac53ccd8d8ad4f31fe8ff78ec8a0f5924b26d46d95f5c22f8c",
@@ -34306,6 +34372,12 @@
       "path": "open-game-stack-20261015/src/graphics-bda/variable-array.comp",
       "bytes": 827,
       "sha256": "0ae8ee6949d5684f570115f2e818ac1c19c76f23f1d6386cf99cec9a6d524573",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/heap_readonly_fetch_gpu.mm",
+      "bytes": 14569,
+      "sha256": "9f5bb1209dcf30958be399bf999b71c234f0ff05dcea527f208816151e78ad38",
       "executable": false
     },
     {
@@ -35048,6 +35120,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/qualify_eligible_2d_access_gpu.py",
+      "bytes": 11145,
+      "sha256": "4f31b92596b10d776dbd5466eb821de291bbadb6ba2f47ec21cef348800ce74f",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/tools/qualify_encoded_work_ring.py",
       "bytes": 1675,
       "sha256": "be4b13ac2216e2ed5dcf43a164afdc938664ed3eb8521ebd4fcbe5211a692771",
@@ -35063,6 +35141,12 @@
       "path": "open-game-stack-20261015/tools/qualify_heap_plan_precise_identity.py",
       "bytes": 6474,
       "sha256": "4b5004fa859f66fff49afb1c4d161a15139f32e55633559243ec82f87ee51fe1",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_heap_readonly_fetch_gpu.py",
+      "bytes": 6394,
+      "sha256": "2f6760c1c3f65df08e235c2904a30afaca0cd35dbd2dda96e38ad174278b5f65",
       "executable": false
     },
     {
@@ -35087,6 +35171,12 @@
       "path": "open-game-stack-20261015/tools/qualify_query_output.py",
       "bytes": 3485,
       "sha256": "e759b8160136df56aec610792f0d39fbfcb6ae33af726ddfcb43ea1de10c26f7",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_readonly_texture_gpu.py",
+      "bytes": 10650,
+      "sha256": "4b727e4bc86e1839de962d3820fd78388b138c8a69f7fa27d6ab8ea0a4d1a49d",
       "executable": false
     },
     {

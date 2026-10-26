@@ -777,9 +777,57 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/evidence/full-forensics-v36-20261025/fine_sampling_control.cpp",
+      "bytes": 3362,
+      "sha256": "b8ed101289908fd289a832ff9c37a36608e523e709b0f3d84b161e087c332bcc",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/full-forensics-v36-20261025/run_cpu_controls.py",
+      "bytes": 1208,
+      "sha256": "d7f70f18398242bb6b7fae8846bc3334e0753574b72d1b6cc6d5c0755993cc5b",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/full-forensics-v36-20261025/runtime_arm_control.cpp",
+      "bytes": 1814,
+      "sha256": "f670698aef7f5375d8c400c95d828c163c238edd33bfb94d02a0ff406d3cdb4c",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/evidence/gpu-suffix-control-20261025/gpu_suffix_control.mm",
       "bytes": 3832,
       "sha256": "a0b0d5ef1886fbcc53ec99a3101b85e780a9ebe1690bb6a39fc0d60fb5b5afb4",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/analyze_resource_forensics.py",
+      "bytes": 7524,
+      "sha256": "be45f8709f1b8023402460332d87d16898f4570f32a3662c80eeda8b06e7fb19",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/build_fixture.py",
+      "bytes": 3951,
+      "sha256": "72fd9ce27e520d6e57dcb447e10d096715e36e466021073b30fc22b661453b19",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/lifecycle_cases.inc",
+      "bytes": 12666,
+      "sha256": "541bc4e9758c218a6127abea3ac05a883709c2c45b4b9847cdc26f5dfcc32bc5",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/residency_lifecycle_gpu.mm",
+      "bytes": 27004,
+      "sha256": "03dc27bcbe263c532995ad1d1bfd64534a8b999a9925b3e1221feddb0a197899",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/run_control.py",
+      "bytes": 3697,
+      "sha256": "38fd61c89c1da4c0e2c8851c56576e3fe5d6bda99fad4e48a765144dd7c186b1",
       "executable": false
     },
     {
@@ -1176,6 +1224,24 @@
       "path": "open-game-stack-20261015/evidence/safe-mesh-serialized-no-retry-game-20261020/launch-proof.json",
       "bytes": 1233,
       "sha256": "54a41334285cb65714a6c78944ac71a03cb62aa78c27ca9f6d1b1c66eb5c2169",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sample-only-image-access-20261026/README.md",
+      "bytes": 2933,
+      "sha256": "3f0ef9c367c65cbe0fc549ae394564edf88af96b9798dbb60ec4c026b05c939e",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sample-only-image-access-20261026/build_fixtures.py",
+      "bytes": 5500,
+      "sha256": "720d20884278bf7a6bbdb3d1d819d90b36415c9499b49ff30f3046f0af921d29",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/evidence/sample-only-image-access-20261026/generate_header.py",
+      "bytes": 9338,
+      "sha256": "f7b3dac9d5d6b21f5c2e2a0a10c7878166b90fa3ebe6054ae7eab1d25c7ca496",
       "executable": false
     },
     {
@@ -2319,6 +2385,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKForensicsTrace.h",
+      "bytes": 12281,
+      "sha256": "ef55d8e662de3901a95c23b721ce3372670c68db2bb6e1ba97dda292e2c6d9bd",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKFramebuffer.h",
       "bytes": 2236,
       "sha256": "1e65a647143453df204d20073f92232e9d8586dc2e6588ff59ca1994560cd44b",
@@ -2493,9 +2565,21 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKResourceForensics.h",
+      "bytes": 10504,
+      "sha256": "3e7c2bbf7d45446aed39e4490853bf2f088b59d3bae0fcf84c27ad21a680d551",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKRuntimeTrace.h",
       "bytes": 10086,
       "sha256": "4b95aaedfa72a5ca9a967d3db918e4dcb197404885b090d89eb270951fc43d85",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderForensics.h",
+      "bytes": 11575,
+      "sha256": "8908a231fec9b5c45ea73a9f3f704f6cf813dd332cc4ed877d495893489b8150",
       "executable": false
     },
     {
@@ -3006,6 +3090,18 @@
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverterTool/main.cpp",
       "bytes": 849,
       "sha256": "44c6997ac9cee54c30ddbc040bb12c4ebe5393b416c4d189a9d6cb352fcea1c9",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/include/MoltenVKShaderConverter/SPIRVConversion.h",
+      "bytes": 3362,
+      "sha256": "3025bf802e874c5372f9dac30ee0623c7e6a952c6984ec7c7803a644e9bc08e4",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/include/MoltenVKShaderConverter/SPIRVToMSLConverter.h",
+      "bytes": 13579,
+      "sha256": "0ef538b938ea23a168a42668d31f871b8c0959d8905277747a1f7eb58d7aa2b6",
       "executable": false
     },
     {
@@ -33195,6 +33291,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/profiles/full-forensics-v36.json",
+      "bytes": 1677,
+      "sha256": "7a843583470ef5cf57d8f01c107fdbf8c0160ee8fbc24a8b2ee14b0baaf4fd3f",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/repro-amd-compiler-20261015/RESULT.txt",
       "bytes": 2854,
       "sha256": "402cbe17d0ae87601ee39ae7fa7659a0bc11b757d2c64f515ed8778db0ec7dab",
@@ -34388,6 +34490,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/sample_only_image_access.h",
+      "bytes": 20199,
+      "sha256": "c9173ec51993c5acc0a2d05d412c1329b89f99512a773af0293a91625f2e7e59",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/sharded_shader_cache_gpu.cpp",
       "bytes": 6896,
       "sha256": "6cd4624c14322839ed90d2f93812493f48f801b0495ab63f67f7e901295059b7",
@@ -34664,6 +34772,12 @@
       "path": "open-game-stack-20261015/tools/capture_game_window.m",
       "bytes": 2233,
       "sha256": "f4d2e19b640976ef3bb1ca07e6734697a6ae5c0ef4c9b744ca3d2cae037b8fee",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/capture_stutter_session.py",
+      "bytes": 33016,
+      "sha256": "523368d1e8f25c802d8f33494aca73a265fad7443580bdbf088115828375d333",
       "executable": false
     },
     {
@@ -34982,6 +35096,18 @@
       "path": "open-game-stack-20261015/tools/test_native_steam_entries.py",
       "bytes": 7861,
       "sha256": "d8b05d676e1a72bd921e097d611e6922ad8a2b9250d541b44fda3d30b2801d04",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/test_sample_only_image_access.cpp",
+      "bytes": 5350,
+      "sha256": "1950ade59882fbc08bca3ef71bbbdfd77dd95f2ac09df620114e5d0ed26459c6",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/test_stutter_session.py",
+      "bytes": 23286,
+      "sha256": "999468c5d72f04abdaf4c16b57796471f29be0169ac0b3ef5e35cc1fd5d4d62b",
       "executable": false
     },
     {
@@ -59326,6 +59452,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/vkd3d_forensics.h",
+      "bytes": 32030,
+      "sha256": "b875fdb941045cfb7e6d783e12fdb0e2caf5cc559c67aff04ae23569b3ae39b8",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/vkd3d_main.c",
       "bytes": 18901,
       "sha256": "adcae2fd370868f0c3515a4fd7632c9803162a277221e02e9d983ed8ad0c5759",
@@ -69751,108 +69883,6 @@
       "path": "yyb_window_state_probe.cpp",
       "bytes": 2812,
       "sha256": "02cfb1b9435f3c4fa6e762fcc78878c9467b8dfd8de4f1b863e8e75f8b4924f0",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKForensicsTrace.h",
-      "bytes": 12281,
-      "sha256": "ef55d8e662de3901a95c23b721ce3372670c68db2bb6e1ba97dda292e2c6d9bd",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKResourceForensics.h",
-      "bytes": 10504,
-      "sha256": "3e7c2bbf7d45446aed39e4490853bf2f088b59d3bae0fcf84c27ad21a680d551",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderForensics.h",
-      "bytes": 11575,
-      "sha256": "8908a231fec9b5c45ea73a9f3f704f6cf813dd332cc4ed877d495893489b8150",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/include/MoltenVKShaderConverter/SPIRVConversion.h",
-      "bytes": 3362,
-      "sha256": "3025bf802e874c5372f9dac30ee0623c7e6a952c6984ec7c7803a644e9bc08e4",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/include/MoltenVKShaderConverter/SPIRVToMSLConverter.h",
-      "bytes": 13579,
-      "sha256": "0ef538b938ea23a168a42668d31f871b8c0959d8905277747a1f7eb58d7aa2b6",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/profiles/full-forensics-v36.json",
-      "bytes": 1677,
-      "sha256": "7a843583470ef5cf57d8f01c107fdbf8c0160ee8fbc24a8b2ee14b0baaf4fd3f",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/tools/capture_stutter_session.py",
-      "bytes": 31977,
-      "sha256": "e7f235e52c302827bc23938e59fde60ec6f047d369d301a6652f5edd8b6852fb",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/tools/test_stutter_session.py",
-      "bytes": 22111,
-      "sha256": "8be7bb613722035bcac51ae88c006cc1ad6ccc6a0defdf0fddd299e591e41272",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/vkd3d_forensics.h",
-      "bytes": 32030,
-      "sha256": "b875fdb941045cfb7e6d783e12fdb0e2caf5cc559c67aff04ae23569b3ae39b8",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/full-forensics-v36-20261025/fine_sampling_control.cpp",
-      "bytes": 3362,
-      "sha256": "b8ed101289908fd289a832ff9c37a36608e523e709b0f3d84b161e087c332bcc",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/full-forensics-v36-20261025/runtime_arm_control.cpp",
-      "bytes": 1814,
-      "sha256": "f670698aef7f5375d8c400c95d828c163c238edd33bfb94d02a0ff406d3cdb4c",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/full-forensics-v36-20261025/run_cpu_controls.py",
-      "bytes": 1208,
-      "sha256": "d7f70f18398242bb6b7fae8846bc3334e0753574b72d1b6cc6d5c0755993cc5b",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/residency_lifecycle_gpu.mm",
-      "bytes": 27004,
-      "sha256": "03dc27bcbe263c532995ad1d1bfd64534a8b999a9925b3e1221feddb0a197899",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/lifecycle_cases.inc",
-      "bytes": 12666,
-      "sha256": "541bc4e9758c218a6127abea3ac05a883709c2c45b4b9847cdc26f5dfcc32bc5",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/build_fixture.py",
-      "bytes": 3951,
-      "sha256": "72fd9ce27e520d6e57dcb447e10d096715e36e466021073b30fc22b661453b19",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/run_control.py",
-      "bytes": 3697,
-      "sha256": "38fd61c89c1da4c0e2c8851c56576e3fe5d6bda99fad4e48a765144dd7c186b1",
-      "executable": false
-    },
-    {
-      "path": "open-game-stack-20261015/evidence/heap-plan-forensics-v36-20261025/analyze_resource_forensics.py",
-      "bytes": 7524,
-      "sha256": "be45f8709f1b8023402460332d87d16898f4570f32a3662c80eeda8b06e7fb19",
       "executable": false
     }
   ],

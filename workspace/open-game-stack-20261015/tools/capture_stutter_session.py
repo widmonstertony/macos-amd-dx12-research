@@ -50,6 +50,13 @@ def marker_paths(profile):
     return paths
 
 
+def instrumentation_paths(profile,mode='all'):
+    paths=marker_paths(profile)
+    if mode=='all':return paths
+    if mode=='forensics-only':return {'forensics':paths['forensics']}
+    raise ValueError('Unknown instrumentation mode')
+
+
 class MarkerLease:
     def __init__(self,paths):self.paths=paths;self.saved={};self.stamps={}
     def arm(self):
@@ -175,8 +182,13 @@ class ForensicsSpool:
                 with target_path.open('ab') as target:destination=target.tell();target.write(complete)
                 events.append(dict(slot=slot,runID=header['runID'],streamGeneration=generation,inode=stat.st_ino,status='observed',destinationFile=target_path.name,sourceOffset=offset,bytes=len(complete),destinationOffset=destination))
                 offset+=len(complete);self.saved+=len(complete);budget-=len(complete)
-            elif data and len(data)>=self.per_poll:
-                events.append(dict(slot=slot,status='capped',reason='line-over-copy-window'))
+            elif data:
+                total_remaining=self.max_bytes-self.saved
+                if total_remaining<=self.per_poll and len(data)>=total_remaining:
+                    self.capped=True
+                    events.append(dict(slot=slot,status='capped',reason='copy-budget-cannot-fit-next-complete-line',remainingBytes=total_remaining,nextLineMinimumBytes=len(data)+1))
+                elif len(data)>=self.per_poll:
+                    events.append(dict(slot=slot,status='capped',reason='line-over-copy-window'))
             self.states[slot]=dict(key=key,offset=offset,size=stat.st_size)
         if observed:
             highest=max(observed)
@@ -261,9 +273,11 @@ def latest_observer(path):
 
 def run(args):
     out=owned(args.output);profile=owned(args.profile)
+    mode=getattr(args,'instrumentation_mode','all')
     if out.exists() or not profile.is_dir():raise ValueError('New session output and existing profile required')
     out.mkdir(parents=True);kernel=system.Kernel();begin=time.monotonic();initial=system.stamp(kernel)
     metadata=dict(schema=2,start=initial,timebase=kernel.timebase,target={},requestedSeconds=args.max_seconds,
+        instrumentationMode=mode,intentionalCoverageGaps=(['CPU/GPU detailed arms are not held; runtime off state must be observed, never assumed from mode alone.'] if mode=='forensics-only' else []),
         userOwnsAllGameActions=True,targetLaunchStopOrInputUsed=False,profile=str(profile),observerIntervalSeconds=1,
         budgets=vars(args)|{'output':str(out),'profile':str(profile)})
     # Paths in argparse state are serialized explicitly, no process environment/auth.
@@ -272,13 +286,13 @@ def run(args):
     reader=None;spool=None;guest_spool=None;cpu_spool=None;observer=None;observer_file=None;observer_chunks=[];foreground_seen=set();observer_offsets={};diagnostics_disabled=None;markers=None;policy=WindowPolicy(args.arm_seconds,args.arm_every,6,args.max_windows)
     status='bounded-complete';windows=[];current_window=None;last_front=None;rows=0;collection_total=0.;recent_costs=[];collector0=kernel.usage(os.getpid());last_clock=initial
     waiting_markers=None;waiting_refresh=0;waiting_record=None
-    paths=marker_paths(profile);pin=owned(profile/args.pin_marker);owned_helpers=[]
+    paths=instrumentation_paths(profile,mode);pin=owned(profile/args.pin_marker);owned_helpers=[]
     (out/'metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
     try:
         with (out/'timeline.jsonl').open('x') as timeline,(out/'segments.jsonl').open('x') as segments,(out/'foreground.jsonl').open('x') as frontlog:
             waiting_markers=MarkerLease(paths);waiting_refresh=time.monotonic()
             waiting_record=dict(reason='waiting-for-user-launch',start=initial,arms=waiting_markers.arm(),preLaunchRefreshEverySeconds=15)
-            print(json.dumps(dict(ready=True,waitingForUserGame=True,output=str(out),gameActions='human only',pinMarker=str(pin),preLaunchDiagnosticsArmed=True)),flush=True)
+            print(json.dumps(dict(ready=True,waitingForUserGame=True,output=str(out),gameActions='human only',pinMarker=str(pin),preLaunchDiagnosticsArmed=True,instrumentationMode=mode)),flush=True)
             while time.monotonic()-begin<args.max_seconds:
                 tick=time.monotonic();clock=system.stamp(kernel);last_clock=clock;row=dict(clock=clock,userOwnsAllGameActions=True)
                 if shutil.disk_usage(ROOT).free<args.min_free_mib*1024**2:status='disk-reserve-stop';break
@@ -369,6 +383,7 @@ def run(args):
         summary=dict(status=status,rows=rows,target=original,captureStart=initial,lastObservation=last_clock,
             collectorUsageDelta=system.delta(kernel.usage(os.getpid()),collector0,('userTime','systemTime','childUserTime','childSystemTime','diskBytesRead','diskBytesWritten')),
             collectionSeconds=collection_total,windows=len(windows),userOwnsAllGameActions=True,
+            instrumentationMode=mode,
             targetLaunchStopOrInputUsed=False,cachesPreserved=True,threadIDJoin='unjoinable: pthread handles are not native Mach IDs',
             rawLogsPreserved=True,diagnosticsDisabledReason=diagnostics_disabled,rawCPUCurrentPaths=[str(p) for p in cpu_spool.paths.values()] if cpu_spool else [],rawForensicsPaths=[str(p) for p in spool.targets.values()] if spool else [],rawGuestForensicsPaths=guest_spool.raw_paths() if guest_spool else [],
             rawLogReferences=[str(profile/'msl'/name) for name in [f'cpu-stutter-{target}.jsonl',f'stutter-native-{target}.jsonl',f'forensics-current-{target}.json'] if (profile/'msl'/name).exists()],limits=['Host polls are coarse. Marker edges do not prove GPU capture completion.','The collector output/free-space bounds cannot stop baseline native logging; only owned arms/helpers are released.','Forensics ring coverage is partial if overwritten, capped, unreadable or copied after generation changes.','No scene correctness/playable FPS/all-causes-found claim.'])
@@ -378,6 +393,7 @@ def run(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--profile',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--instrumentation-mode',choices=('all','forensics-only'),default='all')
     p.add_argument('--max-seconds',type=int,default=1800);p.add_argument('--wait-seconds',type=int,default=300);p.add_argument('--interval',type=float,default=2);p.add_argument('--system-every',type=float,default=10);p.add_argument('--trace-every',type=float,default=2)
     p.add_argument('--arm-seconds',type=int,default=20);p.add_argument('--arm-every',type=int,default=120);p.add_argument('--max-windows',type=int,default=20);p.add_argument('--pin-marker',default='diagnostics.pin');p.add_argument('--max-threads',type=int,default=512)
     p.add_argument('--d3d-directory',type=Path);p.add_argument('--guest-forensics-mib',type=int,default=32)

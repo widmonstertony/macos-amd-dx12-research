@@ -28,3 +28,11 @@ Raw rolling streams, CPU current/status, clock anchors, marker boundaries and lo
 CPU counters, concurrency, arming, rotation, tails and original error values are checked before owned GPU output controls. A real GPU control caught a diagnostic regression: `getVkQueue()` resets loader dispatch magic, so logging now uses a read-only identity accessor. That faulty version was not deployed to the game.
 
 Observer costs are not negligible and must remain visible; instrumented FPS is not an uninstrumented baseline. Probe success does not establish correct game scenes, sustained FPS, attack/equipment stability, or either FSR3 feature. Downloaded artifacts remain research builds.
+
+## Same-process observer control and follow-up source
+
+The collector now supports `--instrumentation-mode forensics-only`: it holds only `forensics.arm` and does not request detailed CPU scopes or GPU boundary sampling. Observer cost remains, and workload changes prevent direct speedup attribution. A rolling copy budget that cannot fit the next complete JSON row explicitly marks truncation.
+
+The [standalone CPU classification prototype](../workspace/open-game-stack-20261015/evidence/sample-only-image-access-20261026/README.md) rejects unknown/unsafe image access and rejects input without a genuine semantic validator. It is not integrated into Native and proves neither heap/attachment/lifetime eligibility nor GPU correctness or FPS.
+
+Runtime integration still needs access-tier upgrades, precise read/write exceptions after heap preparation, and real GPU regressions. Shader serialization and cache UUIDs remain unchanged. New source does not imply a deployed performance fix.

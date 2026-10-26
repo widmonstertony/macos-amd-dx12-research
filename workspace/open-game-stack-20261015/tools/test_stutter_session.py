@@ -223,5 +223,17 @@ class Controls(unittest.TestCase):
         a.guest_rows=[self.guest_header(),begin,detail,end];r=a.guest_report();scope=r['vulkanScopeDetails'][0]
         self.assertTrue(scope['paired']);self.assertEqual(scope['id'],78);self.assertEqual(scope['outerParent'],77)
         self.assertEqual(scope['details'][0]['kindName'],'waitSemaphoreEdge');self.assertEqual(r['unresolvedVulkanScopeDetailCount'],0)
+    def test_partial_next_line_exhausts_global_copy_budget(self):
+        self.slot();spool=session.ForensicsSpool(PID,self.trace,self.out,max_bytes=len(lines(header()))+129)
+        for _ in range(2):result=spool.poll()
+        self.assertTrue(result['capped']);self.assertIn('copy-budget-cannot-fit-next-complete-line',{r.get('reason') for r in result['events']})
+        self.assertEqual(spool.max_bytes-spool.saved,129)
+    def test_forensics_only_never_touches_cpu_gpu_markers(self):
+        profile=self.root/'profile';profile.mkdir();cpu=profile/'cpu-stutter.arm';gpu=profile/'gpu-counter.arm'
+        cpu.write_text('keep-cpu');gpu.write_text('keep-gpu');before={p:p.stat().st_mtime_ns for p in (cpu,gpu)}
+        paths=session.instrumentation_paths(profile,'forensics-only');self.assertEqual(set(paths),{'forensics'})
+        lease=session.MarkerLease(paths);lease.arm();self.assertTrue((profile/'forensics.arm').exists())
+        self.assertTrue(all(p.stat().st_mtime_ns==stamp for p,stamp in before.items()));lease.close()
+        self.assertTrue(all(p.stat().st_mtime_ns==stamp for p,stamp in before.items()));self.assertFalse((profile/'forensics.arm').exists())
 
 if __name__=='__main__':unittest.main()

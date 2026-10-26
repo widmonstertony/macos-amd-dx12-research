@@ -75,3 +75,17 @@ python3 tools/qualify_heap_plan_precise_identity.py --output evidence/owned-prec
 ```
 
 The GPU comparison runner is `tools/qualify_heap_texture_exception_gpu.py`, requiring separately built old/new Native libraries. It runs authored resources and shaders, never the game.
+
+## Actual v39 scene and offline v40 fix
+
+The human subsequently entered a scene and reported severe stutter. The process image UUID matches deployed v39. A 39.413-second observed foreground interval yielded about 1.210 Hz in the valid software present sequence, not physical display FPS. Public GPU execution intervals cover 8.71% of that window, not hardware utilization. Across 35.737 seconds of complete CPU windows, NativeRead self is 17.749 seconds and ResourceGroup self is 7.185 seconds, without scene compilation activity. Per-resource Metal declarations and bookkeeping remain major measured contributors; v39 has not solved low performance. Historical FPS at different resolutions, scenes and instrumentation states is not a speed comparison.
+
+Startup compilation has a separate identified contention point: the second detached PSO creation after archive loading held the shared MTLDevice monitor. v40 preserves that recreation to avoid retaining archive mappings, submits async Metal work under the monitor, and waits outside it. Original PSO fallback and the configured compile timeout remain. Shared requests own descriptor/device/result; late callbacks never access a parent compiler and preserve their original diagnostic session. An admitted async Metal API entry may itself block, so the caller deadline cannot cancel driver work or guarantee a short monitor hold.
+
+Offline qualification passed:
+
+- Stable 224-file Native build; optimized and ASan/UBSan each pass 100 CPU checks with 60/60 objects released.
+- Five candidate texture GPU cases check 10,240 pixels with zero mismatches; 15 strict render archive hits and 15 successful detached recreations.
+- Headless owned compute cold/warm controls in original Tencent Wine pass with strict compute archive-hit verification.
+
+v40 is **not deployed to the game**. The human continues to operate the same game process with preserved caches. Actual startup speedup, mapping-retention counts and game FPS improvement remain unproven. A stricter eligible-2D access contract is under investigation: representative 3D/buffer reads disqualify an entire stage, potentially excluding otherwise sampled 2D images. It is not integrated; keyword matching or allowing a whole aliased binding is insufficient. Remaining PSO-label coverage is incomplete, so overall benefit is unknown.

@@ -2349,6 +2349,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDetachedPipelineRequest.h",
+      "bytes": 11200,
+      "sha256": "72e9243d3d06f16012b736baf3bb16a6553b489d546f692f931993c558ec87df",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h",
       "bytes": 63949,
       "sha256": "de26115a583f40874b24ff2a6770da3d36aff3a923acbd9708000bc0bc460cb3",
@@ -2464,8 +2470,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm",
-      "bytes": 241620,
-      "sha256": "d696ae0475382d056b4e27cd46787f273b233e5bf795ffa122619e26335a3d8a",
+      "bytes": 242930,
+      "sha256": "4bbbd06103b8be5ef773f231451e5df4863d38315bc24d1eb2e367e595c0a519",
       "executable": false
     },
     {
@@ -34016,6 +34022,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/detached_pipeline_request_control.mm",
+      "bytes": 12787,
+      "sha256": "1039a543074eda0d9874a80d69be766e047ac6853582803847173f5fe126ddaa",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/controls/encoded_work_ring_full_allocation.h",
       "bytes": 3951,
       "sha256": "07985aa1b9ce33c4073052bd00f6b2ddebd5c9c76dc10bf62242d14983139649",
@@ -34860,8 +34872,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/capture_foreground_stutter.py",
-      "sha256": "1ac890f772179eb69ac400459862ccafa70231469a5ead6bbd5c0d629bc1f00c",
-      "bytes": 7424,
+      "bytes": 7881,
+      "sha256": "0437234b999fa64bfd73896975a87b7d7f525e237e6c896eac436a06c3d8918d",
       "executable": false
     },
     {
@@ -35030,6 +35042,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/qualify_detached_pipeline_request.py",
+      "bytes": 4611,
+      "sha256": "6d1c6a011f6f77ede7ca9b73e03b8538c7cd3dc471a4657d24c0fa0289fd6270",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/tools/qualify_encoded_work_ring.py",
       "bytes": 1675,
       "sha256": "be4b13ac2216e2ed5dcf43a164afdc938664ed3eb8521ebd4fcbe5211a692771",
@@ -35079,8 +35097,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_sampled_texture_gpu.py",
-      "bytes": 5955,
-      "sha256": "04ff94ff2cb51f15056310de03f47b87ea8064ccea53f59c2dd00054f38ce8dc",
+      "bytes": 7009,
+      "sha256": "7e2e8b259342a445e83027b75dfdfdcbb0c4778e75e529d44545a5efc342012b",
       "executable": false
     },
     {

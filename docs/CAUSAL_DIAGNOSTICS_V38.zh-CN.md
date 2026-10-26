@@ -75,3 +75,17 @@ python3 tools/qualify_heap_plan_precise_identity.py --output evidence/owned-prec
 ```
 
 GPU 对照工具为 `tools/qualify_heap_texture_exception_gpu.py`，需要先构建正确的新/旧 Native 库；仅运行自有资源与着色器，不启动游戏。
+
+## v39 实际场景与 v40 离线修复
+
+用户随后确认已进入场景但仍严重卡顿。同一 v39 进程的原生映像 UUID 与部署库一致。39.413 秒实际前台观察中，软件有效 present 序列约 1.210 Hz；该值不是物理显示帧率。GPU 公开执行区间并集为该窗口的 8.71%，也不是硬件利用率。35.737 秒完整 CPU 明细窗内 NativeRead self 为 17.749 秒、ResourceGroup self 为 7.185 秒，未见场景编译忙。说明逐项 Metal 资源声明和资源整理仍是主要已测贡献，不能说 v39 已解决卡顿。不同分辨率、场景和诊断状态的历史 FPS 不构成速度对照。
+
+启动编译另有具体问题：缓存命中后的第二次 detached PSO 创建持有整个 MTLDevice monitor，阻塞其他工作线程。v40 保留这次重建以避免归档映射长期留存，改为锁内提交异步 Metal 请求、锁外等待，保持原 pipeline fallback 和配置中的编译时限。共享 request 拥有 descriptor/device/result；超时和晚回调不访问父 compiler，日志保持原 session。已 admission 的 Metal API 入口本身仍可能阻塞，不能取消驱动工作或承诺全路径短时结束。
+
+离线验证已通过：
+
+- 稳定 224 文件 Native 构建；optimized 与 ASan/UBSan 各 100 项 CPU 检查、60/60 对象释放。
+- 新库 5 组实际纹理 GPU 测试共 10,240 pixels，零差异；15 次严格 render archive hits 和 15 次 detached 重建成功。
+- 原应用宝 Wine 的无窗口自有 compute 冷/暖 GPU 控制通过，严格 compute archive hit 已验证。
+
+v40 **尚未部署到游戏**；游戏仍由用户操作，同一轮和缓存保留。尚未证明实际启动提速、真实归档映射释放数量或游戏帧率提升。纹理访问分类正在进一步调查：代表性 shader 的 3D/buffer read 会令整个 stage 回退，可能连带阻止纯采样 2D 分组；严格 2D 合同尚未集成，不能凭 MSL 关键字或按 binding 整体放开。剩余 PSO 映射覆盖不足，不能推算总体收益。

@@ -53,6 +53,41 @@ using namespace SPIRV_CROSS_NAMESPACE;
 #include "MVKMeshLinkDifferential.h"
 #include "MVKComputeArchive.h"
 #include "MVKRenderArchive.h"
+#include "MVKDetachedPipelineRequest.h"
+
+// Late optional rehydration callbacks retain only their request, never a
+// compiler/owner. Keep diagnostics on the original session using scalar IDs.
+static void mvkDetachedPipelineMonitorTrace(uint64_t owner, uint64_t operation,
+                                          uint64_t session, uint64_t waitNS) {
+    MVKShaderForensicsContext context{}; context.session = session;
+    MVKShaderForensicsContextGuard guard(context);
+    const void* identity = reinterpret_cast<const void*>(static_cast<uintptr_t>(owner));
+    mvkSFEvent("native-device-monitor-lock", identity, operation, 1, 0, 0, waitNS);
+    mvkSFEvent("archive-rehydrate-native", identity, operation, 0);
+}
+
+static void mvkDetachedPipelineCompletionTrace(uint64_t owner, uint64_t operation,
+                                             uint64_t session, bool accepted,
+                                             bool succeeded, int64_t errorCode) {
+    MVKShaderForensicsContext context{}; context.session = session;
+    MVKShaderForensicsContextGuard guard(context);
+    mvkSFEvent("archive-rehydrate-native",
+        reinterpret_cast<const void*>(static_cast<uintptr_t>(owner)), operation,
+        1, accepted ? (succeeded ? 1 : 2) : 3, static_cast<uint64_t>(errorCode));
+}
+
+static MVKDetachedPipelineTrace mvkDetachedPipelineTrace(
+    const void* owner, const MVKShaderForensicsSpan& span) {
+    MVKDetachedPipelineTrace trace;
+    if (span.operation) {
+        trace.ownerIdentity = mvkSFIdentity(owner);
+        trace.requestIdentity = span.operation;
+        trace.ownerSession = span.owner.session;
+        trace.monitorAcquired = mvkDetachedPipelineMonitorTrace;
+        trace.completed = mvkDetachedPipelineCompletionTrace;
+    }
+    return trace;
+}
 
 
 #pragma mark - MVKPipelineLayout
@@ -4264,19 +4299,14 @@ id<MTLRenderPipelineState> MVKRenderPipelineCompiler::newMTLRenderPipelineState(
         MVKShaderForensicsSpan forensicRehydrate(mvkForensicsArmed(),"archive-rehydrate",this);
 		MTLRenderPipelineDescriptor* detachedDesc = [mtlRPLDesc copy];
 		detachedDesc.binaryArchives = nil;
-		NSError* detachedError = nil;
 		uint64_t detachedStart = mvkGetTimestamp();
-		id<MTLRenderPipelineState> detachedState = nil;
-		const uint64_t forensic_cpuNativeMonitor5=mvkForensicsArmed()?mvkSFTimeNS():0;
-		MVKStutterCPUTrace::Scope cpuNativeMonitor5(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
-		@synchronized (getMTLDevice()) {
-		    cpuNativeMonitor5.finish();
-    if(forensic_cpuNativeMonitor5) mvkSFEvent("native-device-monitor-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuNativeMonitor5);
-			detachedState = [getMTLDevice() newRenderPipelineStateWithDescriptor:detachedDesc
-				error:&detachedError];
-		}
+		// Submit asynchronously under the device monitor, then wait on the
+		// request outside that monitor. Other shader/pipeline work may proceed.
+		auto detached = mvkNewDetachedRenderPipelineState(getMTLDevice(), detachedDesc,
+			getMVKConfig().metalCompileTimeout, mvkDetachedPipelineTrace(this, forensicRehydrate));
+		id<MTLRenderPipelineState> detachedState = detached.state;
 		rehydrateMS = mvkGetElapsedNanoseconds(detachedStart) / 1e6;
-		rehydrateErrorCode = detachedError.code;
+		rehydrateErrorCode = static_cast<NSInteger>(detached.errorCode);
 		forensicRehydrate.finish(detachedState?1:2);
         if (detachedState) {
 			[_mtlRenderPipelineState release];
@@ -4504,19 +4534,14 @@ id<MTLComputePipelineState> MVKComputePipelineCompiler::newMTLComputePipelineSta
         MVKShaderForensicsSpan forensicRehydrate(mvkForensicsArmed(),"archive-rehydrate",this);
         MTLComputePipelineDescriptor* detachedDesc = [plDesc copy];
         detachedDesc.binaryArchives = nil;
-        NSError* detachedError = nil;
         uint64_t detachedStart = mvkGetTimestamp();
-        id<MTLComputePipelineState> detachedState = nil;
-        const uint64_t forensic_cpuNativeMonitor8=mvkForensicsArmed()?mvkSFTimeNS():0;
-        MVKStutterCPUTrace::Scope cpuNativeMonitor8(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
-        @synchronized (getMTLDevice()) {
-            cpuNativeMonitor8.finish();
-    if(forensic_cpuNativeMonitor8) mvkSFEvent("native-device-monitor-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuNativeMonitor8);
-            detachedState = [getMTLDevice() newComputePipelineStateWithDescriptor:detachedDesc
-                options:MTLPipelineOptionNone reflection:nil error:&detachedError];
-        }
+        // Preserve detached-state creation and the original archive fallback;
+        // never hold the shared device monitor while waiting for completion.
+        auto detached = mvkNewDetachedComputePipelineState(getMTLDevice(), detachedDesc,
+            getMVKConfig().metalCompileTimeout, mvkDetachedPipelineTrace(this, forensicRehydrate));
+        id<MTLComputePipelineState> detachedState = detached.state;
         rehydrateMS = mvkGetElapsedNanoseconds(detachedStart) / 1e6;
-        rehydrateErrorCode = detachedError.code;
+        rehydrateErrorCode = static_cast<NSInteger>(detached.errorCode);
         forensicRehydrate.finish(detachedState?1:2);
         if (detachedState) {
             [_mtlComputePipelineState release];

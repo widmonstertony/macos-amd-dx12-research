@@ -48,6 +48,8 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--wait-seconds', type=int, default=90)
     p.add_argument('--capture-seconds', type=int, default=35)
+    p.add_argument('--cpu-only', action='store_true',
+                   help='Arm CPU detail only; leave an independent native/forensics recorder untouched')
     a = p.parse_args()
     assert 5 <= a.wait_seconds <= 120 and 10 <= a.capture_seconds <= 45
     out = a.output.resolve()
@@ -110,9 +112,14 @@ def main():
                                 for n in [f'cpu-stutter-{a.pid}.jsonl', f'stutter-native-{a.pid}.jsonl']}
         # This compatibility harness captures the legacy append logs only.
         # Use the session collector to follow/rearm rolling forensics streams.
-        lease = MarkerLease({k:v for k,v in marker_paths(profile).items() if k != 'forensics'})
+        paths = marker_paths(profile)
+        selected = ({'cpu': paths['cpu']} if a.cpu_only else
+                    {k:v for k,v in paths.items() if k != 'forensics'})
+        if a.cpu_only and any(path.exists() for path in selected.values()):
+            raise RuntimeError('CPU marker already exists; preserve the other observer')
+        lease = MarkerLease(selected)
         armed = lease.arm()
-        record.update(armed=armed, trigger=row,
+        record.update(armed=armed, trigger=row, cpuOnly=a.cpu_only,
                       rollingForensicsFollowed=False, continuousSessionTool='capture_stutter_session.py',
                       UTC=datetime.datetime.now(datetime.timezone.utc).isoformat())
         control.write_text(json.dumps(record, indent=2) + '\n')

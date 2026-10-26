@@ -33,6 +33,12 @@ The bounded owned GPU regressions passed: the geometry control had no mismatches
 
 This checkpoint completes the bounded GPU regressions above; the actual game remains unvalidated. Actual game presentation, stutter, crash and FSR3 root causes remain unconfirmed. Correct scenes, sustained playable FPS, equipment/nanosuit stability, FSR3 upscaling and frame generation still require actual game evidence.
 
+## Analysis completeness follow-up
+
+The analyzer now pairs sync notifications across all parsed rows, exposes drawable acquisition and actual present-call intervals, and reads allocation failure/slow journals plus recent snapshot rings. The first 2,000 records are a display limit, reported separately from writer loss. All 93 CPU tool tests pass. This update changes no Native code, runtime library, cache, or running collector.
+
+Each allocation journal retains the first 128 events; each snapshot ring retains the latest 32. These overlap, so omission counts must not be added. There is no durable allocation Begin: an unreturned call's exact pending ID/site remains unknown, and an attempts/completed difference does not establish a hang or OOM. Full-event loading checks PID, kernel start and observed Mach bounds. Wine's `vkQueueSubmit2` assertion checks outer NTSTATUS separately from inner VkResult; static call-chain verification is not a captured fault-time status.
+
 ## Public backup boundary
 
 This update copies source only. It contains no private checkpoints, raw game logs, shaders, binaries or runtime packages, and creates no new release. Historical checkpoint data is unchanged. Existing historical results retain their original scope; the new diagnostics do not retroactively validate them.

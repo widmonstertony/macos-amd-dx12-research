@@ -34741,14 +34741,26 @@
     },
     {
       "path": "open-game-stack-20261015/tools/analyze_causal_diagnostics.py",
-      "bytes": 10791,
-      "sha256": "9d5b9c0d6e5c9579286daca8d9159b9f8d498880694320f3fe350b6cd3fc837b",
+      "bytes": 14365,
+      "sha256": "77b77a01a9ba299b4bfa02145299c38993bd4ae77aecc5c09cfd3d9f4bfff4e4",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/analyze_memory_observations.py",
+      "bytes": 21630,
+      "sha256": "1aba2d8bf68c59f4a4cb7a74679ad66f6235c38c8db132abd181bb9a3812cf7d",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/analyze_native_sync.py",
+      "bytes": 11184,
+      "sha256": "2babe52d43f435c80aad5576953a8684cca71941b64baf3fbbe0428709fc4492",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/tools/analyze_stutter_capture.py",
-      "bytes": 133378,
-      "sha256": "97c7b7b7ea1d6cc2a1aef343fbef2eba18b6dbd546c1e4bff210fd9736fc52a6",
+      "bytes": 137593,
+      "sha256": "a6c14d917b976ba0c047649839b8ad6cd3007d4e32586618c0712b242863ff95",
       "executable": false
     },
     {
@@ -35184,8 +35196,14 @@
     },
     {
       "path": "open-game-stack-20261015/tools/test_causal_diagnostics.py",
-      "bytes": 6410,
-      "sha256": "5f72ccf78feb754e104266945f0ddf15e131a6a5157d6ffeb76b5c42dc32b145",
+      "bytes": 10905,
+      "sha256": "940a2872dc6fa18ce1705a981e78a415f6450fcbb160a1779c06682478960c5c",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/test_memory_observations.py",
+      "bytes": 16363,
+      "sha256": "5dbc98f1367464e596e6ea4448e9b666acee4ea53fc45ab8f53e24e9b9694816",
       "executable": false
     },
     {
@@ -35198,6 +35216,12 @@
       "path": "open-game-stack-20261015/tools/test_native_steam_entries.py",
       "bytes": 7861,
       "sha256": "d8b05d676e1a72bd921e097d611e6922ad8a2b9250d541b44fda3d30b2801d04",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/test_native_sync_analysis.py",
+      "bytes": 6386,
+      "sha256": "658fc0f41973a95ebdb7f0fbea58984023bbd83ce26326a2c6e07fb3408522b3",
       "executable": false
     },
     {
@@ -70847,8 +70871,8 @@
     }
   ],
   "updatedUTC": "2026-10-24T03:54:53.820584+00:00",
-  "currentSourceState": "v38 causal diagnostics: diagnosis first, v37 performance strategy unchanged; source-stable Native build and CPU mocks passed; actual game presentation, performance, crashes and FSR3 remain unvalidated; no playable release claim; private evidence excluded.",
+  "currentSourceState": "v38 diagnosis first; complete parsed-row sync/acquisition/memory analysis with explicit coverage, identity and pending-allocation limits; runtime/performance configuration unchanged; no playable release claim.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-25T22:54:40.983777+00:00",
-  "lastSourceOnlyUpdateUTC": "2026-10-26T11:05:29.089230+00:00"
+  "lastSourceOnlyUpdateUTC": "2026-10-26T11:34:10.614553+00:00"
 }

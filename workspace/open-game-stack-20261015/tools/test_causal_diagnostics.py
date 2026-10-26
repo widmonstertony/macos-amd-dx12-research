@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from decimal import Decimal
 from analyze_causal_diagnostics import analyze
-from analyze_stutter_capture import Analyzer
+from analyze_stutter_capture import Analyzer, ROOT
 
 
 def row(kind,fields,seq=1,session=10,stream=20):
@@ -89,6 +89,44 @@ class CausalDiagnosticsTests(unittest.TestCase):
         r=analyze([e,dict(e,_source='other-window')],{})
         self.assertEqual(r['resourceBatches']['observedGroups'],1)
 
+    def test_display_prefix_cap_not_misreported_as_raw_writer_loss(self):
+        a=Analyzer(target_pid=123)
+        a.forensic_rows=[anchor()]+[row('resourceSynthetic',{},i+1) for i in range(2001)]
+        report=a.forensics_report()
+        self.assertTrue(report['recordsTruncated'])
+        self.assertEqual(report['kinds']['resourceSynthetic'],2001)
+        self.assertTrue(report['recordsDisplayLimitIsNotWriterLoss'])
+        stage=next(x for x in report['stageMatrix'] if x['stage']=='resource-heap-descriptors')
+        self.assertNotIn('capped',stage['statuses'])
+
+    def test_acquisition_and_present_api_not_lost_after_detail_prefix(self):
+        acquire=dict(imageGeneration=3,acquisitionAttemptID=7,startMachNS=100,
+            layerGetStartMachNS=400,layerGetEndMachNS=420,endMachNS=500,drawableReturned=1,drawableID=8)
+        request=dict(presentationID=9,imageGeneration=3,acquisitionAttemptID=7,requestObserved=1)
+        call=dict(presentationID=9,callStartMachNS=800,callEndMachNS=810,
+            intentStartMachNS=600,intentEndMachNS=780,requestMachNS=550,scheduledHandlerEntryMachNS=580,
+            displaySyncEnabled=0,maximumDrawableCount=3)
+        rows=[row('unrelated',{},i+100) for i in range(2001)]
+        rows += [row('NativeDrawableAcquire',dict(acquire,phase=0),1,session=10),
+            row('NativeDrawableAcquire',dict(acquire,phase=1),2,session=10),
+            row('NativeDrawablePresentRequest',request,3,session=11),
+            row('NativeDrawablePresentCall',call,4,session=11)]
+        report=analyze(rows,{})
+        self.assertEqual(report['drawableAcquisitionsObserved'],1)
+        a=report['drawableAcquisitions'][0];p=report['presentationChains'][0]
+        self.assertEqual((a['diagnosticLeadInWallNS'],a['layerWrapperWallNS'],a['nextDrawableAndRetainWallNS']),(300,20,80))
+        self.assertEqual(p['actualPresentAPIWallNS'],10);self.assertEqual(p['presentIntentLoggerWallNS'],180)
+        self.assertEqual(p['acquisition']['ownerSession'],10);self.assertEqual(p['ownerSession'],11)
+        self.assertEqual(p['effectiveLayer']['displaySyncEnabled'],0)
+
+    def test_acquisition_open_and_output_limit_explicit(self):
+        rows=[row('NativeDrawableAcquire',dict(phase=0,imageGeneration=3,acquisitionAttemptID=i,startMachNS=100),i) for i in range(1,4)]
+        report=analyze(rows,{},limit=1)
+        self.assertEqual(report['drawableAcquisitionsObserved'],3)
+        self.assertTrue(report['outputRankingCapped'])
+        self.assertFalse(report['drawableAcquisitions'][0]['paired'])
+        self.assertIsNone(report['drawableAcquisitions'][0]['nextDrawableAndRetainWallNS'])
+
     def test_capture_subdirectories_loaded_once(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary);folder=root/'raw-window-0001-scene';folder.mkdir()
@@ -101,6 +139,26 @@ class CausalDiagnosticsTests(unittest.TestCase):
             a=Analyzer(target_pid=123);a.load_session(root)
             self.assertEqual(len(a.forensic_rows),1)
             self.assertEqual(a.forensics_report()['causalDiagnostics']['resourceBatches']['beginOnly'],1)
+
+    def test_session_memory_journal_preserves_nested_events_with_lifetime_guard(self):
+        with tempfile.TemporaryDirectory(dir=ROOT/'evidence',prefix='memory-loader-cpu-') as temporary:
+            root=Path(temporary);profile=root/'profile';trace=profile/'msl';trace.mkdir(parents=True)
+            capture=root/'capture';capture.mkdir()
+            metadata=dict(target=dict(pid=123),profile=str(profile),processStartAbstime=99,
+                processStartMachNS=100,processStartUnixEstimate=1,timebase=dict(numer=1,denom=1))
+            (capture/'metadata.json').write_text(json.dumps(metadata));(capture/'summary.json').write_text('{}')
+            (capture/'timeline.jsonl').write_text(json.dumps(dict(clock=dict(machAbsoluteTicks=500,CFAbsoluteTime=1)))+'\n')
+            event=dict(schema=2,allocationID=1,sequence=1,beginMachNS=200,endMachNS=220,
+                clockDomain='mach-absolute-nanoseconds',site='owned-control',returnedNil=True,hostCallNS=20)
+            (trace/'memory-failures-123.jsonl').write_text(json.dumps(event)+'\n'+json.dumps(dict(event,allocationID=2,beginMachNS=50,endMachNS=60))+'\n')
+            (trace/'memory-current-123.json').write_text(json.dumps(dict(pid=123,monotonicNS=400,failureEventsTotal=1,recentFailures=[event])))
+            a=Analyzer(target_pid=123);a.load_session(capture);report=a.memory_report()
+            self.assertEqual(len(a.memory_events),1);self.assertEqual(len(a.memory_snapshots),1)
+            self.assertEqual(a.memory_events[0]['site'],'owned-control')
+            self.assertEqual(a.memory_events[0]['_processStartIdentity'],'99')
+            self.assertEqual(report['unassignedTargetLifetimeCount'],1)
+            self.assertEqual(report['summary']['failureDetailsObserved'],1)
+            self.assertTrue(any(x['kind']=='memory-events' and x.get('sha256') for x in a.sources))
 
 
 if __name__=='__main__':unittest.main()

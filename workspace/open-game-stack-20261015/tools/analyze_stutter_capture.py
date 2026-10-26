@@ -174,6 +174,7 @@ class Analyzer:
         self.cpu_spans=[];self.cpu_span_count=0
         self.cpu_status=[];self.cpu_copy_index=[]
         self.requested_windows=[]
+        self.memory_events=[];self.memory_snapshots=[];self.memory_unassigned=[]
 
     def issue(self, code, *, scope="global", severity="incomplete", **details):
         record = dict(code=code, scope=scope, severity=severity, **details)
@@ -200,7 +201,7 @@ class Analyzer:
             source["sha256"] = hashlib.sha256(raw).hexdigest()
             if len(raw) != state.st_size:
                 self.issue("source-mutated-during-read", source=str(path))
-            pid = re.search(r"(?:stutter-native|cpu-stutter(?:-current)?|gpu-counter-clock-sessions|trace-gpu-timestamps|forensics(?:-current)?)-(\d+)", path.name)
+            pid = re.search(r"(?:stutter-native|cpu-stutter(?:-current)?|gpu-counter-clock-sessions|trace-gpu-timestamps|forensics(?:-current)?|memory-(?:failures|slow-allocations|current|stats))-(\d+)", path.name)
             source["pidFromName"] = int(pid.group(1)) if pid else None
             rows = []
             if path.suffix == ".jsonl":
@@ -275,6 +276,10 @@ class Analyzer:
         for path in current:self.guest_current += self.read(path,'guest-d3d12-current')
         for path in copy_index:self.guest_copy_index += self.read(path,'guest-d3d12-copy-index')
 
+    def load_memory(self, paths=(), snapshots=()):
+        for path in paths:self.memory_events+=self.read(path,'memory-events')
+        for path in snapshots:self.memory_snapshots+=self.read(path,'memory-snapshot')
+
     def load_session(self, directory):
         self.load_system(directory)
         directory=Path(directory)
@@ -307,6 +312,30 @@ class Analyzer:
         profile=self.system_metadata.get('profile')
         if profile and Path(profile).resolve().is_relative_to(ROOT/'evidence'):
             trace=Path(profile)/'msl';minimum=number(self.system_metadata.get('processStartUnixEstimate'),number(self.system_metadata.get('start',{}).get('unixSeconds')))-.2
+            # Allocation journals are append-only with independent 128-event
+            # caps, not members of the rotating forensics stream. Read their
+            # complete records, never the scalar-only polling projection.
+            if self.pid:
+                low=integer(self.system_metadata.get('processStartMachNS'))
+                ticks=[integer(r.get('clock',{}).get('machAbsoluteTicks')) for r in self.system_rows]
+                ticks=[t for t in ticks if t]
+                tb=self.timebase or {};numer,denom=integer(tb.get('numer')),integer(tb.get('denom'))
+                high=max(ticks)*numer//denom if ticks and numer and denom else None
+                start_identity=self.system_metadata.get('processStartAbstime')
+                for prefix,destination in (('memory-failures',self.memory_events),('memory-slow-allocations',self.memory_events),('memory-current',self.memory_snapshots)):
+                    ext='.json' if prefix=='memory-current' else '.jsonl';path=trace/f'{prefix}-{self.pid}{ext}'
+                    if not path.is_file():continue
+                    if path.stat().st_mtime<minimum:
+                        self.issue('memory-source-before-target-start',scope='memory',source=str(path));continue
+                    for record in self.read(path,'memory-snapshot' if prefix=='memory-current' else 'memory-events'):
+                        begin=integer(record.get('beginMachNS',record.get('monotonicNS')))
+                        end=integer(record.get('endMachNS',record.get('monotonicNS')))
+                        valid=bool(low and high and low<=begin<=end<=high and start_identity)
+                        if not valid:
+                            self.memory_unassigned.append(dict(source=ref(record),beginMachNS=begin,endMachNS=end,reason='outside-or-missing-observed-target-lifetime'))
+                            continue
+                        record['_processStartIdentity']=str(start_identity)
+                        record['_targetLifetimeVerified']=True;destination.append(record)
             artifacts=[p for p in trace.glob(f'trace-gpu-timestamps-{self.pid}-*.json') if p.stat().st_mtime>=minimum]
             clocks=[p for p in trace.glob(f'gpu-counter-clock-sessions-{self.pid}*.jsonl') if p.stat().st_mtime>=minimum]
             self.load_gpu(artifacts[:256],clocks[:16])
@@ -1431,6 +1460,7 @@ class Analyzer:
 
     def forensics_report(self):
         from analyze_causal_diagnostics import analyze as analyze_causal_diagnostics
+        from analyze_native_sync import analyze as analyze_native_sync
         native_id_runs=defaultdict(set)
         for raw in self.forensic_rows:
             if str(raw.get('kind','')).startswith('NativeCB'):
@@ -1517,7 +1547,6 @@ class Analyzer:
                 if any(token in kind.lower() for token in tokens):
                     stages[name]['observed']+=1;stages[name]['clockUnjoinable']+=cf is None;stages[name]['contextUnjoinable']+=not joined
             if len(records)<2000:records.append(record)
-            else:capped=True
         losses=[r for r in self.forensic_copy_index if r.get('status') in ('missing','capped','unjoinable')]
         budgets=cumulative_counter_windows(self.forensic_current,('dropped','IOFailures','serializationFailures','lowDiskDrops'),'pid')
         capped=capped or any(r['observedDelta'] for r in budgets) or any(r.get('status')=='capped' for r in losses)
@@ -1540,7 +1569,10 @@ class Analyzer:
                    dict(stage='closed-driver-internals',statuses=['missing','unjoinable'],reason='Public coarse native timelines can contain waits. Private driver scheduler/compiler internals and exclusive shader execution costs are unknown')]
         return dict(available=bool(kinds),clockDomain='mach-absolute-nanoseconds; never C++ steady-clock subtraction',
             causalDiagnostics=analyze_causal_diagnostics(self.forensic_rows,self.cbs),
+            syncDiagnostics=analyze_native_sync(self.forensic_rows),
             stageMatrix=matrix,kinds=dict(kinds),records=records,recordsTruncated=sum(kinds.values())>len(records),
+            recordsDisplayLimit=2000,structuredSummariesProcessAllParsedRows=True,
+            recordsDisplayLimitIsNotWriterLoss=True,
             slowSoftwareScopes=[item for _,_,item in sorted(slow_scopes,reverse=True)],softwareScopeCount=scope_total,softwareScopeRankingCapped=scope_total>len(slow_scopes),unpairedSoftwareScopeEnds=scope_unpaired_end,openSoftwareScopes=len(scope_starts),softwareScopePairingCap=scope_start_cap,
             coarseCommandBuffers=list(coarse_cbs.values()),coarsePresents=coarse_presents,coarseTimelineOutputCapped=coarse_cap,
             coarseTimelineLimits='Actual per-CB/public present observations only; callback observation time is not substituted for native CA timestamps. Coarse CB intervals can contain waits and do not form a complete dependency graph.',
@@ -1559,6 +1591,7 @@ class Analyzer:
         frames = self.frame_reports()
         forensics=self.forensics_report()
         guest=self.guest_report()
+        memory=self.memory_report()
         for frame in frames:
             ids={r['nativeCB'] for r in frame['GPU']['commandBuffers']}
             matched=[r for r in forensics['records'] if r['pid']==frame['pid'] and r['nativeGraphJoined'] and
@@ -1615,6 +1648,9 @@ class Analyzer:
         matrix.append(dict(layer='resource-heap-plan-stats',available=heap_observed,statuses=['observed'] if heap_observed else ['missing'],
             observedCoverageComplete=False,detail='Coarse counter snapshots only; never exclusive slow-frame cost'))
         matrix.append(dict(layer='cpu-history-archive',available=bool(self.cpu_status),observedCoverageComplete=False,statuses=(['observed'] if self.cpu_status else ['missing'])+(['capped'] if any(integer(r.get('historyRowsSkipped')) for r in self.cpu_status) else []),detail='Native history cap is separate from changed-current archives; current/status copy gaps and caps remain explicit'))
+        matrix.append(dict(layer='native-memory-allocation-events',available=bool(self.memory_events or self.memory_snapshots),observedCoverageComplete=False,
+            statuses=(['observed'] if self.memory_events or self.memory_snapshots else ['missing'])+(['unjoinable'] if memory['gaps'] or self.memory_unassigned else [])+(['capped'] if memory['outputRankingCapped'] else []),
+            detail='Full bounded journals and recent snapshot rings; no durable allocation Begin or free/resident VRAM measurement. Process lifetime and overlapping omission counters remain explicit.'))
         return dict(schema=1, tool="analyze_stutter_capture.py", rawInputsPreserved=True,
                     targetPID=self.pid, targetFPS=self.target_fps, referenceCF=self.reference_cf,
                     allCausesFound=False,
@@ -1631,6 +1667,7 @@ class Analyzer:
                     CPUHistoricalReportWindowsSkipped=self.cpu_historical_skipped,CPUHistoryStatus=[ref(r)|{k:v for k,v in r.items() if not k.startswith('_')} for r in self.cpu_status],CPUCurrentCopyIssues=self.cpu_copy_index,
                     CPUObservedSpans=self.cpu_spans,CPUObservedSpanOutputCapped=self.cpu_span_count>len(self.cpu_spans),
                     frames=frames, system=system, GPUCounterArtifacts=gpu, Forensics=forensics, GuestD3D12=guest, CPUFineScopeSampling=self.cpu_fine_sampling,
+                    MemoryAllocations=memory,
                     foregroundContinuity=foreground_intervals(self.foreground),
                     requestedDiagnosticWindows=[{k:v for k,v in r.items() if not k.startswith('_')} for r in self.requested_windows],
                     inputs=self.sources, inputBytesRead=self.bytes_read, inputRowsRead=self.rows_read,
@@ -1640,6 +1677,15 @@ class Analyzer:
                                  "An event value may have been produced outside the capture. Missing producer is incomplete coverage, not proof of deadlock.",
                                  "Native trace files contain PID but no process start identity; the system capture's PID+lstart+kernel start guard and overlapping clocks are needed.",
                                  "No game scene correctness, input response or sustained playable FPS is inferred from log coverage."])
+
+    def memory_report(self):
+        from analyze_memory_observations import analyze as analyze_memory
+        result=analyze_memory(self.memory_events,self.memory_snapshots)
+        result['unassignedTargetLifetimeRecords']=self.memory_unassigned[:128]
+        result['unassignedTargetLifetimeCount']=len(self.memory_unassigned)
+        result['unassignedOutputCapped']=len(self.memory_unassigned)>128
+        result['sourcePolicy']='Full append-only journals/current snapshot read from the owned profile with source hashes; session loads require filename PID and observed kernel-start/Mach lifetime bounds. No event is inferred from scalar-only polling.'
+        return result
 
 
 def convert_gpu_clock(raw, pair, timebase):
@@ -1718,6 +1764,8 @@ def main():
     parser.add_argument("--forensics-trace",type=Path,action="append",default=[])
     parser.add_argument("--forensics-current",type=Path,action="append",default=[])
     parser.add_argument("--forensics-copy-index",type=Path,action="append",default=[])
+    parser.add_argument("--memory-events",type=Path,action="append",default=[])
+    parser.add_argument("--memory-snapshot",type=Path,action="append",default=[])
     parser.add_argument("--gpu-artifact", type=Path, action="append", default=[])
     parser.add_argument("--gpu-clock-sidecar", type=Path, action="append", default=[])
     parser.add_argument("--pid", type=int)
@@ -1752,6 +1800,7 @@ def main():
         analyzer.load_system(args.system_capture)
     analyzer.load_forensics(args.forensics_trace,args.forensics_current,args.forensics_copy_index)
     analyzer.load_guest(args.guest_trace,args.guest_current,args.guest_copy_index)
+    analyzer.load_memory(args.memory_events,args.memory_snapshot)
     analyzer.load_native(args.native_trace)
     analyzer.load_cpu(args.cpu_report)
     analyzer.load_gpu(args.gpu_artifact, args.gpu_clock_sidecar)

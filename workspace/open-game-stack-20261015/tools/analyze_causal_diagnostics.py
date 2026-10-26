@@ -34,6 +34,7 @@ def analyze(rows, command_buffers, limit=500):
         a=min(candidates,key=lambda x:abs(x.get('machBeforeNS',0)-row.get('machNS',0)))
         return Decimal(a['machBeforeNS']+a['machAfterNS'])/2+(Decimal(str(ca))-Decimal(str(a['timeCA'])))*1000000000
     batches=defaultdict(dict);presents=defaultdict(dict);terminals=defaultdict(dict);run_cbs={}
+    acquisitions=defaultdict(dict);acquisition_phase_counts=Counter()
     for row in records:
         kind=row.get('kind');f=row.get('fields',{})
         if kind in ('resourceBatchBegin','resourceBatchEnd') and f.get('batchID'):
@@ -42,6 +43,10 @@ def analyze(rows, command_buffers, limit=500):
             terminals[group_id(row,'ownerSubmission')][kind]=row
         if kind and kind.startswith('NativeDrawable') and f.get('presentationID'):
             presents[group_id(row,'presentationID')][kind]=row
+        if kind=='NativeDrawableAcquire' and f.get('imageGeneration') and f.get('acquisitionAttemptID') and f.get('phase') in (0,1):
+            acquisition_key=ident(row)+(row.get('session'),f['imageGeneration'],f['acquisitionAttemptID'])
+            acquisitions[acquisition_key][f['phase']]=row
+            acquisition_phase_counts[(acquisition_key,f['phase'])]+=1
         if kind=='NativeCBCompleted' and f.get('ownerNativeCB'):
             run_cbs[ident(row)+(f['ownerNativeCB'],)]=dict(nativeCB=f['ownerNativeCB'],
                 logicalSubmit=f.get('ownerSubmit'),split=f.get('split'),nativeStatus=f.get('status'),
@@ -72,10 +77,28 @@ def analyze(rows, command_buffers, limit=500):
             signature=(key[0],key[1],b.get('sourceKind'),b.get('declarationKind'),b.get('stageMask'),b.get('resourceCount'),b.get('pointerHash1'),b.get('pointerHash2'))
             by_fingerprint[signature]['observations']+=1
             by_fingerprint[signature]['summedAPIWallNS']+=wall or 0
+    acquisition_rows=[];acquisition_lookup=defaultdict(list)
+    for key,phases in acquisitions.items():
+        begin,end=phases.get(0),phases.get(1);f=(end or begin).get('fields',{})
+        item=dict(pid=key[0],runID=key[1],ownerSession=key[2],imageGeneration=key[3],acquisitionAttemptID=key[4],
+            paired=bool(begin and end),begin=source(begin) if begin else None,end=source(end) if end else None,
+            phaseConflict=any(acquisition_phase_counts[(key,phase)]>1 for phase in phases),
+            swapchainGeneration=f.get('swapchainGeneration'),surfaceGeneration=f.get('surfaceGeneration'),
+            layerBindingGeneration=f.get('layerBindingGeneration'),drawableID=f.get('drawableID'),
+            drawableReturned=f.get('drawableReturned'),invalidFormat=f.get('invalidFormat'),
+            acquisitionObservedWallNS=delta(f,'endMachNS','startMachNS') if end else None,
+            diagnosticLeadInWallNS=delta(f,'layerGetStartMachNS','startMachNS') if end else None,
+            layerWrapperWallNS=delta(f,'layerGetEndMachNS','layerGetStartMachNS') if end else None,
+            nextDrawableAndRetainWallNS=delta(f,'endMachNS','layerGetEndMachNS') if end else None)
+        acquisition_rows.append(item);acquisition_lookup[(key[0],key[1],key[3],key[4])].append(item)
     presentation_rows=[]
     for key,phases in presents.items():
         entry=phases.get('NativeDrawablePresentedEntry');done=phases.get('NativeDrawablePresented')
         call=phases.get('NativeDrawablePresentCall');f=(done or entry or call or next(iter(phases.values()))).get('fields',{})
+        call_fields=(call or {}).get('fields',{})
+        request=phases.get('NativeDrawablePresentRequest');request_fields=(request or {}).get('fields',{})
+        acquisition_candidates=acquisition_lookup.get((key[0],key[1],request_fields.get('imageGeneration'),request_fields.get('acquisitionAttemptID')),[])
+        acquisition=acquisition_candidates[0] if len(acquisition_candidates)==1 else None
         # Legacy coarse graph IDs have no runID; never borrow them across a PID
         # restart. Only native completions carrying this exact run qualify.
         cb=run_cbs.get((key[0],key[1],f.get('ownerNativeCB')))
@@ -97,6 +120,16 @@ def analyze(rows, command_buffers, limit=500):
             rawPresentedTimeBits=f.get('rawPresentedTimeBits'),handlerEntryMachNS=handler,
             ownerGPUStatus=cb.get('nativeStatus') if cb else None,
             nativeCBJoinStatus=join_status,ownerCBPartialPrefix=cb.get('partialPrefix') if cb else None,
+            actualPresentCallObserved=bool(call),presentAPI=call_fields.get('presentAPI'),
+            effectiveLayer={name:call_fields.get(name) for name in ('displaySyncEnabled','maximumDrawableCount',
+                'drawableWidth','drawableHeight','presentsWithTransaction','drawsAsynchronously','layerHidden','hasSuperlayer')},
+            actualPresentAPIWallNS=delta(call_fields,'callEndMachNS','callStartMachNS'),
+            presentIntentLoggerWallNS=delta(call_fields,'intentEndMachNS','intentStartMachNS'),
+            requestToScheduledEntryWallNS=delta(call_fields,'scheduledHandlerEntryMachNS','requestMachNS'),
+            scheduledEntryToCallStartWallNS=delta(call_fields,'callStartMachNS','scheduledHandlerEntryMachNS'),
+            requestPrefixObserved=request_fields.get('requestObserved'),
+            acquisitionJoinStatus='observed-exact-run-image-generation-attempt' if acquisition else 'ambiguous' if len(acquisition_candidates)>1 else 'unjoinable-missing-acquisition',
+            acquisition=acquisition,
             GPUIntervalEndToHandlerEntryNS=delay,
             entryLoggerNS=delta(f,'handlerEntryLogEndMachNS','handlerEntryLogStartMachNS'),
             detachmentLockWaitNS=delta(f,'lockAcquiredMachNS','lockRequestedMachNS'),
@@ -121,17 +154,20 @@ def analyze(rows, command_buffers, limit=500):
             end=source(end) if end else None,intent=source(intent) if intent else None))
     batch_rows.sort(key=lambda r:r.get('actualAPIWallNS') or -1,reverse=True)
     presentation_rows.sort(key=lambda r:r.get('GPUIntervalEndToHandlerEntryNS') or -1,reverse=True)
+    acquisition_rows.sort(key=lambda r:r.get('nextDrawableAndRetainWallNS') or -1,reverse=True)
     repeated=[dict(signature=list(key),**dict(value),addressIdentityOnly=True) for key,value in by_fingerprint.items() if value['observations']>1]
     repeated.sort(key=lambda r:r['summedAPIWallNS'],reverse=True)
     return dict(schema=1,allCausesFound=False,resourceBatches=dict(totals),
         resourceBatchBySource=[dict(sourceKind=key,**dict(value)) for key,value in by_source.items()],
         slowestResourceBatches=batch_rows[:limit],repeatedAddressSequences=repeated[:limit],
         presentationChains=presentation_rows[:limit],presentationChainsObserved=len(presents),
+        drawableAcquisitions=acquisition_rows[:limit],drawableAcquisitionsObserved=len(acquisitions),
         submissionTerminals=submission_rows[:limit],submissionTerminalsObserved=len(terminals),
-        outputRankingCapped=any(len(v)>limit for v in (batch_rows,repeated,presentation_rows,submission_rows)),
+        outputRankingCapped=any(len(v)>limit for v in (batch_rows,repeated,presentation_rows,submission_rows,acquisition_rows)),
         limits=['Missing End is an open observation, not proof of a hang without coverage/health checks.',
             'Summed API wall spans may overlap threads and are not elapsed frame time or exclusive driver CPU.',
             'Identical raw address sequences do not prove resource lifetime, contents or redundant declarations.',
             'GPU interval to handler entry includes scheduling and presentation; zero presentedTime does not prove a dropped frame.',
+            'Acquisition observed wall includes intent IO; nextDrawableAndRetain and layerWrapper are separately bracketed software calls, not exclusive driver CPU or physical display latency.',
             'Terminal suffix closure is limited to observed successful submission splits; it does not prove the whole capture is complete.',
             'Wine Unix-call NTSTATUS, private driver scheduler, physical scanout and actual GPU clocks remain separate gaps.'])

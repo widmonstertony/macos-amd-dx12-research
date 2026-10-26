@@ -26,6 +26,7 @@
 #import <Metal/Metal.h>
 
 class MVKWatermark;
+struct MVKSurfaceDiagnosticInfo;
 
 
 #pragma mark -
@@ -43,7 +44,10 @@ public:
 	VkDebugReportObjectTypeEXT getVkDebugReportObjectType() override { return VK_DEBUG_REPORT_OBJECT_TYPE_SWAPCHAIN_KHR_EXT; }
 
 	/** Returns the CAMetalLayer underlying the surface used by this swapchain. */
-	CAMetalLayer* getCAMetalLayer();
+	CAMetalLayer* getCAMetalLayer(MVKSurfaceDiagnosticInfo* diagnostics = nullptr);
+
+	/** Process-local construction identity for numeric diagnostics only. */
+	uint64_t getDiagnosticGeneration() const { return _diagnosticGeneration; }
 
 	/** Returns whether the surface is headless. */
 	bool isHeadless();
@@ -122,10 +126,13 @@ protected:
     void renderWatermark(id<MTLTexture> mtlTexture, id<MTLCommandBuffer> mtlCmdBuff);
     void markFrameInterval();
 	void beginPresentation(const MVKImagePresentInfo& presentInfo);
-	void endPresentation(const MVKImagePresentInfo& presentInfo, uint64_t beginPresentTime, uint64_t actualPresentTime = 0);
+	void endPresentation(const MVKImagePresentInfo& presentInfo, uint64_t beginPresentTime, uint64_t actualPresentTime = 0,
+						 MVKPresentDiagnosticInfo* diagnostics = nullptr);
 	void notifyPresentComplete(const MVKImagePresentInfo& presentInfo);
-	void forceUnpresentedImageCompletion();
+	void forceUnpresentedImageCompletion(uint64_t reason, uint64_t initiatingSwapchainGeneration = 0);
 
+	// Assigned at construction even when tracing is disabled; raw layer pointers are not lifetime IDs.
+	uint64_t _diagnosticGeneration = 0, _diagnosticOldSwapchain = 0, _diagnosticOldSwapchainGeneration = 0;
 	MVKSurface* _surface = nullptr;
     MVKWatermark* _licenseWatermark = nullptr;
 	MVKSmallVector<MVKPresentableSwapchainImage*, kMVKMaxSwapchainImageCount> _presentableImages;

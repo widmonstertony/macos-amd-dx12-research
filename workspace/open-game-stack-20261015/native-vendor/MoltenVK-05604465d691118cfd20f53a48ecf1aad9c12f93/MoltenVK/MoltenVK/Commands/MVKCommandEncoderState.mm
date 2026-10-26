@@ -1092,23 +1092,29 @@ static bool isGraphicsStage(MVKShaderStage stage) {
 
 static constexpr MTLResourceUsage MTLResourceUsageReadWrite = MTLResourceUsageRead | MTLResourceUsageWrite;
 
-// Attribute host residency cost without changing resource coverage or ordering.
-// The only per-call work when disabled is the existing statistics flag check.
-template<class F> static void measureResidencyDeclaration(MVKResourceForensics* forensics, bool enabled, uint64_t& total,
+// Hash and persist intent before entering the existing timing scope. The exact
+// API interval excludes fingerprinting, Begin/End writers and Scope::finish().
+// With both diagnostics and statistics off there are no new clock/hash calls.
+template<class Pointer,class F> static void measureResidencyDeclaration(MVKResourceForensics* forensics, bool enabled, uint64_t& total,
     uint64_t& maximum, id<MTLCommandEncoder> encoder, const char* kind,
-    size_t count, unsigned stages, F&& declaration) {
-    auto measuredDeclaration = [&] {
-        auto phase = kind[0]=='h' ? MVKCPUPhase::NativeHeap :
-            (kind[0]=='r' ? MVKCPUPhase::NativeRead : MVKCPUPhase::NativeWrite);
-        MVKStutterCPUTrace::Scope timing(mvkStutterCPU(),static_cast<size_t>(phase));
-        uint64_t forensicStart=forensics && forensics->armed ? MVKResourceForensics::now() : 0;
-        declaration();
-        if(forensicStart)forensics->declaration(kind[0],count,stages,MVKResourceForensics::now()-forensicStart);
-    };
-    if (!enabled) { measuredDeclaration(); return; }
-    uint64_t start = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
-    measuredDeclaration();
-    uint64_t elapsed = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - start;
+    const Pointer* resources,size_t count,unsigned stages,MVKResourceBatchSource source,
+    uint64_t pendingGeneration,uint64_t encoderGeneration,F&& declaration) {
+    bool diagnostic=forensics && forensics->armed;
+    MVKResourceForensics::Batch batch;
+    if(diagnostic)batch=forensics->beginBatch(resources,count,kind[0],stages,source,pendingGeneration,
+        encoderGeneration,reinterpret_cast<uintptr_t>(encoder),mvkStutterContext());
+    auto phase = kind[0]=='h' ? MVKCPUPhase::NativeHeap :
+        (kind[0]=='r' ? MVKCPUPhase::NativeRead : MVKCPUPhase::NativeWrite);
+    MVKStutterCPUTrace::Scope timing(mvkStutterCPU(),static_cast<size_t>(phase),batch.id);
+    uint64_t cpuStart=diagnostic?MVKCPUDefaultClock::threadNS():0;
+    uint64_t actualStart=(diagnostic||enabled)?mvkStutterMonotonicNS():0;
+    declaration();
+    uint64_t actualEnd=(diagnostic||enabled)?mvkStutterMonotonicNS():0;
+    uint64_t cpuEnd=diagnostic?MVKCPUDefaultClock::threadNS():0;
+    timing.finish();
+    uint64_t elapsed=actualEnd-actualStart;
+    if(diagnostic){forensics->declaration(kind[0],count,stages,elapsed);forensics->endBatch(batch,actualStart,actualEnd,cpuStart,cpuEnd);}
+    if(!enabled)return;
     total += elapsed;
     maximum = std::max(maximum, elapsed);
     if (elapsed >= 2000000) {
@@ -1413,7 +1419,9 @@ void MVKUseResourceHelper::bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, 
             }
             uint64_t& elapsed = usage==MTLResourceUsageRead ? statsReadDeclarationNS : statsWriteDeclarationNS;
             measureResidencyDeclaration(&resourceForensics,resourceUseStats,elapsed,statsDeclarationMaxNS,
-                encoder,kind,batch.resources.size(),batch.stages,[&] {
+                encoder,kind,batch.resources.data(),batch.resources.size(),graphics?batch.stages:0,
+                usage==MTLResourceUsageRead?MVKResourceBatchSource::HeapPlanRead:MVKResourceBatchSource::HeapPlanWrite,
+                pendingBatchGeneration,encoderGeneration,[&] {
                 if (graphics) [static_cast<id<MTLRenderCommandEncoder>>(encoder)
                     useResources:batch.resources.data() count:batch.resources.size()
                     usage:usage stages:static_cast<MTLRenderStages>(batch.stages)];
@@ -1434,7 +1442,8 @@ void MVKUseResourceHelper::bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, 
                 if (batch.resources.empty()) continue;
                 if (resourceUseStats) statsHeapDeclarations+=batch.resources.size();
                 measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsHeapDeclarationNS,statsDeclarationMaxNS,
-                    encoder,"heap",batch.resources.size(),batch.stages,[&] {
+                    encoder,"heap",batch.resources.data(),batch.resources.size(),graphics?batch.stages:0,
+                    MVKResourceBatchSource::HeapPlanHeaps,pendingBatchGeneration,encoderGeneration,[&] {
                     if (graphics) [static_cast<id<MTLRenderCommandEncoder>>(encoder)
                         useHeaps:batch.resources.data() count:batch.resources.size()
                         stages:static_cast<MTLRenderStages>(batch.stages)];
@@ -2002,9 +2011,14 @@ MVKUseResourceHelper::ResourceInfo* MVKUseResourceHelper::addImmediate(id<MTLRes
                 else heapLedger.queuePreciseRead(resource,heap,mask);
                 if (heap && heapLedger.heapCount()!=before) encoderHeapOwners.push_back([heap retain]);
             }
-            uint64_t forensicStart=resourceForensics.armed?MVKResourceForensics::now():0;
-            func(enc, resource, (encoderHeapPlans ? stored.write : write) ? MTLResourceUsageReadWrite : MTLResourceUsageRead, stored.stages);
-            if(forensicStart) { resourceForensics.add(MVKResourceForensics::ImmediateCalls); resourceForensics.declaration((encoderHeapPlans?stored.write:write)?'w':'r',1,getMTLStages(stored.stages),MVKResourceForensics::now()-forensicStart); }
+            // Immediate declarations share the same batch protocol, with the
+            // actual singleton argument address and no new legacy stats totals.
+            measureResidencyDeclaration(&resourceForensics,false,statsReadDeclarationNS,statsDeclarationMaxNS,
+                enc,(encoderHeapPlans?stored.write:write)?"write":"read",&resource,1,func==useResourceCompute?0:getMTLStages(stored.stages),
+                MVKResourceBatchSource::Immediate,pendingBatchGeneration,encoderGeneration,[&] {
+                func(enc, resource, (encoderHeapPlans ? stored.write : write) ? MTLResourceUsageReadWrite : MTLResourceUsageRead, stored.stages);
+            });
+            resourceForensics.add(MVKResourceForensics::ImmediateCalls);
         }
 	}
 	return &stored;
@@ -2057,7 +2071,7 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 				}
 				entry.read.resources.resize(output);
 				entry.read.heaps.resize(output);
-				measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsHeapDeclarationNS,statsDeclarationMaxNS,encoder,"heap",declaredHeaps.size(),static_cast<unsigned>(mtlStages),[&]{ [encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size() stages:mtlStages]; });
+				measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsHeapDeclarationNS,statsDeclarationMaxNS,encoder,"heap",declaredHeaps.data(),declaredHeaps.size(),static_cast<unsigned>(mtlStages),MVKResourceBatchSource::CollapsedHeaps,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size() stages:mtlStages]; });
 				resourceForensics.add(MVKResourceForensics::HeapCollapsedChildren,collapsedResources);
                 if (resourceUseStats) { statsCollapsedRead += collapsedResources; statsHeapDeclarations += declaredHeaps.size(); }
 				if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS graphics resources=%u heaps=%zu stage=%u\n", collapsedResources, declaredHeaps.size(), i);
@@ -2065,17 +2079,17 @@ void MVKUseResourceHelper::bindAndResetGraphics(id<MTLRenderCommandEncoder> enco
 		}
 		if (!entry.retainedSnapshotReads.empty()) {
 			if (resourceUseStats) statsPreciseRead += entry.retainedSnapshotReads.size();
-			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.retainedSnapshotReads.size(),static_cast<unsigned>(mtlStages),[&]{ [encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead stages:mtlStages]; });
+			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.retainedSnapshotReads.data(),entry.retainedSnapshotReads.size(),static_cast<unsigned>(mtlStages),MVKResourceBatchSource::RetainedSnapshot,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead stages:mtlStages]; });
 			entry.retainedSnapshotReads.clear();
 		}
 		if (!entry.read.empty()) {
 			if (resourceUseStats) statsPreciseRead += entry.read.size();
-			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.read.size(),static_cast<unsigned>(mtlStages),[&]{ [encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead stages:mtlStages]; });
+			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.read.resources.data(),entry.read.size(),static_cast<unsigned>(mtlStages),MVKResourceBatchSource::PreciseRead,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead stages:mtlStages]; });
 			entry.read.clear();
 		}
 		if (!entry.readWrite.empty()) {
 			if (resourceUseStats) statsPreciseReadWrite += entry.readWrite.size();
-			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsWriteDeclarationNS,statsDeclarationMaxNS,encoder,"write",entry.readWrite.size(),static_cast<unsigned>(mtlStages),[&]{ [encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite stages:mtlStages]; });
+			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsWriteDeclarationNS,statsDeclarationMaxNS,encoder,"write",entry.readWrite.resources.data(),entry.readWrite.size(),static_cast<unsigned>(mtlStages),MVKResourceBatchSource::PreciseReadWrite,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite stages:mtlStages]; });
 			entry.readWrite.clear();
 		}
 	}
@@ -2118,7 +2132,7 @@ void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> enco
 			}
 			entry.read.resources.resize(output);
 			entry.read.heaps.resize(output);
-			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsHeapDeclarationNS,statsDeclarationMaxNS,encoder,"heap",declaredHeaps.size(),0,[&]{ [encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size()]; });
+			measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsHeapDeclarationNS,statsDeclarationMaxNS,encoder,"heap",declaredHeaps.data(),declaredHeaps.size(),0,MVKResourceBatchSource::CollapsedHeaps,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useHeaps:declaredHeaps.data() count:declaredHeaps.size()]; });
 			resourceForensics.add(MVKResourceForensics::HeapCollapsedChildren,collapsedResources);
                 if (resourceUseStats) { statsCollapsedRead += collapsedResources; statsHeapDeclarations += declaredHeaps.size(); }
 			if (traceArgumentHeaps) fprintf(stderr, "MVK_ARGUMENT_HEAPS compute resources=%u heaps=%zu\n", collapsedResources, declaredHeaps.size());
@@ -2126,17 +2140,17 @@ void MVKUseResourceHelper::bindAndResetCompute(id<MTLComputeCommandEncoder> enco
 	}
 	if (!entry.retainedSnapshotReads.empty()) {
 		if (resourceUseStats) statsPreciseRead += entry.retainedSnapshotReads.size();
-		measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.retainedSnapshotReads.size(),0,[&]{ [encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead]; });
+		measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.retainedSnapshotReads.data(),entry.retainedSnapshotReads.size(),0,MVKResourceBatchSource::RetainedSnapshot,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useResources:entry.retainedSnapshotReads.data() count:entry.retainedSnapshotReads.size() usage:MTLResourceUsageRead]; });
 		entry.retainedSnapshotReads.clear();
 	}
 	if (!entry.read.empty()) {
 		if (resourceUseStats) statsPreciseRead += entry.read.size();
-		measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.read.size(),0,[&]{ [encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead]; });
+		measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsReadDeclarationNS,statsDeclarationMaxNS,encoder,"read",entry.read.resources.data(),entry.read.size(),0,MVKResourceBatchSource::PreciseRead,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useResources:entry.read.resources.data() count:entry.read.size() usage:MTLResourceUsageRead]; });
 		entry.read.clear();
 	}
 	if (!entry.readWrite.empty()) {
 		if (resourceUseStats) statsPreciseReadWrite += entry.readWrite.size();
-		measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsWriteDeclarationNS,statsDeclarationMaxNS,encoder,"write",entry.readWrite.size(),0,[&]{ [encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite]; });
+		measureResidencyDeclaration(&resourceForensics,resourceUseStats,statsWriteDeclarationNS,statsDeclarationMaxNS,encoder,"write",entry.readWrite.resources.data(),entry.readWrite.size(),0,MVKResourceBatchSource::PreciseReadWrite,pendingBatchGeneration,encoderGeneration,[&]{ [encoder useResources:entry.readWrite.resources.data() count:entry.readWrite.size() usage:MTLResourceUsageReadWrite]; });
 		entry.readWrite.clear();
 	}
 	for (uint32_t i = 1; i < std::size(entries.elements); i++) {

@@ -11,6 +11,7 @@ import argparse
 import ctypes as C
 import datetime as DT
 import errno
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -20,9 +21,110 @@ import shutil
 import subprocess
 import sys
 import time
+from mac_session_state import session_state
 
 ROOT=Path(__file__).resolve().parents[1]
 CF_EPOCH=978307200.0
+
+
+class ConfigurationTracker:
+    """Hash only supplied owned configuration files; cache unchanged stat keys."""
+    def __init__(self,paths=()):self.paths=tuple(map(Path,paths));self.cache={};self.last=None;self.generation=0
+    def poll(self):
+        files=[]
+        for path in self.paths:
+            try:
+                state=path.stat();key=(state.st_dev,state.st_ino,state.st_size,state.st_mtime_ns)
+                if path not in self.cache or self.cache[path][0]!=key:
+                    record={'name':path.name,'available':True,'bytes':state.st_size,'mtimeUnixNS':state.st_mtime_ns,'inode':state.st_ino}
+                    if state.st_size<=2*1024**2:
+                        raw=path.read_bytes();after=path.stat()
+                        if (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns)!=key:record.update(available=False,reason='configuration-changed-during-read')
+                        else:record['sha256']=hashlib.sha256(raw).hexdigest()
+                    else:record.update(available=False,reason='configuration-over-2MiB')
+                    self.cache[path]=(key,record)
+                files.append(self.cache[path][1])
+            except OSError:files.append({'name':path.name,'available':False,'reason':'configuration-unavailable'})
+        canonical=[{key:row[key] for key in ('name','available','sha256','reason') if key in row} for row in files]
+        digest=hashlib.sha256(json.dumps(canonical,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        if digest!=self.last:self.generation+=1;self.last=digest
+        known=bool(files) and all(row.get('sha256') for row in files)
+        return {'generation':self.generation,'sha256':digest,'known':known,'files':files,
+                'scope':'Supplied configuration bytes only; effective game/runtime state is unmeasured.'}
+
+
+def process_identity(record,kernel_start=None):
+    known=record.get('present') is True and record.get('pid') is not None and bool(record.get('lstart'))
+    values={'pid':record.get('pid'),'lstart':record.get('lstart'),'processStartAbstime':kernel_start}
+    return values|{'known':known,'key':hashlib.sha256(json.dumps(values,sort_keys=True).encode()).hexdigest() if known else None,
+                   'scope':'Observed PID plus process-start identity; no command arguments or environment.'}
+
+
+class WindowIdentityTracker:
+    """CGWindow IDs are scoped to a process generation, never to a drawable."""
+    def __init__(self):self.current=None;self.generation=0
+    def observe(self,foreground,process):
+        wid=foreground.get('windowID') if foreground else None
+        known=process.get('known') and type(wid) is int and wid>0 and foreground.get('matchedWindowExists',True)
+        key=(process.get('key'),wid) if known else None
+        if key is not None and key!=self.current:self.generation+=1;self.current=key
+        return {'known':bool(known),'pid':process.get('pid'),'processKey':process.get('key'),'windowID':wid if known else None,
+                'generation':self.generation if known else None,
+                'key':hashlib.sha256(json.dumps(key).encode()).hexdigest() if known else None,
+                'sourceObservationCFAbsoluteTime':foreground.get('time') if foreground else None,'currentWindowStateProved':False,
+                'scope':'CGWindow identity only; ID reuse between polls, CAMetalLayer/drawable identity and physical display are unproved.'}
+
+
+class DisplaySessionSampler:
+    def __init__(self,every=2):self.every=every;self.next=0.;self.last=None
+    def poll(self,clock):
+        sampled=False
+        if self.last is None or clock['monotonicSeconds']>=self.next:
+            self.last=session_state();self.next=clock['monotonicSeconds']+self.every;sampled=True
+        age=clock['unixSeconds']-self.last['observedUnixSeconds']
+        return dict(self.last,observationAgeSeconds=age,sampledThisRow=sampled,
+                    observationEndAgeSeconds=clock['unixSeconds']-self.last.get('observationEndUnixSeconds',self.last['observedUnixSeconds']),
+                    carriedForwardContextOnly=not sampled,intervalStateProved=False)
+
+
+def observer_cost(usage_delta,collection_seconds):
+    return {'collectorCounterDelta':usage_delta,'collectionWallSeconds':collection_seconds,
+            'interpretation':'Observer cost measured separately. Never subtract collector time or an estimated FPS from game measurements.'}
+
+
+ACTION_LABELS=('stable','move','attack','equipment','nanosuit','present')
+
+
+class HumanActionMarkers:
+    """Observe an external whitelist file; never create or operate game input."""
+    def __init__(self,path):self.path=Path(path) if path else None;self.last=None;self.sequence=0
+    def poll(self,clock):
+        if self.path is None:return None
+        try:
+            state=self.path.stat();key=(state.st_dev,state.st_ino,state.st_size,state.st_mtime_ns)
+            if key==self.last:return None
+            self.last=key
+            if state.st_size>1024:return {'status':'unjoinable','reason':'action-marker-over-1024-bytes'}
+            raw=self.path.read_bytes();after=self.path.stat()
+            if (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns)!=key:return {'status':'unjoinable','reason':'action-marker-changed-during-read'}
+            value=json.loads(raw)
+            if not isinstance(value,dict) or value.get('action') not in ACTION_LABELS or value.get('phase','start') not in ('start','end'):
+                return {'status':'unjoinable','reason':'action-marker-outside-whitelist'}
+            self.sequence+=1
+            return {'status':'observed','sequence':self.sequence,'action':value['action'],'phase':value.get('phase','start'),
+                    'markerMtimeUnixNS':state.st_mtime_ns,'markerMtimeCF':state.st_mtime-CF_EPOCH,
+                    'observedClock':clock,'source':'external-human-label-file','gameActionVerified':False,'gameInputGenerated':False}
+        except FileNotFoundError:return None
+        except (OSError,ValueError):return {'status':'unjoinable','reason':'action-marker-unreadable-or-incomplete'}
+
+
+def output_bytes(out):
+    total=0
+    for path in Path(out).rglob('*'):
+        try:
+            if path.is_file():total+=path.stat().st_size
+        except OSError:pass
+    return total
 
 class TaskInfo(C.Structure):
     _fields_=[(n,C.c_uint64) for n in ('virtualSize','residentSize','totalUser','totalSystem','threadsUser','threadsSystem')]+[(n,C.c_int32) for n in ('policy','faults','pageins','cowFaults','messagesSent','messagesReceived','machSyscalls','unixSyscalls','contextSwitches','threadCount','runningThreads','priority')]
@@ -258,28 +360,38 @@ def capture(args):
     if args.lstart and original['lstart']!=args.lstart:raise RuntimeError('Expected PID+lstart does not match; no capture launched')
     normalized=original['comm'].replace('\\','/').lower()
     if not args.self_test and not (normalized.endswith('/sb-win64-shipping.exe') or '/stellarblade/sb.exe' in normalized):raise RuntimeError('This harness only targets the game; Steam/authentication processes are excluded')
-    collector_usage0=kernel.usage(os.getpid())
+    collector_usage0=kernel.usage(os.getpid());display_sampler=DisplaySessionSampler();configuration=ConfigurationTracker(getattr(args,'configuration',[]));action_markers=HumanActionMarkers(getattr(args,'action_marker',None));window_identity=WindowIdentityTracker()
     usage0=kernel.usage(args.pid);start_identity=usage0.get('processStartAbstime');clock0=stamp(kernel);offset0=clock0['unixSeconds']-clock0['monotonicSeconds']
-    metadata={'schema':1,'start':clock0,'target':original,'processStartAbstime':start_identity,'timebase':kernel.timebase,'platform':platform.platform(),'requestedSeconds':args.seconds,'intervalSeconds':args.interval,'readOnlyTarget':True,'targetLaunchStopOrInputUsed':False,'processMemoryRead':False,'authDataRead':False,'cacheMutation':False,'rawCPUTimeUnits':'kernel counters retained raw; normalized existing-thread shares do not require a unit assumption','stackSamplingOptIn':args.stack_seconds>0,'limits':['No Windows guest stack unwinding or thread-to-Win32-ID mapping is promised. Native sample may show Wine/vkd3d symbols.','No per-process compressed-page count, allocation contents or hardware GPU counter data is collected.','Global VM/compression/swap counters do not identify one process as their cause. Disk iostat first-snapshot totals are system-wide, not target-only.','Read-only sampling has overhead; row collection durations and bounded native-stack windows are recorded.','Foreground observer reports host visibility only. Actual scene validation still requires images/user observation and native present timestamps.','Missing observation is not target exit; only ps authoritative missing or PID start change ends capture.']}
+    metadata={'schema':2,'start':clock0,'target':original,'processIdentity':process_identity(original,start_identity),'configuration':configuration.poll(),'processStartAbstime':start_identity,'timebase':kernel.timebase,'platform':platform.platform(),'requestedSeconds':args.seconds,'intervalSeconds':args.interval,'readOnlyTarget':True,'targetLaunchStopOrInputUsed':False,'processMemoryRead':False,'authDataRead':False,'cacheMutation':False,'rawCPUTimeUnits':'kernel counters retained raw; normalized existing-thread shares do not require a unit assumption','stackSamplingOptIn':args.stack_seconds>0,'limits':['No Windows guest stack unwinding or thread-to-Win32-ID mapping is promised. Native sample may show Wine/vkd3d symbols.','No per-process compressed-page count, allocation contents or hardware GPU counter data is collected.','Global VM/compression/swap counters do not identify one process as their cause. Disk iostat first-snapshot totals are system-wide, not target-only.','Read-only sampling has overhead; row collection durations and bounded native-stack windows are recorded.','Foreground observer reports host visibility only. Actual scene validation still requires user observation and native present timestamps. Active/CGWindowOnscreen do not establish physical display or lock state.','Missing observation is not target exit; only ps authoritative missing or PID start change ends capture.','Display/session metadata is a point snapshot; missing booleans are unknown and never retroactively prove a historical lock.']}
     (out/'metadata.json').write_text(json.dumps(metadata,indent=2)+'\n')
     native=NativeReader(args.pid,args.trace_directory);graphics=GraphicsLog(args.graphics_log);helpers=[];stack_next=0.;stack_number=0
     observer=None
     if args.foreground:
         binary=ROOT/'build/probes/observe_game_activity'
         if binary.is_file():
-            observer=subprocess.Popen([str(binary),str(args.pid),str(args.seconds),str(out/'foreground.jsonl')],stdout=(out/'foreground.stdout').open('w'),stderr=(out/'foreground.stderr').open('w'));helpers.append(('foreground',observer))
+            observer=subprocess.Popen([str(binary),str(args.pid),str(args.seconds),str(out/'foreground-raw.jsonl')],stdout=(out/'foreground.stdout').open('w'),stderr=(out/'foreground.stderr').open('w'));helpers.append(('foreground',observer))
         else:metadata['foregroundUnavailable']='existing observer binary absent'
     previous_task=None;previous_usage=None;previous_threads=None;previous_system=None;previous_related={};previous_host_cpu=None;system_next=0.;native_next=0.;last_system=None;last_native=None;rows=0;coverage={'usageSamples':0,'taskSamples':0,'threadSamples':0,'truncatedThreadLists':0,'nativePolls':0,'systemPolls':0};warnings=set();errors=[];status='bounded-complete';last_clock=clock0
+    detail_disabled=None;observed_context=[];collection_total=0.;logger_total=0.;previous_logger_seconds=0.;reserve_bytes=min(4*1024**2,args.max_output_mib*1024**2//4)
     with (out/'timeline.jsonl').open('x') as f:
         deadline=time.monotonic()+args.seconds;next_sample=time.monotonic()
         while time.monotonic()<deadline:
             if time.monotonic()<next_sample:time.sleep(min(next_sample-time.monotonic(),args.interval))
-            began=time.monotonic();clock=stamp(kernel);last_clock=clock;ident=identity(args.pid);row={'clock':clock,'pid':args.pid,'identity':ident,'clockOffsetDriftSeconds':clock['unixSeconds']-clock['monotonicSeconds']-offset0}
+            began=time.monotonic();clock=stamp(kernel);last_clock=clock;ident=identity(args.pid);config_begin=time.monotonic();config=configuration.poll();config_seconds=time.monotonic()-config_begin;display_begin=time.monotonic();display=display_sampler.poll(clock)
+            row={'clock':clock,'pid':args.pid,'identity':ident,'clockOffsetDriftSeconds':clock['unixSeconds']-clock['monotonicSeconds']-offset0,
+                'processIdentity':process_identity(ident,start_identity),'configuration':config,'displaySession':display,
+                'observerCosts':{'configurationPollWallSeconds':config_seconds,'displaySessionPollWallSeconds':time.monotonic()-display_begin,'previousRowLoggerWallSeconds':previous_logger_seconds}}
+            action_marker=action_markers.poll(clock)
+            if action_marker:row['actionMarker']=action_marker
+            if output_bytes(out)>=args.max_output_mib*1024**2-reserve_bytes:detail_disabled='detail-output-budget-reserved-for-telemetry-tail'
+            if shutil.disk_usage(ROOT).free<getattr(args,'min_free_mib',2048)*1024**2:detail_disabled='disk-reserve-detail-stop'
+            if detail_disabled:row['detailUndercoverage']=detail_disabled
             if ident.get('authoritativeMissing'):row['terminal']='target-no-longer-present';status='target-exited'
             elif ident.get('present') and ident['lstart']!=original['lstart']:row['terminal']='PID-reused-or-start-changed';status='identity-changed'
             elif ident.get('present') and ident.get('state','').startswith('Z'):row['terminal']='kernel-zombie-exited';status='target-exited'
             if 'terminal' not in row:
-                usage=kernel.usage(args.pid);task=kernel.task(args.pid);threads=kernel.threads(args.pid,args.max_threads)
+                process_sample_begin=time.monotonic()
+                usage=kernel.usage(args.pid);task=kernel.task(args.pid);threads=kernel.threads(args.pid,args.max_threads) if not detail_disabled else {'available':False,'reason':detail_disabled,'threads':{}}
                 if usage.get('available') and usage.get('processExitAbstime',0):row['terminal']='kernel-process-exited';status='target-exited'
                 if usage.get('available') and start_identity is not None and usage['processStartAbstime']!=start_identity:row['terminal']='kernel-process-start-changed';status='identity-changed'
                 row.update(usage=usage,task=task,threadCounters=threads,threadCPU=thread_delta(threads,previous_threads))
@@ -290,8 +402,10 @@ def capture(args):
                 row['usageDelta']=delta(usage,previous_usage,('userTime','systemTime','pageins','diskBytesRead','diskBytesWritten','packageIdleWakeups','interruptWakeups'))
                 row['taskCounterDelta']=delta(task,previous_task,('faults','pageins','cowFaults','machSyscalls','unixSyscalls','contextSwitches'),True)
                 previous_task,previous_usage,previous_threads=task,usage,threads
+                row['observerCosts']['processSamplerWallSeconds']=time.monotonic()-process_sample_begin
             now=time.monotonic()
-            if now>=system_next:
+            if now>=system_next and not detail_disabled:
+                system_poll_begin=time.monotonic()
                 coverage['systemPolls']+=1;last_system=system_snapshot()
                 host_cpu=last_system.get('hostCPU',{})
                 if host_cpu.get('available') and previous_host_cpu and previous_host_cpu.get('available'):
@@ -305,7 +419,9 @@ def capture(args):
                     previous_related[related['pid']]=current
                 vm=last_system.get('vmStat',{}).get('counters',{});last_system['vmCounterDelta']={k:v-previous_system.get(k,v) for k,v in vm.items()} if previous_system else None;previous_system=vm;row['system']=last_system;system_next=now+args.system_every
                 row['diskFreeBytes']=shutil.disk_usage(ROOT).free
-            if now>=native_next:
+                row['observerCosts']['hostSystemPollWallSeconds']=time.monotonic()-system_poll_begin
+            if now>=native_next and not detail_disabled:
+                native_poll_begin=time.monotonic()
                 coverage['nativePolls']+=1;last_native=native.read(clock['CFAbsoluteTime']);row['native']=last_native
                 for key,value in last_native.items():
                     if isinstance(value,dict) and value.get('sourceFreshWithin15Seconds') is False:warnings.add('stale-native-source:'+key)
@@ -316,7 +432,8 @@ def capture(args):
                 row['cacheFiles']=[file_meta(p) for p in args.cache_path]
                 row['crashArtifacts']=crash_metadata(args.crash_directory,clock0['unixSeconds'],original['comm'])
                 native_next=now+args.trace_every
-            sample_guard=identity(args.pid) if args.stack_seconds and stack_number<args.max_stack_bursts and now>=stack_next and 'terminal' not in row else None
+                row['observerCosts']['nativePollWallSeconds']=time.monotonic()-native_poll_begin
+            sample_guard=identity(args.pid) if not detail_disabled and args.stack_seconds and stack_number<args.max_stack_bursts and now>=stack_next and 'terminal' not in row else None
             if sample_guard and sample_guard.get('present') and sample_guard.get('lstart')==original['lstart'] and not sample_guard.get('state','').startswith('Z'):
                 path=out/f'sample-{args.pid}-{stack_number:02d}.txt';record={'path':path.name,'start':stamp(kernel),'seconds':args.stack_seconds,'intervalMilliseconds':args.stack_interval_ms};
                 with (out/f'sample-{stack_number:02d}.stdout').open('w') as stdout,(out/f'sample-{stack_number:02d}.stderr').open('w') as stderr:
@@ -329,10 +446,9 @@ def capture(args):
                     sample_path=out/name['path']
                     if sample_path.is_file() and sample_path.stat().st_size>24*1024**2:
                         name['stoppedForOwnedSampleFileLimit']=True;helper.terminate()
-            row['collectionSeconds']=time.monotonic()-began;f.write(json.dumps(row,separators=(',',':'))+'\n');f.flush();rows+=1
+            row['collectionSeconds']=time.monotonic()-began;collection_total+=row['collectionSeconds'];observed_context.append({'clock':clock,'processIdentity':row['processIdentity'],'configuration':row['configuration'],'displaySession':row['displaySession']})
+            logger_begin=time.monotonic();f.write(json.dumps(row,separators=(',',':'))+'\n');f.flush();previous_logger_seconds=time.monotonic()-logger_begin;logger_total+=previous_logger_seconds;rows+=1
             if row.get('terminal'):break
-            total_output=sum(p.stat().st_size for p in out.iterdir() if p.is_file())
-            if total_output>args.max_output_mib*1024**2:status='bounded-output-limit';break
             next_sample=max(next_sample+args.interval,time.monotonic())
     helper_results=[]
     for name,helper in helpers:
@@ -346,8 +462,22 @@ def capture(args):
         if isinstance(name,dict):
             p=out/name['path'];text=p.read_text(errors='replace') if p.is_file() and p.stat().st_size<=24*1024**2 else '';result['waitSymbolsPresent']=[s for s in ('__psynch_cvwait','__psynch_mutexwait','semaphore_wait_trap','mach_msg2_trap','__ulock_wait','wine_server_call','WaitForMultipleObjects','kevent') if s in text];result['end']=stamp(kernel)
         helper_results.append(result)
-    collector_usage1=kernel.usage(os.getpid())
-    summary={'coverage':coverage,'observabilityWarnings':sorted(warnings),'collectorUsageDelta':delta(collector_usage1,collector_usage0,('userTime','systemTime','childUserTime','childSystemTime','diskBytesRead','diskBytesWritten')),'status':status,'target':original,'captureStart':clock0,'lastObservation':last_clock,'rows':rows,'helperResults':helper_results,'targetModified':False,'cachesPreserved':True,'actualGPUWorkExecutedByHarness':False,'errors':errors}
+    # Preserve native observer bytes separately; enrichment is an explicitly
+    # contextual merged copy, never a claim that a later snapshot was historical.
+    raw_foreground=out/'foreground-raw.jsonl'
+    if raw_foreground.is_file() and raw_foreground.stat().st_size<=8*1024**2:
+        with raw_foreground.open() as source,(out/'foreground.jsonl').open('x') as merged:
+            for number,line in enumerate(source,1):
+                try:front=json.loads(line)
+                except ValueError:continue
+                context=min(observed_context,key=lambda row:abs(row['clock']['CFAbsoluteTime']-front.get('time',0))) if observed_context else None
+                if context:
+                    front.update(processIdentity=context['processIdentity'],configuration=context['configuration'],displaySessionContext=context['displaySession'],contextClock=context['clock'],contextOnlyNotIntervalProof=True,
+                                 displaySessionContextMinusWindowSeconds=context['displaySession']['observedUnixSeconds']-front.get('time',0)-CF_EPOCH,
+                                 windowIdentity=window_identity.observe(front,context['processIdentity']),rawSource={'file':raw_foreground.name,'line':number})
+                merged.write(json.dumps(front,separators=(',',':'))+'\n')
+    collector_usage1=kernel.usage(os.getpid());cost_delta=delta(collector_usage1,collector_usage0,('userTime','systemTime','childUserTime','childSystemTime','diskBytesRead','diskBytesWritten'))
+    summary={'coverage':coverage,'observabilityWarnings':sorted(warnings),'collectorUsageDelta':cost_delta,'observerCost':observer_cost(cost_delta,collection_total)|{'timelineLoggerWallSeconds':logger_total},'detailUndercoverage':detail_disabled,'outputBytes':output_bytes(out),'telemetryReserveBytes':reserve_bytes,'status':status,'target':original,'captureStart':clock0,'lastObservation':last_clock,'rows':rows,'helperResults':helper_results,'targetModified':False,'cachesPreserved':True,'actualGPUWorkExecutedByHarness':False,'errors':errors}
     (out/'summary.json').write_text(json.dumps(summary,indent=2)+'\n');(out/'metadata.json').write_text(json.dumps(metadata,indent=2)+'\n');return summary
 
 
@@ -377,11 +507,15 @@ def self_test(args):
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--pid',type=int);p.add_argument('--lstart');p.add_argument('--output',type=Path,required=True);p.add_argument('--seconds',type=int,default=60);p.add_argument('--interval',type=float,default=1);p.add_argument('--system-every',type=float,default=5);p.add_argument('--trace-every',type=float,default=2);p.add_argument('--max-threads',type=int,default=1024);p.add_argument('--trace-directory',type=Path);p.add_argument('--cache-path',type=Path,action='append',default=[]);p.add_argument('--graphics-log',type=Path);p.add_argument('--crash-directory',type=Path,action='append',default=[]);p.add_argument('--foreground',action='store_true');p.add_argument('--stack-seconds',type=int,default=0);p.add_argument('--stack-every',type=float,default=30);p.add_argument('--stack-interval-ms',type=int,default=20);p.add_argument('--max-stack-bursts',type=int,default=3);p.add_argument('--max-output-mib',type=int,default=64);p.add_argument('--self-test',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--pid',type=int);p.add_argument('--lstart');p.add_argument('--output',type=Path,required=True);p.add_argument('--seconds',type=int,default=60);p.add_argument('--interval',type=float,default=1);p.add_argument('--system-every',type=float,default=5);p.add_argument('--trace-every',type=float,default=2);p.add_argument('--max-threads',type=int,default=1024);p.add_argument('--trace-directory',type=Path);p.add_argument('--cache-path',type=Path,action='append',default=[]);p.add_argument('--graphics-log',type=Path);p.add_argument('--crash-directory',type=Path,action='append',default=[]);p.add_argument('--foreground',action='store_true');p.add_argument('--stack-seconds',type=int,default=0);p.add_argument('--stack-every',type=float,default=30);p.add_argument('--stack-interval-ms',type=int,default=20);p.add_argument('--max-stack-bursts',type=int,default=3);p.add_argument('--max-output-mib',type=int,default=64);p.add_argument('--self-test',action='store_true')
+    p.add_argument('--configuration',type=Path,action='append',default=[]);p.add_argument('--action-marker',type=Path);p.add_argument('--min-free-mib',type=int,default=2048);a=p.parse_args()
     if not a.self_test and (a.pid is None or a.pid<2):p.error('--pid >=2 required')
     if not (5<=a.seconds<=180 and 1<=a.interval<=10 and 2<=a.system_every<=30 and 1<=a.trace_every<=30 and 32<=a.max_threads<=4096 and 0<=a.stack_seconds<=5 and a.stack_every>=20 and 5<=a.stack_interval_ms<=100 and 0<=a.max_stack_bursts<=5 and 4<=a.max_output_mib<=128):p.error('Capture/sample bounds exceeded')
     for path in [a.trace_directory,*a.cache_path,a.graphics_log]:
         if path and not any(path.resolve().is_relative_to(ROOT/n) for n in ('build','evidence')):p.error('Trace/cache/graphics inputs must be owned build/evidence paths')
+    for path in [*a.configuration,a.action_marker]:
+        if path and not path.resolve().is_relative_to(ROOT/'evidence'):p.error('Configuration/action-marker paths must be owned evidence paths')
+    if a.min_free_mib<512:p.error('At least512MiB disk reserve required')
     for directory in a.crash_directory:
         if not directory.resolve().is_relative_to(Path.home()/'Library/Logs/DiagnosticReports') and not any(directory.resolve().is_relative_to(ROOT/n) for n in ('build','evidence')):p.error('Crash metadata is restricted to owned paths or native DiagnosticReports')
     if a.graphics_log and not re.fullmatch(r'vkd3d[^/]*\.log',a.graphics_log.name):p.error('Only explicitly supplied graphics-only vkd3d logs are accepted; Steam/auth/client logs are excluded')

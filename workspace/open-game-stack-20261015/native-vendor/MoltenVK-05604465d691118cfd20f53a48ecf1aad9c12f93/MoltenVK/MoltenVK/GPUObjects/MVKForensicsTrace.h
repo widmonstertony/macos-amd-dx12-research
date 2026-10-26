@@ -78,11 +78,12 @@ struct State {
         // Only this process-run's explicitly rotating slots are replaced.
         file=fopen(path,"w");if(!file){++ioFailures;return false;}
         uint64_t before=mvkStutterMonotonicNS();double cf=CFAbsoluteTimeGetCurrent();double ca=CACurrentMediaTime();uint64_t after=mvkStutterMonotonicNS();
-        int n=fprintf(file,"{\"schema\":1,\"type\":\"clockCalibration\",\"pid\":%d,\"runID\":%llu,\"streamGeneration\":%llu,\"session\":%llu,\"machBeforeNS\":%llu,\"machAfterNS\":%llu,\"timeCF\":%.9f,\"timeCA\":%.9f,\"clockDomain\":\"mach-absolute-nanoseconds\",\"rollingSegmentSlots\":%u}\n",getpid(),(unsigned long long)runID,(unsigned long long)generation,(unsigned long long)armID,(unsigned long long)before,(unsigned long long)after,cf,ca,segmentSlots);
+        int n=fprintf(file,"{\"schema\":1,\"type\":\"clockCalibration\",\"pid\":%d,\"runID\":%llu,\"streamGeneration\":%llu,\"session\":%llu,\"streamSession\":%llu,\"streamOwnershipSchema\":2,\"machBeforeNS\":%llu,\"machAfterNS\":%llu,\"timeCF\":%.9f,\"timeCA\":%.9f,\"clockDomain\":\"mach-absolute-nanoseconds\",\"rollingSegmentSlots\":%u}\n",getpid(),(unsigned long long)runID,(unsigned long long)generation,(unsigned long long)armID,(unsigned long long)armID,(unsigned long long)before,(unsigned long long)after,cf,ca,segmentSlots);
         if(n<0||fflush(file)){++ioFailures;fclose(file);file=nullptr;return false;}bytes+=uint64_t(n);return true;
     }
     void record(const char*kind,const char*body,size_t bodyBytes,bool jsonPayload,uint64_t ownerSession=0) noexcept {
-        uint64_t armID=ownerSession?ownerSession:active();if(!armID||!dir)return;
+        uint64_t activeID=active(),armID=ownerSession?ownerSession:activeID;
+        uint64_t streamID=activeID?activeID:armID;if(!armID||!dir)return;
         ErrnoGuard preserve;uint64_t start=mvkStutterMonotonicNS();
         try{
             std::lock_guard<std::mutex> guard(lock);
@@ -95,10 +96,13 @@ struct State {
             if(now>=nextDiskCheckNS){struct statvfs s{};lowDisk=statvfs(dir,&s)==0&&uint64_t(s.f_bavail)*s.f_frsize<512ULL*1024*1024;nextDiskCheckNS=now+10000000000ULL;}
             uint64_t sec=now/1000000000ULL;if(sec!=second){second=sec;secondRows=0;}
             if(lowDisk||++secondRows>rowsPerSecond){++dropped;if(lowDisk)++lowDiskDrops;if(now-flushNS>250000000ULL){currentLocked(now);flushNS=now;}return;}
-            if(!file||lastArm!=armID||bytes+bodyBytes+1024>segmentBytes){if(!openLocked(armID))return;lastArm=armID;}
+            // Logical old-owner callbacks may arrive during a new action arm.
+            // Keep the current physical stream instead of ping-pong rotating
+            // all four slots between old/new owners on every callback.
+            if(!file||lastArm!=streamID||bytes+bodyBytes+1024>segmentBytes){if(!openLocked(streamID))return;lastArm=streamID;}
             auto c=mvkStutterContext();uint64_t thread=0;pthread_threadid_np(nullptr,&thread);
-            int n=fprintf(file,"{\"schema\":1,\"type\":\"forensics\",\"kind\":\"%s\",\"pid\":%d,\"runID\":%llu,\"streamGeneration\":%llu,\"seq\":%llu,\"session\":%llu,\"machNS\":%llu,\"threadMachID\":%llu,\"context\":{\"domain\":%u,\"queueFamily\":%u,\"queueIndex\":%u,\"logicalSubmit\":%llu,\"nativeCB\":%llu,\"frame\":%llu,\"shader\":%llu},\"%s\":",
-                kind,getpid(),(unsigned long long)runID,(unsigned long long)generation,(unsigned long long)++sequence,(unsigned long long)armID,(unsigned long long)now,(unsigned long long)thread,c.domain,c.queueFamily,c.queueIndex,(unsigned long long)c.submission,(unsigned long long)c.nativeCB,(unsigned long long)c.frame,(unsigned long long)c.shader,jsonPayload?"payload":"fields");
+            int n=fprintf(file,"{\"schema\":1,\"type\":\"forensics\",\"kind\":\"%s\",\"pid\":%d,\"runID\":%llu,\"streamGeneration\":%llu,\"seq\":%llu,\"session\":%llu,\"streamSession\":%llu,\"streamOwnershipSchema\":2,\"machNS\":%llu,\"threadMachID\":%llu,\"context\":{\"domain\":%u,\"queueFamily\":%u,\"queueIndex\":%u,\"logicalSubmit\":%llu,\"nativeCB\":%llu,\"frame\":%llu,\"shader\":%llu},\"%s\":",
+                kind,getpid(),(unsigned long long)runID,(unsigned long long)generation,(unsigned long long)++sequence,(unsigned long long)armID,(unsigned long long)streamID,(unsigned long long)now,(unsigned long long)thread,c.domain,c.queueFamily,c.queueIndex,(unsigned long long)c.submission,(unsigned long long)c.nativeCB,(unsigned long long)c.frame,(unsigned long long)c.shader,jsonPayload?"payload":"fields");
             if(n<0||fwrite(body,1,bodyBytes,file)!=bodyBytes||fwrite("}\n",1,2,file)!=2){++ioFailures;return;}
             bytes+=uint64_t(n)+bodyBytes+2;++written;
             if(written%64==0||now-flushNS>250000000ULL){if(fflush(file))++ioFailures;currentLocked(now);flushNS=now;}
@@ -109,6 +113,22 @@ inline State& state(){static State s;return s;}
 }
 inline uint64_t mvkForensicsSessionID() noexcept {return MVKForensics::state().active();}
 inline bool mvkForensicsArmed() noexcept {return mvkForensicsSessionID()!=0;}
+// Make already-admitted intent rows visible before a possibly blocking API.
+// A successful fflush is not proof that a particular row passed admission.
+// Do not update flushNS: normal periodic current/loss publication must continue.
+inline bool mvkForensicsFlushIntent(uint64_t ownerSession) noexcept {
+    if(!ownerSession)return false;
+    MVKForensics::ErrnoGuard preserve;
+    auto&state=MVKForensics::state();uint64_t activeID=state.active(),start=mvkStutterMonotonicNS();
+    try {
+        std::lock_guard<std::mutex> guard(state.lock);
+        struct Accounting {MVKForensics::State&state;uint64_t start;
+            ~Accounting(){state.writerHostNS+=mvkStutterMonotonicNS()-start;}} accounting{state,start};
+        if(!state.file || (state.lastArm!=ownerSession && (!activeID||state.lastArm!=activeID)))return false;
+        if(fflush(state.file)){++state.ioFailures;return false;}
+        return true;
+    }catch(...){++state.rejectedBeforeRecord;return false;}
+}
 inline void mvkForensicsRecordArray(uint64_t ownerSession,const char*kind,const std::pair<const char*,uint64_t>*fields,size_t count) noexcept {
     if(!ownerSession&&!mvkForensicsArmed())return;
     MVKForensics::ErrnoGuard preserve;

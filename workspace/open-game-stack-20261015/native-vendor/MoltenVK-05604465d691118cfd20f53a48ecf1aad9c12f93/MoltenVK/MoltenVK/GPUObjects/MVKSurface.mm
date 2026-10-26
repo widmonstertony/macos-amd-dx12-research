@@ -17,6 +17,7 @@
  */
 
 #include "MVKSurface.h"
+#include "MVKForensicsTrace.h"
 #include "MVKSwapchain.h"
 #include "MVKInstance.h"
 #include "MVKFoundation.h"
@@ -49,9 +50,32 @@ static constexpr VkExtent2D kMVKUndefinedExtent = {0xFFFFFFFF, 0xFFFFFFFF};
 
 #pragma mark MVKSurface
 
-CAMetalLayer* MVKSurface::getCAMetalLayer() {
-	std::lock_guard<std::mutex> lock(_layerLock);
-	return _mtlCAMetalLayer;
+uint64_t MVKSurface::nextDiagnosticGeneration() {
+	static std::atomic<uint64_t> next{1};
+	return next.fetch_add(1, std::memory_order_relaxed);
+}
+
+CAMetalLayer* MVKSurface::getCAMetalLayer(MVKSurfaceDiagnosticInfo* diagnostics) {
+	uint64_t session = mvkForensicsSessionID();
+	uint64_t requested = session ? mvkStutterMonotonicNS() : 0, acquired = 0;
+	CAMetalLayer* layer;
+	uint64_t layerBindingGeneration;
+	{
+		std::lock_guard<std::mutex> lock(_layerLock);
+		if (session) { acquired = mvkStutterMonotonicNS(); }
+		layer = _mtlCAMetalLayer;
+		layerBindingGeneration = _diagnosticLayerBindingGeneration;
+		if (diagnostics) {
+			diagnostics->surfaceGeneration = _diagnosticGeneration;
+			diagnostics->layerBindingGeneration = layerBindingGeneration;
+		}
+	}
+	if (session) { mvkForensicsRecordForSession(session, "NativeSurfaceLayerGet", {
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"layer", uint64_t(uintptr_t(layer))}, {"layerBindingGeneration", layerBindingGeneration},
+		{"externalLayerBirthKnown", 0}, {"lockRequestedMachNS", requested},
+		{"lockAcquiredMachNS", acquired}, {"lockReleasedMachNS", mvkStutterMonotonicNS()}}); }
+	return layer;
 }
 
 VkExtent2D MVKSurface::getExtent() {
@@ -69,19 +93,31 @@ void MVKSurface::setActiveSwapchain(MVKSwapchain* swapchain) {
 MVKSurface::MVKSurface(MVKInstance* mvkInstance,
 					   const VkMetalSurfaceCreateInfoEXT* pCreateInfo,
 					   const VkAllocationCallbacks* pAllocator) : _mvkInstance(mvkInstance) {
+	mvkForensicsRecord("NativeSurfaceConstruct", {{"phase", 0}, {"constructorKind", 1},
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration}});
 	initLayer((CAMetalLayer*)pCreateInfo->pLayer, "vkCreateMetalSurfaceEXT", false);
+	mvkForensicsRecord("NativeSurfaceConstruct", {{"phase", 1}, {"constructorKind", 1},
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"configurationResultBits", uint64_t(int64_t(getConfigurationResult()))}});
 }
 
 MVKSurface::MVKSurface(MVKInstance* mvkInstance,
 					   const VkHeadlessSurfaceCreateInfoEXT* pCreateInfo,
 					   const VkAllocationCallbacks* pAllocator) : _mvkInstance(mvkInstance) {
+	mvkForensicsRecord("NativeSurfaceConstruct", {{"phase", 0}, {"constructorKind", 2},
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration}});
 	initLayer(nil, "vkCreateHeadlessSurfaceEXT", true);
+	mvkForensicsRecord("NativeSurfaceConstruct", {{"phase", 1}, {"constructorKind", 2},
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"configurationResultBits", uint64_t(int64_t(getConfigurationResult()))}});
 }
 
 // pCreateInfo->pView can be either a CAMetalLayer or a view (NSView/UIView).
 MVKSurface::MVKSurface(MVKInstance* mvkInstance,
 					   const Vk_PLATFORM_SurfaceCreateInfoMVK* pCreateInfo,
 					   const VkAllocationCallbacks* pAllocator) : _mvkInstance(mvkInstance) {
+	mvkForensicsRecord("NativeSurfaceConstruct", {{"phase", 0}, {"constructorKind", 3},
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration}});
 	MVKLogWarn("%s() is deprecated. Use vkCreateMetalSurfaceEXT() from the VK_EXT_metal_surface extension.", STR(vkCreate_PLATFORM_SurfaceMVK));
 
 	// Get the platform object contained in pView
@@ -95,32 +131,79 @@ MVKSurface::MVKSurface(MVKInstance* mvkInstance,
 
 	// Confirm that we were provided with a CAMetalLayer
 	initLayer([obj isKindOfClass: CAMetalLayer.class] ? (CAMetalLayer*)obj : nil, STR(vkCreate_PLATFORM_SurfaceMVK), false);
+	mvkForensicsRecord("NativeSurfaceConstruct", {{"phase", 1}, {"constructorKind", 3},
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"configurationResultBits", uint64_t(int64_t(getConfigurationResult()))}});
 }
 
 void MVKSurface::initLayer(CAMetalLayer* mtlLayer, const char* vkFuncName, bool isHeadless) {
 
+	uint64_t session = mvkForensicsSessionID();
+	if (session) { mvkForensicsRecordForSession(session, "NativeSurfaceLayerBind", {
+		{"phase", 0}, {"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"layer", uint64_t(uintptr_t(mtlLayer))}, {"externalLayerBirthKnown", 0}, {"headless", uint64_t(isHeadless)}}); }
+	uint64_t retainStart = session ? mvkStutterMonotonicNS() : 0;
 	_mtlCAMetalLayer = [mtlLayer retain];	// retained
+	uint64_t retainEnd = session ? mvkStutterMonotonicNS() : 0;
+	if (_mtlCAMetalLayer) { _diagnosticLayerBindingGeneration = nextDiagnosticGeneration(); }
+	if (session) { mvkForensicsRecordForSession(session, "NativeSurfaceLayerBind", {
+		{"phase", 1}, {"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"layer", uint64_t(uintptr_t(_mtlCAMetalLayer))}, {"layerBindingGeneration", _diagnosticLayerBindingGeneration},
+		{"externalLayerBirthKnown", 0}, {"headless", uint64_t(isHeadless)},
+		{"retainStartMachNS", retainStart}, {"retainEndMachNS", retainEnd}}); }
 	if ( !_mtlCAMetalLayer && !isHeadless ) { setConfigurationResult(reportError(VK_ERROR_SURFACE_LOST_KHR, "%s(): On-screen rendering requires a layer of type CAMetalLayer.", vkFuncName)); }
 
 	// Sometimes, the owning view can replace its CAMetalLayer.
 	// When that happens, the app needs to recreate the surface.
 	if ([_mtlCAMetalLayer.delegate isKindOfClass: [PLATFORM_VIEW_CLASS class]]) {
-		_layerObserver = [MVKBlockObserver observerWithBlock: ^(NSString* path, id, NSDictionary*, void*) {
-			if ([path isEqualToString: @"layer"]) { this->releaseLayer(); }
+		_layerObserver = [MVKBlockObserver observerWithBlock: ^(NSString* path, id observedObject, NSDictionary*, void*) {
+			if ([path isEqualToString: @"layer"]) {
+				mvkForensicsRecord("NativeSurfaceLayerKVO", {{"surface", uint64_t(uintptr_t(this))},
+					{"surfaceGeneration", _diagnosticGeneration}, {"externalLayerBirthKnown", 0},
+					{"observedObject", uint64_t(uintptr_t(observedObject))}, {"replacementLayerKnown", 0}});
+				this->releaseLayer(1);
+			}
 		} forObject: _mtlCAMetalLayer.delegate atKeyPath: @"layer"];
 	}
 }
 
-void MVKSurface::releaseLayer() {
-	std::lock_guard<std::mutex> lock(_layerLock);
-	setConfigurationResult(VK_ERROR_SURFACE_LOST_KHR);
-	[_mtlCAMetalLayer release];
-	_mtlCAMetalLayer = nil;
-	[_layerObserver release];
-	_layerObserver = nil;
+void MVKSurface::releaseLayer(uint64_t reason) {
+	uint64_t session = mvkForensicsSessionID();
+	uint64_t requested = 0, acquired = 0;
+	uint64_t layer = 0, layerBindingGeneration = 0, releaseStart = 0, releaseEnd = 0;
+	if (session) { mvkForensicsRecordForSession(session, "NativeSurfaceLayerReleaseIntent", {
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"reason", reason}, {"intentMachNS", mvkStutterMonotonicNS()}}); }
+	requested = session ? mvkStutterMonotonicNS() : 0;
+	{
+		std::lock_guard<std::mutex> lock(_layerLock);
+		if (session) {
+			acquired = mvkStutterMonotonicNS();
+			layer = uint64_t(uintptr_t(_mtlCAMetalLayer));
+			layerBindingGeneration = _diagnosticLayerBindingGeneration;
+		}
+		setConfigurationResult(VK_ERROR_SURFACE_LOST_KHR);
+		if (session) { releaseStart = mvkStutterMonotonicNS(); }
+		[_mtlCAMetalLayer release];
+		if (session) { releaseEnd = mvkStutterMonotonicNS(); }
+		_mtlCAMetalLayer = nil;
+		_diagnosticLayerBindingGeneration = 0;
+		[_layerObserver release];
+		_layerObserver = nil;
+	}
+	if (session) { mvkForensicsRecordForSession(session, "NativeSurfaceLayerReleased", {
+		{"surface", uint64_t(uintptr_t(this))}, {"surfaceGeneration", _diagnosticGeneration},
+		{"layer", layer}, {"layerBindingGeneration", layerBindingGeneration}, {"externalLayerBirthKnown", 0},
+		{"reason", reason}, {"lockRequestedMachNS", requested}, {"lockAcquiredMachNS", acquired},
+		{"releaseStartMachNS", releaseStart}, {"releaseEndMachNS", releaseEnd},
+		{"lockReleasedMachNS", mvkStutterMonotonicNS()}}); }
 }
 
 MVKSurface::~MVKSurface() {
-	releaseLayer();
+	mvkForensicsRecord("NativeSurfaceDestroy", {{"phase", 0}, {"surface", uint64_t(uintptr_t(this))},
+		{"surfaceGeneration", _diagnosticGeneration}});
+	releaseLayer(2);
+	mvkForensicsRecord("NativeSurfaceDestroy", {{"phase", 1}, {"surface", uint64_t(uintptr_t(this))},
+		{"surfaceGeneration", _diagnosticGeneration}});
 }
 

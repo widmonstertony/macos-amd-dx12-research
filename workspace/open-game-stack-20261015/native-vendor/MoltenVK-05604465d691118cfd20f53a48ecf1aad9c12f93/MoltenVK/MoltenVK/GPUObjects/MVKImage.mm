@@ -1540,9 +1540,25 @@ MVKSwapchainImage::MVKSwapchainImage(MVKDevice* device,
 }
 
 void MVKSwapchainImage::detachSwapchain() {
-	lock_guard<mutex> lock(_detachmentLock);
-	_swapchain = nullptr;
-	_device = nullptr;
+	uint64_t session = mvkForensicsSessionID();
+	if (session) { mvkForensicsRecordForSession(session, "NativeSwapchainImageDetachIntent", {
+		{"image", uint64_t(uintptr_t(this))}}); }
+	uint64_t requested = session ? mvkStutterMonotonicNS() : 0, acquired = 0;
+	uint64_t swapchain = 0, swapchainGeneration = 0;
+	{
+		lock_guard<mutex> lock(_detachmentLock);
+		if (session) {
+			acquired = mvkStutterMonotonicNS();
+			swapchain = uint64_t(uintptr_t(_swapchain));
+			swapchainGeneration = _swapchain ? _swapchain->getDiagnosticGeneration() : 0;
+		}
+		_swapchain = nullptr;
+		_device = nullptr;
+	}
+	if (session) { mvkForensicsRecordForSession(session, "NativeSwapchainImageDetached", {
+		{"image", uint64_t(uintptr_t(this))}, {"swapchain", swapchain}, {"swapchainGeneration", swapchainGeneration},
+		{"lockRequestedMachNS", requested}, {"lockAcquiredMachNS", acquired},
+		{"lockReleasedMachNS", mvkStutterMonotonicNS()}}); }
 }
 
 void MVKSwapchainImage::destroy() {
@@ -1607,7 +1623,7 @@ VkResult MVKPresentableSwapchainImage::acquireAndSignalWhenAvailable(MVKSemaphor
 
 	// Now that this image is being acquired, release the existing drawable and its texture.
 	// This is not done earlier so the texture is retained for any post-processing such as screen captures, etc.
-	releaseMetalDrawable();
+	releaseMetalDrawable(1);
 
 	lock_guard<mutex> lock(_availabilityLock);
 
@@ -1659,10 +1675,36 @@ id<CAMetalDrawable> MVKPresentableSwapchainImage::getCAMetalDrawable() {
 			uint32_t attemptCnt = _swapchain->getImageCount();	// Attempt a resonable number of times
 			for (uint32_t attemptIdx = 0; !_mtlDrawable && attemptIdx < attemptCnt; attemptIdx++) {
 				uint64_t startTime = getPerformanceTimestamp();
-				_mtlDrawable = [_swapchain->getCAMetalLayer().nextDrawable retain];	// retained
+				uint64_t diagnosticSession = mvkForensicsSessionID();
+				uint64_t attemptID = ++_diagnosticAcquisitionAttemptID;
+				uint64_t acquireStartMachNS = diagnosticSession ? mvkStutterMonotonicNS() : 0;
+				if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeDrawableAcquire", {
+					{"phase", 0}, {"imageGeneration", _diagnosticImageGeneration}, {"acquisitionAttemptID", attemptID},
+					{"swapchain", uint64_t(uintptr_t(_swapchain))}, {"swapchainGeneration", _swapchain->_diagnosticGeneration},
+					{"imageIndex", _swapchainIndex}, {"attemptIndex", attemptIdx}, {"startMachNS", acquireStartMachNS}});
+					mvkForensicsFlushIntent(diagnosticSession);
+				}
+				uint64_t layerGetStartMachNS = diagnosticSession ? mvkStutterMonotonicNS() : 0;
+				MVKSurfaceDiagnosticInfo surfaceDiagnostics;
+				auto* acquisitionLayer = _swapchain->getCAMetalLayer(&surfaceDiagnostics);
+				_diagnosticSurfaceGeneration = surfaceDiagnostics.surfaceGeneration;
+				_diagnosticLayerBindingGeneration = surfaceDiagnostics.layerBindingGeneration;
+				_diagnosticAcquisitionLayer = uint64_t(uintptr_t(acquisitionLayer));
+				uint64_t layerGetEndMachNS = diagnosticSession ? mvkStutterMonotonicNS() : 0;
+				_mtlDrawable = [acquisitionLayer.nextDrawable retain];	// retained
+				uint64_t acquireEndMachNS = diagnosticSession ? mvkStutterMonotonicNS() : 0;
 				addPerformanceInterval(getPerformanceStats().queue.retrieveCAMetalDrawable, startTime);
 				hasInvalidFormat = _mtlDrawable && !_mtlDrawable.texture.pixelFormat;
-				if (hasInvalidFormat) { releaseMetalDrawable(); }
+				if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeDrawableAcquire", {
+					{"phase", 1}, {"imageGeneration", _diagnosticImageGeneration}, {"acquisitionAttemptID", attemptID},
+					{"swapchain", uint64_t(uintptr_t(_swapchain))}, {"swapchainGeneration", _swapchain->_diagnosticGeneration},
+					{"imageIndex", _swapchainIndex}, {"attemptIndex", attemptIdx}, {"startMachNS", acquireStartMachNS},
+					{"layerGetStartMachNS", layerGetStartMachNS}, {"layerGetEndMachNS", layerGetEndMachNS},
+					{"endMachNS", acquireEndMachNS}, {"acquisitionLayer", _diagnosticAcquisitionLayer}, {"surfaceGeneration", _diagnosticSurfaceGeneration},
+					{"layerBindingGeneration", _diagnosticLayerBindingGeneration}, {"externalLayerBirthKnown", 0},
+					{"drawable", uint64_t(uintptr_t(_mtlDrawable))}, {"drawableID", _mtlDrawable.drawableID},
+					{"invalidFormat", uint64_t(hasInvalidFormat)}, {"drawableReturned", uint64_t(_mtlDrawable != nil)}}); }
+				if (hasInvalidFormat) { releaseMetalDrawable(2); }
 			}
 			if (hasInvalidFormat) {
 				setConfigurationResult(reportError(VK_ERROR_OUT_OF_DATE_KHR, "CAMetalDrawable with valid format could not be acquired after %d attempts.", attemptCnt));
@@ -1691,6 +1733,15 @@ MVKPresentDiagnosticInfo MVKPresentableSwapchainImage::getPresentDiagnostics(
 	diagnostics.imageGeneration = _diagnosticImageGeneration;
 	diagnostics.drawableGeneration = _diagnosticDrawableGeneration.load(std::memory_order_relaxed);
 	diagnostics.swapchain = uint64_t(uintptr_t(_swapchain));
+	if (_swapchain) {
+		diagnostics.swapchainGeneration = _swapchain->_diagnosticGeneration;
+		diagnostics.oldSwapchain = _swapchain->_diagnosticOldSwapchain;
+		diagnostics.oldSwapchainGeneration = _swapchain->_diagnosticOldSwapchainGeneration;
+	}
+	diagnostics.acquisitionLayer = _diagnosticAcquisitionLayer;
+	diagnostics.acquisitionAttemptID = _diagnosticAcquisitionAttemptID;
+	diagnostics.surfaceGeneration = _diagnosticSurfaceGeneration;
+	diagnostics.layerBindingGeneration = _diagnosticLayerBindingGeneration;
 	diagnostics.imageIndex = _swapchainIndex;
 	diagnostics.drawable = uint64_t(uintptr_t(mtlDrawable));
 	diagnostics.drawableID = mtlDrawable.drawableID;
@@ -1703,9 +1754,14 @@ MVKPresentDiagnosticInfo MVKPresentableSwapchainImage::getPresentDiagnostics(
 	}
 	diagnostics.metadataEndMachNS = mvkStutterMonotonicNS();
 	mvkForensicsRecordForSession(diagnostics.session, "NativeDrawablePresentRequest", {
-		{"presentationID", diagnostics.presentationID}, {"imageGeneration", diagnostics.imageGeneration},
+		{"presentationID", diagnostics.presentationID}, {"image", uint64_t(uintptr_t(this))}, {"imageGeneration", diagnostics.imageGeneration},
 		{"drawableGeneration", diagnostics.drawableGeneration}, {"layerObservationGeneration", diagnostics.layerObservationGeneration},
-		{"swapchain", diagnostics.swapchain}, {"imageIndex", diagnostics.imageIndex},
+		{"swapchain", diagnostics.swapchain}, {"swapchainGeneration", diagnostics.swapchainGeneration},
+		{"oldSwapchain", diagnostics.oldSwapchain}, {"oldSwapchainGeneration", diagnostics.oldSwapchainGeneration},
+		{"acquisitionLayer", diagnostics.acquisitionLayer}, {"acquisitionAttemptID", diagnostics.acquisitionAttemptID},
+		{"surfaceGeneration", diagnostics.surfaceGeneration}, {"layerBindingGeneration", diagnostics.layerBindingGeneration},
+		{"externalLayerBirthKnown", 0}, {"drawableLayerMatchesAcquisitionLayer", uint64_t(diagnostics.layer == diagnostics.acquisitionLayer)},
+		{"imageIndex", diagnostics.imageIndex},
 		{"drawable", diagnostics.drawable}, {"drawableID", diagnostics.drawableID}, {"layer", diagnostics.layer},
 		{"requestMachNS", diagnostics.requestMachNS}, {"requestCANS", diagnostics.requestCANS},
 		{"metadataStartMachNS", diagnostics.metadataStartMachNS}, {"metadataEndMachNS", diagnostics.metadataEndMachNS},
@@ -1758,12 +1814,13 @@ VkResult MVKPresentableSwapchainImage::presentCAMetalDrawable(id<MTLCommandBuffe
 		}
 		// Read effective layer settings only while this bounded diagnostic is armed.
 		// This is an observed layer generation, not proof of a swapchain recreation.
-		uint64_t displaySync = 0, maximumDrawables = 0, drawableWidth = 0, drawableHeight = 0;
+		uint64_t displaySync = 0, maximumDrawables = 0, drawableWidth = 0, drawableHeight = 0, callLayer = 0;
 		uint64_t presentsWithTransaction = 0, drawsAsynchronously = 0, layerHidden = 0, hasSuperlayer = 0;
-		uint64_t callStartMachNS = 0, callStartCANS = 0, callStartRuntimeNS = 0;
+		uint64_t callStartMachNS = 0, callStartCANS = 0, callStartRuntimeNS = 0, intentStartMachNS = 0, intentEndMachNS = 0;
 		if (actualDiagnostics.session) {
 			MVKForensics::ErrnoGuard preserveErrno;
 			CAMetalLayer* layer = mtlDrwbl.layer;
+			callLayer = uint64_t(uintptr_t(layer));
 			displaySync = layer.displaySyncEnabledMVK;
 			maximumDrawables = layer.maximumDrawableCount;
 			drawableWidth = uint64_t(layer.drawableSize.width);
@@ -1772,6 +1829,22 @@ VkResult MVKPresentableSwapchainImage::presentCAMetalDrawable(id<MTLCommandBuffe
 			drawsAsynchronously = layer.drawsAsynchronously;
 			layerHidden = layer.hidden;
 			hasSuperlayer = layer.superlayer != nil;
+			intentStartMachNS = mvkStutterMonotonicNS();
+			// A durable intent precedes the potentially non-returning API. Its IO is
+			// excluded from the API interval sampled immediately below.
+			mvkForensicsRecordForSession(actualDiagnostics.session, "NativeDrawablePresentIntent", {
+				{"presentationID", actualDiagnostics.presentationID}, {"swapchain", actualDiagnostics.swapchain},
+				{"swapchainGeneration", actualDiagnostics.swapchainGeneration}, {"drawable", actualDiagnostics.drawable},
+				{"drawableID", actualDiagnostics.drawableID}, {"layer", actualDiagnostics.layer}, {"callLayer", callLayer},
+				{"scheduledHandlerEntryMachNS", scheduledHandlerEntryMachNS},
+				{"desiredPresentTimeNS", presentInfo.desiredPresentTime}, {"presentAPI", uint64_t(presentInfo.desiredPresentTime != 0)},
+				{"presentModeOverride", uint64_t(presentInfo.presentMode)}, {"displaySyncEnabled", displaySync},
+				{"maximumDrawableCount", maximumDrawables}, {"drawableWidth", drawableWidth}, {"drawableHeight", drawableHeight},
+				{"presentsWithTransaction", presentsWithTransaction}, {"drawsAsynchronously", drawsAsynchronously},
+				{"layerHidden", layerHidden}, {"hasSuperlayer", hasSuperlayer},
+				{"ownerNativeCB", actualPresentInfo.diagnosticNativeCB}, {"ownerFrame", actualPresentInfo.diagnosticFrameID}});
+			mvkForensicsFlushIntent(actualDiagnostics.session);
+			intentEndMachNS = mvkStutterMonotonicNS();
 			callStartCANS = uint64_t(CACurrentMediaTime() * 1.0e9);
 			callStartRuntimeNS = mvkGetRuntimeNanoseconds();
 			callStartMachNS = mvkStutterMonotonicNS();
@@ -1790,10 +1863,12 @@ VkResult MVKPresentableSwapchainImage::presentCAMetalDrawable(id<MTLCommandBuffe
 			mvkForensicsRecordForSession(actualDiagnostics.session, "NativeDrawablePresentCall", {
 				{"presentationID", actualDiagnostics.presentationID}, {"imageGeneration", actualDiagnostics.imageGeneration},
 				{"drawableGeneration", actualDiagnostics.drawableGeneration}, {"layerObservationGeneration", actualDiagnostics.layerObservationGeneration},
-				{"swapchain", actualDiagnostics.swapchain}, {"imageIndex", actualDiagnostics.imageIndex},
-				{"drawable", actualDiagnostics.drawable}, {"drawableID", actualDiagnostics.drawableID}, {"layer", actualDiagnostics.layer},
+				{"swapchain", actualDiagnostics.swapchain}, {"swapchainGeneration", actualDiagnostics.swapchainGeneration},
+				{"imageIndex", actualDiagnostics.imageIndex},
+				{"drawable", actualDiagnostics.drawable}, {"drawableID", actualDiagnostics.drawableID}, {"layer", actualDiagnostics.layer}, {"callLayer", callLayer},
 				{"requestMachNS", actualDiagnostics.requestMachNS}, {"scheduledHandlerEntryMachNS", scheduledHandlerEntryMachNS},
 				{"callStartMachNS", callStartMachNS}, {"callEndMachNS", callEndMachNS},
+				{"intentStartMachNS", intentStartMachNS}, {"intentEndMachNS", intentEndMachNS},
 				{"callStartCANS", callStartCANS}, {"callEndCANS", callEndCANS}, {"callStartRuntimeNS", callStartRuntimeNS},
 				{"desiredPresentTimeNS", presentInfo.desiredPresentTime}, {"presentAPI", uint64_t(presentInfo.desiredPresentTime != 0)},
 				{"presentModeOverride", uint64_t(presentInfo.presentMode)}, {"displaySyncEnabled", displaySync},
@@ -1816,6 +1891,13 @@ VkResult MVKPresentableSwapchainImage::presentCAMetalDrawable(id<MTLCommandBuffe
 	auto* fence = presentInfo.fence;
 	if (fence) { fence->retain(); }
 	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mcb) {
+		uint64_t completionSession = diagnostics.session ? diagnostics.session : mvkForensicsSessionID();
+		if (completionSession) { mvkForensicsRecordForSession(completionSession, "NativeDrawableCommandCompleted", {
+			{"presentationID", diagnostics.presentationID}, {"imageGeneration", _diagnosticImageGeneration},
+			{"swapchain", diagnostics.swapchain}, {"swapchainGeneration", diagnostics.swapchainGeneration},
+			{"drawable", uint64_t(uintptr_t(mtlDrwbl))}, {"ownerNativeCB", presentInfo.diagnosticNativeCB},
+			{"ownerFrame", presentInfo.diagnosticFrameID}, {"presentFence", uint64_t(uintptr_t(fence))},
+			{"presentationProvenanceObservedAtRequest", uint64_t(diagnostics.session != 0)}}); }
 		signal(fence);
 		if (fence) { fence->release(); }
 		[mtlDrwbl release];
@@ -1869,6 +1951,18 @@ void MVKPresentableSwapchainImage::addPresentedHandler(id<CAMetalDrawable> mtlDr
 		if (callbackDiagnostics.session) {
 			callbackDiagnostics.rawPresentedTimeBits = mvkPresentDiagnosticDoubleBits(rawPresentedTime);
 			callbackDiagnostics.handlerRawReadEndMachNS = mvkStutterMonotonicNS();
+			// If the existing lock or downstream timing code stalls, entry/raw zero
+			// remains observable without waiting for the final callback row.
+			callbackDiagnostics.handlerEntryLogStartMachNS = mvkStutterMonotonicNS();
+			mvkForensicsRecordForSession(callbackDiagnostics.session, "NativeDrawablePresentedEntry", {
+				{"presentationID", callbackDiagnostics.presentationID}, {"swapchain", callbackDiagnostics.swapchain},
+				{"swapchainGeneration", callbackDiagnostics.swapchainGeneration}, {"drawable", callbackDiagnostics.drawable},
+				{"drawableID", callbackDiagnostics.drawableID}, {"layer", callbackDiagnostics.layer},
+				{"handlerEntryMachNS", callbackDiagnostics.handlerEntryMachNS}, {"handlerEntryCANS", callbackDiagnostics.handlerEntryCANS},
+				{"handlerRawReadEndMachNS", callbackDiagnostics.handlerRawReadEndMachNS},
+				{"rawPresentedTimeBits", callbackDiagnostics.rawPresentedTimeBits},
+				{"ownerNativeCB", presentInfo.diagnosticNativeCB}, {"ownerFrame", presentInfo.diagnosticFrameID}});
+			callbackDiagnostics.handlerEntryLogEndMachNS = mvkStutterMonotonicNS();
 		}
         MVKCPUContext context;context.domain=7;context.submission=presentInfo.diagnosticFrameID;
         context.frame=presentInfo.diagnosticFrameID;context.nativeCB=presentInfo.diagnosticNativeCB;
@@ -1893,7 +1987,7 @@ void MVKPresentableSwapchainImage::beginPresentation(const MVKImagePresentInfo& 
 void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& presentInfo,
 												   const MVKSwapchainSignaler& signaler,
 												   uint64_t actualPresentTime,
-												   const MVKPresentDiagnosticInfo* diagnostics) {
+												   MVKPresentDiagnosticInfo* diagnostics) {
 
 	// If the presentation time is not available, use the current nanosecond runtime clock,
 	// which should be reasonably accurate (sub-ms) to the presentation time. The presentation
@@ -1922,7 +2016,7 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
             if (_device) mvkTracePresentedFrame(getMVKConfig(), _swapchain, nativePresentTime);
             mvkStutterPresentedFrame(presentInfo.diagnosticFrameID,_swapchain,nativePresentTime,
                 presentInfo.presentId,presentInfo.diagnosticCaptureSession,presentInfo.diagnosticNativeCB,presentInfo.diagnosticPartialPrefix);
-            _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime);
+            _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime, diagnostics);
         }
 	}
 	if (diagnosticActive) {
@@ -1931,14 +2025,22 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 		mvkForensicsRecordForSession(diagnostics->session, "NativeDrawablePresented", {
 			{"presentationID", diagnostics->presentationID}, {"imageGeneration", diagnostics->imageGeneration},
 			{"drawableGeneration", diagnostics->drawableGeneration}, {"layerObservationGeneration", diagnostics->layerObservationGeneration},
-			{"swapchain", diagnostics->swapchain}, {"callbackSwapchain", callbackSwapchain}, {"imageIndex", diagnostics->imageIndex},
+			{"swapchain", diagnostics->swapchain}, {"swapchainGeneration", diagnostics->swapchainGeneration},
+			{"callbackSwapchain", callbackSwapchain}, {"imageIndex", diagnostics->imageIndex},
 			{"drawable", diagnostics->drawable}, {"drawableID", diagnostics->drawableID}, {"layer", diagnostics->layer},
 			{"requestMachNS", diagnostics->requestMachNS}, {"scheduledHandlerEntryMachNS", diagnostics->scheduledHandlerEntryMachNS},
 			{"handlerEntryMachNS", diagnostics->handlerEntryMachNS}, {"handlerEntryCANS", diagnostics->handlerEntryCANS},
 			{"handlerRawReadEndMachNS", diagnostics->handlerRawReadEndMachNS}, {"rawPresentedTimeBits", diagnostics->rawPresentedTimeBits},
+			{"handlerEntryLogStartMachNS", diagnostics->handlerEntryLogStartMachNS},
+			{"handlerEntryLogEndMachNS", diagnostics->handlerEntryLogEndMachNS},
 			{"nativeTimestampCANS", nativePresentTime}, {"nativeTimestampValid", uint64_t(nativePresentTime != 0)},
 			{"lockRequestedMachNS", lockRequestedMachNS}, {"lockAcquiredMachNS", lockAcquiredMachNS},
 			{"lockReleasedMachNS", lockReleasedMachNS}, {"detachedAtCallback", uint64_t(callbackSwapchain == 0)},
+			{"historyLockRequestedMachNS", diagnostics->historyLockRequestedMachNS},
+			{"historyLockAcquiredMachNS", diagnostics->historyLockAcquiredMachNS},
+			{"historyWorkEndMachNS", diagnostics->historyWorkEndMachNS},
+			{"historyLockReleasedMachNS", diagnostics->historyLockReleasedMachNS},
+			{"timingHistoryTimeNS", diagnostics->historyTimeNS}, {"timingHistoryMayUseFallback", 1},
 			{"ownerNativeCB", presentInfo.diagnosticNativeCB}, {"ownerFrame", presentInfo.diagnosticFrameID},
 			{"presentId", presentInfo.presentId}});
 	}
@@ -1951,17 +2053,34 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 }
 
 // Releases the CAMetalDrawable underlying this image.
-void MVKPresentableSwapchainImage::releaseMetalDrawable() {
+void MVKPresentableSwapchainImage::releaseMetalDrawable(uint64_t reason) {
 	uint64_t diagnosticSession = mvkForensicsSessionID();
 	uint64_t imageGeneration = _diagnosticImageGeneration;
 	uint64_t drawableGeneration = _diagnosticDrawableGeneration.load(std::memory_order_relaxed);
 	uint64_t drawable = uint64_t(uintptr_t(_mtlDrawable));
+	uint64_t observedPresentedTimeBits = 0, observedPresentedTimeReadEndMachNS = 0;
+	if (diagnosticSession && drawable) {
+		// This later observation is not proof that a zero callback was displayed.
+		// Keep the raw IEEE value, including zero; never substitute a CPU clock.
+#if !MVK_OS_SIMULATOR
+		observedPresentedTimeBits = mvkPresentDiagnosticDoubleBits(_mtlDrawable.presentedTime);
+#endif
+		observedPresentedTimeReadEndMachNS = mvkStutterMonotonicNS();
+		mvkForensicsRecordForSession(diagnosticSession, "NativeDrawableReferenceReleaseIntent", {
+			{"imageGeneration", imageGeneration}, {"drawableGeneration", drawableGeneration}, {"drawable", drawable},
+			{"reason", reason}, {"observationSupported", uint64_t(!MVK_OS_SIMULATOR)},
+			{"observedPresentedTimeBits", observedPresentedTimeBits},
+			{"observedPresentedTimeReadEndMachNS", observedPresentedTimeReadEndMachNS}});
+	}
 	uint64_t releaseStartMachNS = diagnosticSession ? mvkStutterMonotonicNS() : 0;
     [_mtlDrawable release];
 	_mtlDrawable = nil;
 	if (diagnosticSession && drawable) {
 		mvkForensicsRecordForSession(diagnosticSession, "NativeDrawableReferenceReleased", {
 			{"imageGeneration", imageGeneration}, {"drawableGeneration", drawableGeneration}, {"drawable", drawable},
+			{"reason", reason}, {"observationSupported", uint64_t(!MVK_OS_SIMULATOR)},
+			{"observedPresentedTimeBits", observedPresentedTimeBits},
+			{"observedPresentedTimeReadEndMachNS", observedPresentedTimeReadEndMachNS},
 			{"releaseStartMachNS", releaseStartMachNS}, {"releaseEndMachNS", mvkStutterMonotonicNS()}});
 	}
 }
@@ -1969,7 +2088,7 @@ void MVKPresentableSwapchainImage::releaseMetalDrawable() {
 // Signal, untrack, and release any signalers that are tracking.
 // Release the drawable before the lock, as it may trigger completion callback.
 void MVKPresentableSwapchainImage::makeAvailable() {
-	releaseMetalDrawable();
+	releaseMetalDrawable(3);
 	lock_guard<mutex> lock(_availabilityLock);
 
 	if ( !_availability.isAvailable ) {
@@ -1991,6 +2110,9 @@ MVKPresentableSwapchainImage::MVKPresentableSwapchainImage(MVKDevice* device,
 	MVKSwapchainImage(device, pCreateInfo, swapchain, swapchainIndex) {
 
 	_diagnosticImageGeneration = mvkNextPresentDiagnosticID();
+	mvkForensicsRecord("NativePresentableImageConstruct", {{"image", uint64_t(uintptr_t(this))},
+		{"imageGeneration", _diagnosticImageGeneration}, {"swapchain", uint64_t(uintptr_t(_swapchain))},
+		{"swapchainGeneration", _swapchain->getDiagnosticGeneration()}, {"imageIndex", _swapchainIndex}});
 	_availability.acquisitionID = _swapchain->getNextAcquisitionID();
 	_availability.isAvailable = true;
 
@@ -2012,7 +2134,7 @@ MVKPresentableSwapchainImage::MVKPresentableSwapchainImage(MVKDevice* device,
 
 
 void MVKPresentableSwapchainImage::destroy() {
-	releaseMetalDrawable();
+	releaseMetalDrawable(4);
 	[_mtlTextureHeadless release];
 	_mtlTextureHeadless = nil;
 	MVKSwapchainImage::destroy();

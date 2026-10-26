@@ -76,7 +76,8 @@ class Controls(unittest.TestCase):
         self.slot();spool=session.ForensicsSpool(PID,self.trace,self.out,max_bytes=len(lines(header())))
         r=spool.poll();self.assertTrue(r['capped']);self.assertLessEqual(spool.saved,spool.max_bytes)
     def test_forensics_clock_context_and_missing_pipeline(self):
-        p=self.root/f'forensics-{PID}-fixture.jsonl';p.write_bytes(lines(header(),event()))
+        cb=event();cb.update(kind='NativeCBCreated',seq=2,fields=dict(ownerNativeCB=2))
+        p=self.root/f'forensics-{PID}-fixture.jsonl';p.write_bytes(lines(header(),event(),cb))
         a=analysis.Analyzer(target_pid=PID);a.load_forensics([p]);a.cbs[(PID,2)]={'logicalSubmit':3}
         r=a.forensics_report();record=r['records'][0]
         self.assertEqual(record['timeCF'],D('100.99999995'));self.assertEqual(record['calibrationBracketHalfNS'],50)
@@ -157,7 +158,7 @@ class Controls(unittest.TestCase):
             self.assertTrue((profile/'forensics.arm').is_file());return [PID]
         with (mock.patch.object(session.system,'Kernel',return_value=kernel),mock.patch.object(session.system,'stamp',return_value=clock),mock.patch.object(session.system,'identity',return_value=dict(pid=PID,present=True,lstart='synthetic')),
              mock.patch.object(session,'discover',side_effect=discover_primed),mock.patch.object(session.time,'monotonic',side_effect=lambda:next(ticks)),mock.patch.object(session.time,'sleep'),mock.patch.object(session.shutil,'disk_usage',return_value=SimpleNamespace(free=3*1024**3)),
-             mock.patch.object(session.system,'system_snapshot',return_value={}),mock.patch.object(session.subprocess,'Popen',return_value=helper) as popen):
+             mock.patch.object(session.system,'system_snapshot',return_value={}),mock.patch.object(session.system,'session_state',return_value={'observedUnixSeconds':clock['unixSeconds'],'observedMonotonicSeconds':1,'screenLocked':None,'lockStateKnown':False,'historicalStateKnown':False}),mock.patch.object(session.subprocess,'Popen',return_value=helper) as popen):
             result=session.run(args)
         self.assertFalse(result['targetLaunchStopOrInputUsed']);self.assertFalse(list(profile.glob('*.arm')))
         self.assertEqual(json.loads((out/'metadata.json').read_text())['processStartAbstime'],1000)
@@ -195,7 +196,8 @@ class Controls(unittest.TestCase):
         a=analysis.Analyzer(target_pid=PID);row=event();row['context']['nativeCB']=2
         row['fields']=dict(ownerNativeCB=1,ownerSubmission=3,ownerQueueFamily=0,ownerQueueIndex=0,vulkanPipeline=44,nativePipeline=55)
         h=header();h['_pid']=PID;row['_pid']=PID
-        a.forensic_rows=[h,row];a.cbs[(PID,1)]={'logicalSubmit':3}
+        cb=dict(row,seq=2,kind='NativeCBCreated',fields=dict(ownerNativeCB=1))
+        a.forensic_rows=[h,row,cb];a.cbs[(PID,1)]={'logicalSubmit':3}
         r=a.forensics_report()['records'][0]
         self.assertEqual(r['context']['nativeCB'],2);self.assertEqual(r['savedOwnerContext']['nativeCB'],1)
         self.assertTrue(r['nativeGraphJoined']);self.assertEqual((r['linkedNativeCB'],r['pipeline'],r['nativePipeline']),(1,44,55))

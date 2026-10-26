@@ -276,6 +276,8 @@ namespace mvk {
 		SPIRVToMSLConversionResultInfo resultInfo = {};
 		std::string msl;
 		std::string resultLog;
+		// Runtime-only: intentionally excluded from serialized resultInfo and cache keys.
+		bool sampleOnlyImageAccess = false;
 	} SPIRVToMSLConversionResult;
 
 
@@ -301,6 +303,9 @@ namespace mvk {
 
 		/** Returns whether the SPIR-V code has been set. */
 		bool hasSPIRV() { return !_spirv.empty(); }
+
+		/** Fast conservative rejection before runtime access qualification. */
+		bool mayUseSampleOnlyImageAccess() const;
 
 		/**
 		 * Converts SPIR-V code, set using setSPIRV() to MSL code.

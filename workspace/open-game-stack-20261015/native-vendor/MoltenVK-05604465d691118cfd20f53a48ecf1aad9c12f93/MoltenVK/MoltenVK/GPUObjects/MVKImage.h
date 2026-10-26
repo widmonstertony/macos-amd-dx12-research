@@ -473,15 +473,21 @@ struct MVKSwapchainSignaler {
 // Private diagnostic provenance, not a cache key or presentation decision.
 // layerObservationGeneration is this image's drawable-acquisition generation at
 // observation. It is NOT a CAMetalLayer/swapchain creation epoch; a reused layer
-// pointer cannot be distinguished without additional swapchain provenance.
+// pointer is not an identity. surfaceGeneration/layerBindingGeneration describe
+// the surface-owned retain bracket captured during acquisition; external layer
+// birth remains unknown, and a drawable-layer mismatch is explicitly reported.
 struct MVKPresentDiagnosticInfo {
 	uint64_t session = 0, presentationID = 0;
 	uint64_t imageGeneration = 0, drawableGeneration = 0, layerObservationGeneration = 0;
-	uint64_t swapchain = 0, imageIndex = 0, drawable = 0, drawableID = 0, layer = 0;
+	uint64_t swapchain = 0, swapchainGeneration = 0, oldSwapchain = 0, oldSwapchainGeneration = 0;
+	uint64_t imageIndex = 0, drawable = 0, drawableID = 0, layer = 0;
+	uint64_t acquisitionLayer = 0, acquisitionAttemptID = 0, surfaceGeneration = 0, layerBindingGeneration = 0;
 	uint64_t requestMachNS = 0, requestCANS = 0, metadataStartMachNS = 0, metadataEndMachNS = 0;
 	uint64_t scheduledHandlerEntryMachNS = 0;
 	uint64_t handlerEntryMachNS = 0, handlerEntryCANS = 0, handlerRawReadEndMachNS = 0;
-	uint64_t rawPresentedTimeBits = 0;
+	uint64_t rawPresentedTimeBits = 0, handlerEntryLogStartMachNS = 0, handlerEntryLogEndMachNS = 0;
+	uint64_t historyLockRequestedMachNS = 0, historyLockAcquiredMachNS = 0;
+	uint64_t historyWorkEndMachNS = 0, historyLockReleasedMachNS = 0, historyTimeNS = 0;
 };
 
 
@@ -504,7 +510,7 @@ public:
 	void endPresentation(const MVKImagePresentInfo& presentInfo,
 						 const MVKSwapchainSignaler& signaler,
 						 uint64_t actualPresentTime = 0,
-						 const MVKPresentDiagnosticInfo* diagnostics = nullptr);
+						 MVKPresentDiagnosticInfo* diagnostics = nullptr);
 
 #pragma mark Construction
 
@@ -523,7 +529,7 @@ protected:
 						 MVKSwapchainSignaler signaler, MVKPresentDiagnosticInfo diagnostics);
 	MVKPresentDiagnosticInfo getPresentDiagnostics(id<CAMetalDrawable> mtlDrawable,
 												const MVKImagePresentInfo& presentInfo, bool atRequest);
-	void releaseMetalDrawable();
+	void releaseMetalDrawable(uint64_t reason = 0);
 	MVKSwapchainImageAvailability getAvailability();
 	void makeAvailable();
 	VkResult acquireAndSignalWhenAvailable(MVKSemaphore* semaphore, MVKFence* fence);
@@ -539,6 +545,8 @@ protected:
 	uint64_t _presentationStartTime = 0;
 	uint64_t _diagnosticImageGeneration = 0;
 	std::atomic<uint64_t> _diagnosticDrawableGeneration{0};
+	uint64_t _diagnosticAcquisitionLayer = 0, _diagnosticAcquisitionAttemptID = 0;
+	uint64_t _diagnosticSurfaceGeneration = 0, _diagnosticLayerBindingGeneration = 0;
 };
 
 

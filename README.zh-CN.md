@@ -10,6 +10,8 @@
 
 2026-10-26：[v37 采样纹理读计划源码与独立 GPU 回归](docs/SAMPLED-READ-PLAN-2026-10-26.md)；实际游戏性能仍待验证。
 
+2026-10-26：[v38 因果诊断源码](docs/CAUSAL_DIAGNOSTICS_V38.zh-CN.md)补齐资源批次、提交尾部、呈现生命周期与采集覆盖审计。限定 GPU 回归通过；游戏呈现延迟根因仍待取证，下载运行包未更新。
+
 ## 下载与测试
 
 [实验版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.1.0-experimental) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)

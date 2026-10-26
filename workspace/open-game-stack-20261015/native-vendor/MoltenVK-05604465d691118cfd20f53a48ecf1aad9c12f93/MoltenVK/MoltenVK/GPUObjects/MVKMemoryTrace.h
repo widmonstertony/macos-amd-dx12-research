@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <os/lock.h>
+#include <pthread.h>
+#include "MVKStutterCoverage.h"
 
 // Requested sizes are cumulative API requests, NOT live bytes or free VRAM.
 // Heap capacity plus placed children double-count common backing storage.
@@ -22,7 +24,9 @@ struct MVKStutterMemoryAllocationToken {
     bool active=false, bytesKnown=false;
     MVKStutterMemoryKind kind=MVKStutterMemoryKind::Buffer;
     uint32_t storageMode=0;
-    uint64_t requestedBytes=0, beginNS=0;
+    uint64_t requestedBytes=0, beginNS=0, allocationID=0, threadMachID=0;
+    uint64_t ownerSubmit=0, ownerNativeCB=0, ownerFrame=0;
+    uint32_t ownerQueueFamily=0, ownerQueueIndex=0;
     const char* site=nullptr; // static literal until AllocationEnd()
 };
 namespace mvkStutterMemoryDetail {
@@ -31,7 +35,8 @@ inline bool enabled() {
     static const bool value=[] {const char*p=getenv("MVK_AMD_STUTTER_COVERAGE");return p&&!strcmp(p,"1");}();
     return value;
 }
-inline uint64_t monotonicNS(){timespec t{};clock_gettime(CLOCK_MONOTONIC,&t);return uint64_t(t.tv_sec)*1000000000ULL+t.tv_nsec;}
+// Match CPU/native diagnostic intervals; never reconstruct an end from wall UTC.
+inline uint64_t monotonicNS(){return mvkStutterMonotonicNS();}
 inline double cfTime(){timespec t{};clock_gettime(CLOCK_REALTIME,&t);return double(t.tv_sec)-978307200.0+double(t.tv_nsec)*1e-9;}
 inline const char* kindName(uint32_t k){static const char*names[]={"buffer","heap","texture","host"};return k<4?names[k]:"unknown";}
 inline const char* modeName(uint32_t m){static const char*names[]={"shared","managed","private","memoryless","other"};return names[m<4?m:4];}
@@ -42,6 +47,9 @@ struct Counters {
 };
 struct Event {
     uint64_t sequence=0,requestedBytes=0,hostNS=0,limitBytes=0;
+    uint64_t allocationID=0,beginMachNS=0,endMachNS=0,threadMachID=0;
+    uint64_t ownerSubmit=0,ownerNativeCB=0,ownerFrame=0;
+    uint32_t ownerQueueFamily=0,ownerQueueIndex=0;
     double time=0;
     uint32_t kind=0,storage=0;
     int64_t resultCode=0;
@@ -50,7 +58,7 @@ struct Event {
 };
 struct State {
     Counters counters[4][5];
-    std::atomic<uint64_t> lastReportNS{0},reports{0},writerErrors{0},eventWriteErrors{0},metadataTruncations{0},failureEvents{0},slowEvents{0};
+    std::atomic<uint64_t> nextAllocationID{1},lastReportNS{0},reports{0},writerErrors{0},eventWriteErrors{0},metadataTruncations{0},failureEvents{0},slowEvents{0};
     os_unfair_lock eventsLock=OS_UNFAIR_LOCK_INIT;
     Event failures[32],slow[32];
 };
@@ -60,7 +68,7 @@ inline void jsonString(FILE*f,const char*s){
     fputc('"',f);if(s)for(unsigned n=0;s[n]&&n<1024;++n){unsigned char c=s[n];if(c=='"'||c=='\\'){fputc('\\',f);fputc(c,f);}else if(c<32)fprintf(f,"\\u%04x",c);else fputc(c,f);}fputc('"',f);
 }
 inline void writeEvent(FILE*f,const Event&e){
-    fprintf(f,"{\"sequence\":%llu,\"time\":%.6f,\"kind\":",(unsigned long long)e.sequence,e.time);jsonString(f,kindName(e.kind));
+    fprintf(f,"{\"schema\":2,\"sequence\":%llu,\"time\":%.6f,\"allocationID\":%llu,\"beginMachNS\":%llu,\"endMachNS\":%llu,\"threadMachID\":%llu,\"ownerSubmission\":%llu,\"ownerNativeCB\":%llu,\"ownerFrame\":%llu,\"ownerQueueFamily\":%u,\"ownerQueueIndex\":%u,\"clockDomain\":\"mach-absolute-nanoseconds\",\"resultCodeDomain\":\"caller-supplied\",\"kind\":",(unsigned long long)e.sequence,e.time,(unsigned long long)e.allocationID,(unsigned long long)e.beginMachNS,(unsigned long long)e.endMachNS,(unsigned long long)e.threadMachID,(unsigned long long)e.ownerSubmit,(unsigned long long)e.ownerNativeCB,(unsigned long long)e.ownerFrame,e.ownerQueueFamily,e.ownerQueueIndex);jsonString(f,kindName(e.kind));
     fprintf(f,",\"storageMode\":%u,\"storageName\":",e.storage);jsonString(f,modeName(e.storage));
     fprintf(f,",\"requestedBytes\":%llu,\"requestedBytesKnown\":%s,\"hostCallNS\":%llu,\"returnedNil\":%s,\"rejectedBeforeMetalCall\":%s,\"resultCode\":%lld,\"limitBytes\":%llu,\"site\":",(unsigned long long)e.requestedBytes,e.bytesKnown?"true":"false",(unsigned long long)e.hostNS,e.returnedNil?"true":"false",e.rejected?"true":"false",(long long)e.resultCode,(unsigned long long)e.limitBytes);jsonString(f,e.site);fputs(",\"reason\":",f);jsonString(f,e.reason);fprintf(f,",\"siteTruncated\":%s,\"reasonTruncated\":%s,\"labelSanitized\":%s}",e.siteTruncated?"true":"false",e.reasonTruncated?"true":"false",e.labelSanitized?"true":"false");
 }
@@ -78,8 +86,8 @@ inline void persistEvent(const Event&e,bool failure){
     if(e.sequence>128)return;const char*dir=getenv("MVK_CONFIG_SHADER_DUMP_DIR");if(!dir)return;
     char path[4096];int n=snprintf(path,sizeof(path),"%s/memory-%s-%d.jsonl",dir,failure?"failures":"slow-allocations",getpid());
     if(n<0||size_t(n)>=sizeof(path))return;
-    char site[sizeof(e.site)*6+1],reason[sizeof(e.reason)*6+1],line[2048];escapeJSON(site,sizeof(site),e.site);escapeJSON(reason,sizeof(reason),e.reason);
-    n=snprintf(line,sizeof(line),"{\"sequence\":%llu,\"time\":%.6f,\"kind\":\"%s\",\"storageMode\":%u,\"storageName\":\"%s\",\"requestedBytes\":%llu,\"requestedBytesKnown\":%s,\"hostCallNS\":%llu,\"returnedNil\":%s,\"rejectedBeforeMetalCall\":%s,\"resultCode\":%lld,\"limitBytes\":%llu,\"site\":\"%s\",\"reason\":\"%s\",\"siteTruncated\":%s,\"reasonTruncated\":%s,\"labelSanitized\":%s}\n",(unsigned long long)e.sequence,e.time,kindName(e.kind),e.storage,modeName(e.storage),(unsigned long long)e.requestedBytes,e.bytesKnown?"true":"false",(unsigned long long)e.hostNS,e.returnedNil?"true":"false",e.rejected?"true":"false",(long long)e.resultCode,(unsigned long long)e.limitBytes,site,reason,e.siteTruncated?"true":"false",e.reasonTruncated?"true":"false",e.labelSanitized?"true":"false");
+    char site[sizeof(e.site)*6+1],reason[sizeof(e.reason)*6+1],line[3072];escapeJSON(site,sizeof(site),e.site);escapeJSON(reason,sizeof(reason),e.reason);
+    n=snprintf(line,sizeof(line),"{\"schema\":2,\"sequence\":%llu,\"time\":%.6f,\"allocationID\":%llu,\"beginMachNS\":%llu,\"endMachNS\":%llu,\"threadMachID\":%llu,\"ownerSubmission\":%llu,\"ownerNativeCB\":%llu,\"ownerFrame\":%llu,\"ownerQueueFamily\":%u,\"ownerQueueIndex\":%u,\"clockDomain\":\"mach-absolute-nanoseconds\",\"resultCodeDomain\":\"caller-supplied\",\"kind\":\"%s\",\"storageMode\":%u,\"storageName\":\"%s\",\"requestedBytes\":%llu,\"requestedBytesKnown\":%s,\"hostCallNS\":%llu,\"returnedNil\":%s,\"rejectedBeforeMetalCall\":%s,\"resultCode\":%lld,\"limitBytes\":%llu,\"site\":\"%s\",\"reason\":\"%s\",\"siteTruncated\":%s,\"reasonTruncated\":%s,\"labelSanitized\":%s}\n",(unsigned long long)e.sequence,e.time,(unsigned long long)e.allocationID,(unsigned long long)e.beginMachNS,(unsigned long long)e.endMachNS,(unsigned long long)e.threadMachID,(unsigned long long)e.ownerSubmit,(unsigned long long)e.ownerNativeCB,(unsigned long long)e.ownerFrame,e.ownerQueueFamily,e.ownerQueueIndex,kindName(e.kind),e.storage,modeName(e.storage),(unsigned long long)e.requestedBytes,e.bytesKnown?"true":"false",(unsigned long long)e.hostNS,e.returnedNil?"true":"false",e.rejected?"true":"false",(long long)e.resultCode,(unsigned long long)e.limitBytes,site,reason,e.siteTruncated?"true":"false",e.reasonTruncated?"true":"false",e.labelSanitized?"true":"false");
     if(n<0||size_t(n)>=sizeof(line)){state.writerErrors.fetch_add(1,std::memory_order_relaxed);state.eventWriteErrors.fetch_add(1,std::memory_order_relaxed);return;}
     int fd=open(path,O_WRONLY|O_CREAT|O_APPEND,0600);if(fd<0){state.writerErrors.fetch_add(1,std::memory_order_relaxed);state.eventWriteErrors.fetch_add(1,std::memory_order_relaxed);return;}
     if(write(fd,line,size_t(n))!=n){state.writerErrors.fetch_add(1,std::memory_order_relaxed);state.eventWriteErrors.fetch_add(1,std::memory_order_relaxed);}close(fd);
@@ -89,9 +97,17 @@ inline bool copyLabel(char*destination,size_t capacity,const char*source,bool&sa
     while(source[n]&&n+1<capacity){unsigned char c=source[n];destination[n]=c<128?char(c):'?';if(c>=128)sanitized=true;++n;}
     destination[n]=0;return source[n]!=0;
 }
-inline void recordEvent(MVKStutterMemoryAllocationToken token,bool nilResult,bool rejected,uint64_t duration,const char*reason,int64_t resultCode,uint64_t limitBytes,bool failure){
+inline void captureOwner(MVKStutterMemoryAllocationToken& token){
+    token.allocationID=state.nextAllocationID.fetch_add(1,std::memory_order_relaxed);
+    pthread_threadid_np(nullptr,&token.threadMachID);
+    auto context=mvkStutterContext();token.ownerSubmit=context.submission;token.ownerNativeCB=context.nativeCB;
+    token.ownerFrame=context.frame;token.ownerQueueFamily=context.queueFamily;token.ownerQueueIndex=context.queueIndex;
+}
+inline void recordEvent(MVKStutterMemoryAllocationToken token,bool nilResult,bool rejected,uint64_t endNS,const char*reason,int64_t resultCode,uint64_t limitBytes,bool failure){
     Event event{};event.sequence=(failure?state.failureEvents:state.slowEvents).fetch_add(1,std::memory_order_relaxed)+1;
-    event.time=cfTime();event.kind=static_cast<uint32_t>(token.kind);event.storage=token.storageMode;event.requestedBytes=token.requestedBytes;event.bytesKnown=token.bytesKnown;event.returnedNil=nilResult;event.rejected=rejected;event.hostNS=duration;event.resultCode=resultCode;event.limitBytes=limitBytes;
+    event.allocationID=token.allocationID;event.beginMachNS=token.beginNS;event.endMachNS=endNS;event.threadMachID=token.threadMachID;
+    event.ownerSubmit=token.ownerSubmit;event.ownerNativeCB=token.ownerNativeCB;event.ownerFrame=token.ownerFrame;event.ownerQueueFamily=token.ownerQueueFamily;event.ownerQueueIndex=token.ownerQueueIndex;
+    event.time=cfTime();event.kind=static_cast<uint32_t>(token.kind);event.storage=token.storageMode;event.requestedBytes=token.requestedBytes;event.bytesKnown=token.bytesKnown;event.returnedNil=nilResult;event.rejected=rejected;event.hostNS=endNS-token.beginNS;event.resultCode=resultCode;event.limitBytes=limitBytes;
     event.siteTruncated=copyLabel(event.site,sizeof(event.site),token.site,event.labelSanitized);event.reasonTruncated=copyLabel(event.reason,sizeof(event.reason),reason,event.labelSanitized);if(event.siteTruncated||event.reasonTruncated||event.labelSanitized)state.metadataTruncations.fetch_add(1,std::memory_order_relaxed);
     os_unfair_lock_lock(&state.eventsLock);auto&slot=(failure?state.failures:state.slow)[(event.sequence-1)%32];if(slot.sequence<event.sequence)slot=event;os_unfair_lock_unlock(&state.eventsLock);
     persistEvent(event,failure);
@@ -101,22 +117,23 @@ inline void maximum(std::atomic<uint64_t>&value,uint64_t incoming){uint64_t old=
 
 inline MVKStutterMemoryAllocationToken mvkStutterMemoryAllocationBegin(MVKStutterMemoryKind kind,uint64_t bytes,uint32_t storageMode,const char*site,bool bytesKnown=true){
     mvkStutterMemoryDetail::ErrnoScope errnoScope;MVKStutterMemoryAllocationToken token{};if(!mvkStutterMemoryDetail::enabled())return token;
-    token.active=true;token.kind=kind;token.requestedBytes=bytes;token.storageMode=storageMode;token.site=site;token.bytesKnown=bytesKnown;token.beginNS=mvkStutterMemoryDetail::monotonicNS();
+    token.active=true;token.kind=kind;token.requestedBytes=bytes;token.storageMode=storageMode;token.site=site;token.bytesKnown=bytesKnown;mvkStutterMemoryDetail::captureOwner(token);
     auto&c=mvkStutterMemoryDetail::counter(kind,storageMode);c.attempts.fetch_add(1,std::memory_order_relaxed);
-    (bytesKnown?c.knownByteRequests:c.unknownByteRequests).fetch_add(1,std::memory_order_relaxed);if(bytesKnown)c.attemptedRequestedBytes.fetch_add(bytes,std::memory_order_relaxed);return token;
+    (bytesKnown?c.knownByteRequests:c.unknownByteRequests).fetch_add(1,std::memory_order_relaxed);if(bytesKnown)c.attemptedRequestedBytes.fetch_add(bytes,std::memory_order_relaxed);token.beginNS=mvkStutterMemoryDetail::monotonicNS();return token;
 }
 inline void mvkStutterMemoryAllocationEnd(const MVKStutterMemoryAllocationToken&token,bool succeeded,int64_t resultCode=0){
     if(!token.active)return;using namespace mvkStutterMemoryDetail;ErrnoScope errnoScope;
-    uint64_t duration=monotonicNS()-token.beginNS;auto&c=counter(token.kind,token.storageMode);c.completed.fetch_add(1,std::memory_order_relaxed);c.hostCallTotalNS.fetch_add(duration,std::memory_order_relaxed);maximum(c.hostCallMaxNS,duration);
+    uint64_t endNS=monotonicNS(),duration=endNS-token.beginNS;auto&c=counter(token.kind,token.storageMode);c.completed.fetch_add(1,std::memory_order_relaxed);c.hostCallTotalNS.fetch_add(duration,std::memory_order_relaxed);maximum(c.hostCallMaxNS,duration);
     if(succeeded){c.succeeded.fetch_add(1,std::memory_order_relaxed);if(token.bytesKnown)c.successfulRequestedBytes.fetch_add(token.requestedBytes,std::memory_order_relaxed);}else c.nilResults.fetch_add(1,std::memory_order_relaxed);
-    if(!succeeded)recordEvent(token,true,false,duration,"nil-or-unsuccessful-result",resultCode,0,true);
-    else if(duration>=2000000ULL)recordEvent(token,false,false,duration,"host-allocation-call-at-least-2ms",resultCode,0,false);
+    if(!succeeded)recordEvent(token,true,false,endNS,"nil-or-unsuccessful-result",resultCode,0,true);
+    else if(duration>=2000000ULL)recordEvent(token,false,false,endNS,"host-allocation-call-at-least-2ms",resultCode,0,false);
 }
 inline void mvkStutterMemoryAllocationRejected(MVKStutterMemoryKind kind,uint64_t bytes,uint32_t storageMode,const char*site,const char*reason,uint64_t limitBytes=0){
     mvkStutterMemoryDetail::ErrnoScope errnoScope;if(!mvkStutterMemoryDetail::enabled())return;
     mvkStutterMemoryDetail::counter(kind,storageMode).rejectedBeforeCall.fetch_add(1,std::memory_order_relaxed);
     MVKStutterMemoryAllocationToken t{};t.active=true;t.kind=kind;t.requestedBytes=bytes;t.storageMode=storageMode;t.site=site;t.bytesKnown=true;
-    mvkStutterMemoryDetail::recordEvent(t,false,true,0,reason,0,limitBytes,true);
+    mvkStutterMemoryDetail::captureOwner(t);t.beginNS=mvkStutterMemoryDetail::monotonicNS();
+    mvkStutterMemoryDetail::recordEvent(t,false,true,t.beginNS,reason,0,limitBytes,true);
 }
 
 inline void mvkStutterReportMetalMemory(id<MTLDevice>device){
@@ -150,7 +167,10 @@ inline void mvkStutterReportMetalMemory(id<MTLDevice>device){
     const char*dir=getenv("MVK_CONFIG_SHADER_DUMP_DIR");if(!dir)return;char path[4096],temporary[4096],history[4096];
     int n=snprintf(path,sizeof(path),"%s/memory-current-%d.json",dir,getpid());int t=snprintf(temporary,sizeof(temporary),"%s/memory-current-%d.json.next",dir,getpid());int h=snprintf(history,sizeof(history),"%s/memory-stats-%d.jsonl",dir,getpid());if(n<0||t<0||h<0||size_t(n)>=sizeof(path)||size_t(t)>=sizeof(temporary)||size_t(h)>=sizeof(history))return;
     auto writeSnapshot=[&](FILE*f){
-        fprintf(f,"{\"time\":%.6f,\"monotonicNS\":%llu,\"pid\":%d,\"reportIndex\":%llu,\"historyCapped\":%s,\"deviceAvailable\":%s,\"currentAllocatedSizeAvailable\":%s,\"currentAllocatedSizeBytes\":",cfTime(),(unsigned long long)now,getpid(),(unsigned long long)report,report>=1024?"true":"false",device?"true":"false",allocatedAvailable?"true":"false");if(allocatedAvailable)fprintf(f,"%llu",(unsigned long long)allocated);else fputs("null",f);
+        // Omission counts are independent: recent rings retain 32, journals 128.
+        // Both retain the existing process-wide failure/slow counters after caps.
+        fprintf(f,"{\"schema\":2,\"clockDomain\":\"mach-absolute-nanoseconds\",\"allocationIDScope\":\"process-local\",\"recentFailureRingOmittedEvents\":%llu,\"recentSlowRingOmittedEvents\":%llu,",(unsigned long long)(failuresTotal>32?failuresTotal-32:0),(unsigned long long)(slowTotal>32?slowTotal-32:0));
+        fprintf(f,"\"time\":%.6f,\"monotonicNS\":%llu,\"pid\":%d,\"reportIndex\":%llu,\"historyCapped\":%s,\"deviceAvailable\":%s,\"currentAllocatedSizeAvailable\":%s,\"currentAllocatedSizeBytes\":",cfTime(),(unsigned long long)now,getpid(),(unsigned long long)report,report>=1024?"true":"false",device?"true":"false",allocatedAvailable?"true":"false");if(allocatedAvailable)fprintf(f,"%llu",(unsigned long long)allocated);else fputs("null",f);
         fprintf(f,",\"recommendedMaxWorkingSetSizeAvailable\":%s,\"recommendedMaxWorkingSetSizeBytes\":",recommendedAvailable?"true":"false");if(recommendedAvailable)fprintf(f,"%llu",(unsigned long long)recommended);else fputs("null",f);
         fprintf(f,",\"hasUnifiedMemoryAvailable\":%s,\"hasUnifiedMemory\":",unifiedAvailable?"true":"false");if(unifiedAvailable)fputs(unified?"true":"false",f);else fputs("null",f);
         fprintf(f,",\"maxBufferLengthAvailable\":%s,\"maxBufferLengthBytes\":",maximumAvailable?"true":"false");if(maximumAvailable)fprintf(f,"%llu",(unsigned long long)maxBuffer);else fputs("null",f);

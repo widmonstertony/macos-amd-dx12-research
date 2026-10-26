@@ -279,15 +279,24 @@ class Analyzer:
         self.load_system(directory)
         directory=Path(directory)
         if (directory/'segments.jsonl').exists():self.requested_windows+=self.read(directory/'segments.jsonl','requested-diagnostic-windows')
-        self.load_cpu(sorted(directory.glob('cpu-stutter-current-*-snapshots.jsonl')))
-        for path in directory.glob('cpu-stutter-status-*-snapshots.jsonl'):self.cpu_status+=self.read(path,'cpu-history-status')
-        if (directory/'cpu-snapshot-copy-index.jsonl').exists():self.cpu_copy_index+=self.read(directory/'cpu-snapshot-copy-index.jsonl','cpu-copy-index')
-        self.load_forensics(sorted(directory.glob('forensics-*-run-*-generation-*.jsonl')),
-                            current=[directory/'forensics-current-snapshots.jsonl'] if (directory/'forensics-current-snapshots.jsonl').exists() else [],
-                            copy_index=[directory/'forensics-copy-index.jsonl'] if (directory/'forensics-copy-index.jsonl').exists() else [])
-        self.load_guest(sorted(directory.glob('vkd3d-forensics-*-run-*-generation-*.jsonl')),
-                        current=[directory/'vkd3d-forensics-current-snapshots.jsonl'] if (directory/'vkd3d-forensics-current-snapshots.jsonl').exists() else [],
-                        copy_index=[directory/'vkd3d-forensics-copy-index.jsonl'] if (directory/'vkd3d-forensics-copy-index.jsonl').exists() else [])
+        # Raw action windows are append-only subdirectories. Include retired
+        # owner tails across all windows; never join only the newest arm.
+        def captured_paths(pattern, summary_key=None):
+            found={p.resolve() for p in directory.rglob(pattern)}
+            for text in self.system_summary.get(summary_key, []) if summary_key else []:
+                path=Path(text).resolve()
+                if path.is_relative_to(directory.resolve()):found.add(path)
+                else:self.issue('session-raw-reference-outside-capture',source=str(path))
+            return sorted(found)
+        self.load_cpu(captured_paths('cpu-stutter-current-*-snapshots.jsonl','rawCPUCurrentPaths'))
+        for path in captured_paths('cpu-stutter-status-*-snapshots.jsonl'):self.cpu_status+=self.read(path,'cpu-history-status')
+        for path in captured_paths('cpu-snapshot-copy-index.jsonl'):self.cpu_copy_index+=self.read(path,'cpu-copy-index')
+        self.load_forensics(captured_paths('forensics-*-run-*-generation-*.jsonl','rawForensicsPaths'),
+                            current=captured_paths('forensics-current-snapshots.jsonl','rawForensicsCurrentPaths'),
+                            copy_index=captured_paths('forensics-copy-index.jsonl'))
+        self.load_guest(captured_paths('vkd3d-forensics-*-run-*-generation-*.jsonl','rawGuestForensicsPaths'),
+                        current=captured_paths('vkd3d-forensics-current-snapshots.jsonl'),
+                        copy_index=captured_paths('vkd3d-forensics-copy-index.jsonl'))
         for text in self.system_summary.get('rawLogReferences', []):
             path=Path(text).resolve()
             if not path.is_relative_to(ROOT/'evidence'):
@@ -1421,6 +1430,12 @@ class Analyzer:
             limits='Only guest software timing and observed user-stage overlap; FIFO workKey association is not a unique submission ticket. No implicit host-process/thread/pipeline mapping or exclusive slow-frame attribution',allCausesFound=False)
 
     def forensics_report(self):
+        from analyze_causal_diagnostics import analyze as analyze_causal_diagnostics
+        native_id_runs=defaultdict(set)
+        for raw in self.forensic_rows:
+            if str(raw.get('kind','')).startswith('NativeCB'):
+                cbid=raw.get('fields',{}).get('ownerNativeCB')
+                if cbid:native_id_runs[(self._pid_for(raw),cbid)].add(raw.get('runID'))
         anchors=defaultdict(list)
         for row in self.forensic_rows:
             if row.get('type')!='clockCalibration':continue
@@ -1444,7 +1459,9 @@ class Analyzer:
             seen.add(key);kind=str(row.get('kind','unknown'));kinds[kind]+=1
             if isinstance(seq,int):sequences[(pid,run)].add(seq)
             clock=dec(row.get('machNS'));available=anchors.get((pid,run),[])
-            anchor=min(available,key=lambda a:abs(a['mid']-clock)) if available and clock is not None and row.get('schema')==1 else None
+            physical=row.get('streamSession') if row.get('streamOwnershipSchema')==2 else row.get('session')
+            matching=[a for a in available if a['session']==physical]
+            anchor=min(matching,key=lambda a:abs(a['mid']-clock)) if matching and clock is not None and row.get('schema')==1 else None
             cf=anchor['cf']+(clock-anchor['mid'])/NS if anchor else None
             ctx=row.get('context',{}) if isinstance(row.get('context'),dict) else {}
             fields=row.get('fields',{}) if isinstance(row.get('fields'),dict) else {};payload=row.get('payload',{}) if isinstance(row.get('payload'),dict) else {}
@@ -1455,18 +1472,20 @@ class Analyzer:
             has_owner='ownerNativeCB' in fields
             native=integer(owner['nativeCB'] if has_owner else ctx.get('nativeCB'))
             logical=integer(owner['logicalSubmit'] if has_owner else ctx.get('logicalSubmit'))
-            joined=bool(native and logical and (pid,native) in self.cbs and integer(self.cbs[(pid,native)].get('logicalSubmit'))==logical)
+            run_validated=native_id_runs.get((pid,native))=={run}
+            joined=bool(run_validated and native and logical and (pid,native) in self.cbs and integer(self.cbs[(pid,native)].get('logicalSubmit'))==logical)
             if any(t in kind.lower() for t in ('denied','dropped','truncated')) or any(re.search(r'(dropped|truncated|denied|overflow)$',k,re.I) and integer(v)>0 for k,v in fields.items()):capped=True
             pipeline=fields.get('pipeline',fields.get('vulkanPipeline',payload.get('ownerPipeline')))
-            record=dict(pid=pid,runID=run,session=row.get('session'),seq=seq,kind=kind,machNS=row.get('machNS'),timeCF=cf,
+            record=dict(pid=pid,runID=run,session=row.get('session'),streamSession=physical,streamOwnershipSchema=row.get('streamOwnershipSchema',1),seq=seq,kind=kind,machNS=row.get('machNS'),timeCF=cf,
                 clockStatus='observed' if cf is not None else 'unjoinable',
                 calibrationBracketHalfNS=anchor['bound'] if anchor else None,
-                calibrationSessionMatched=bool(anchor and anchor['session']==row.get('session')),
+                calibrationSessionMatched=bool(anchor and anchor['session']==physical),
+                lateLogicalOwner=physical!=row.get('session'),
                 context={k:ctx.get(k) for k in ('domain','queueFamily','queueIndex','logicalSubmit','nativeCB','frame','shader')},
                 savedOwnerContext=owner if has_owner else None,linkedNativeCB=native,linkedLogicalSubmit=logical,linkContextSource='saved-owner-fields' if has_owner else 'ambient-context',
-                pipeline=pipeline,nativePipeline=fields.get('nativePipeline'),threadMachID=row.get('threadMachID'),nativeGraphJoined=joined,fields=fields,payload=payload,source=ref(row),
+                pipeline=pipeline,nativePipeline=fields.get('nativePipeline'),threadMachID=row.get('threadMachID'),nativeGraphJoined=joined,nativeGraphRunValidated=run_validated,fields=fields,payload=payload,source=ref(row),
                 meaning='Software observation, not exclusive GPU/shader duration or proven cause of a frame stall')
-            if anchor and anchor['session']!=row.get('session'):
+            if available and not matching:
                 self.issue('forensics-clock-session-mismatch',scope='forensics',runID=run,session=row.get('session'))
             if 'spanID' in fields and fields.get('phase') in (0,1):
                 scope_key=(pid,run,fields['spanID'])
@@ -1520,6 +1539,7 @@ class Analyzer:
                    dict(stage='forensics-writer-health',statuses=(['observed'] if self.forensic_current else ['missing'])+(['capped'] if any(r['observedDelta'] for r in budgets) else [])+(['unjoinable'] if any(r['alreadyNonzeroAtFirstSnapshot'] or r['nonmonotonic'] for r in budgets) else []),reason='Run-cumulative metadata deltas; pre-first-snapshot losses are an unknown prefix'),
                    dict(stage='closed-driver-internals',statuses=['missing','unjoinable'],reason='Public coarse native timelines can contain waits. Private driver scheduler/compiler internals and exclusive shader execution costs are unknown')]
         return dict(available=bool(kinds),clockDomain='mach-absolute-nanoseconds; never C++ steady-clock subtraction',
+            causalDiagnostics=analyze_causal_diagnostics(self.forensic_rows,self.cbs),
             stageMatrix=matrix,kinds=dict(kinds),records=records,recordsTruncated=sum(kinds.values())>len(records),
             slowSoftwareScopes=[item for _,_,item in sorted(slow_scopes,reverse=True)],softwareScopeCount=scope_total,softwareScopeRankingCapped=scope_total>len(slow_scopes),unpairedSoftwareScopeEnds=scope_unpaired_end,openSoftwareScopes=len(scope_starts),softwareScopePairingCap=scope_start_cap,
             coarseCommandBuffers=list(coarse_cbs.values()),coarsePresents=coarse_presents,coarseTimelineOutputCapped=coarse_cap,

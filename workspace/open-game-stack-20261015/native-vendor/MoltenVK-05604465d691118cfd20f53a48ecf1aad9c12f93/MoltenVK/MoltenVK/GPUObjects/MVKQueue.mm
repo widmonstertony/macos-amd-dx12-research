@@ -711,6 +711,44 @@ MVKQueueSubmission::~MVKQueueSubmission() {
 #pragma mark -
 #pragma mark MVKQueueCommandBufferSubmission
 
+// Stack-only terminal provenance. Completion can destroy the submission during
+// commit, so no post-commit diagnostic may dereference that object or its queue.
+struct MVKSubmissionTerminalTrace {
+    uint64_t session=0,logical=0,frame=0,lastCB=0,splits=0,kind=0;
+    uint64_t intentStart=0,intentEnd=0,commitStart=0,commitEnd=0;
+    uint32_t family=0,index=0;int32_t result=0;bool flushSucceeded=false;
+    MVKSubmissionTerminalTrace(bool enabled,uint64_t submission,uint64_t count,
+        id<MTLCommandBuffer> cb,uint64_t submissionKind,VkResult status) {
+        if(!enabled)return;session=mvkForensicsSessionID();if(!session)return;
+        auto owner=mvkStutterContext();logical=submission;frame=owner.frame;
+        family=owner.queueFamily;index=owner.queueIndex;lastCB=mvkStutterNativeID(cb);
+        splits=count;kind=submissionKind;result=static_cast<int32_t>(status);
+        intentStart=mvkStutterMonotonicNS();
+        mvkForensicsRecordForSession(session,"NativeSubmissionTerminalIntentV1",{
+            {"schemaVersion",1},{"ownerSubmission",logical},{"ownerFrame",frame},
+            {"ownerQueueFamily",family},{"ownerQueueIndex",index},{"submissionKind",kind},
+            {"expectedSplitCount",splits},{"splitCountMeaning",1},{"lastNativeCB",lastCB},
+            {"resultBits",uint32_t(result)},{"intentMachNS",intentStart}});
+        flushSucceeded=mvkForensicsFlushIntent(session);intentEnd=mvkStutterMonotonicNS();
+    }
+    void beginCommit() {if(session)commitStart=mvkStutterMonotonicNS();}
+    void endCommit() {if(session)commitEnd=mvkStutterMonotonicNS();}
+    void finish() const {
+        if(!session)return;
+        mvkForensicsRecordForSession(session,"NativeSubmissionEndV1",{
+            {"schemaVersion",1},{"ownerSubmission",logical},{"ownerFrame",frame},
+            {"ownerQueueFamily",family},{"ownerQueueIndex",index},{"submissionKind",kind},
+            {"expectedSplitCount",splits},{"splitCountMeaning",1},{"lastNativeCB",lastCB},
+            {"resultBits",uint32_t(result)},{"lastNativeCBKnown",lastCB!=0},
+            {"intentMachNS",intentStart},{"intentLoggerEndMachNS",intentEnd},
+            {"intentLoggerWallNS",intentEnd>=intentStart?intentEnd-intentStart:0},
+            {"intentFileFlushSucceeded",flushSucceeded},{"commitStartMachNS",commitStart},
+            {"commitEndMachNS",commitEnd},{"endMachNS",mvkStutterMonotonicNS()},
+            {"nativeCommitReturned",lastCB&&commitStart&&commitEnd>=commitStart},
+            {"endSessionChanged",session!=mvkForensicsSessionID()}});
+    }
+};
+
 VkResult MVKQueueCommandBufferSubmission::execute() {
     MVKCPUContext context=mvkStutterContext();
     context.domain=std::min(_queue->_queueFamily->getIndex()+1,6u);
@@ -830,15 +868,20 @@ VkResult MVKQueueCommandBufferSubmission::commitActiveMTLCommandBuffer(bool sign
 
 	// Retrieve the result before committing MTLCommandBuffer, because finish() will destroy this instance.
 	VkResult rslt = mtlCmdBuff ? getConfigurationResult() : VK_ERROR_OUT_OF_POOL_MEMORY;
+    MVKSubmissionTerminalTrace terminal(signalCompletion,_stutterSubmissionID,
+        _stutterNativeSplit,mtlCmdBuff,1,rslt);
 	mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
 	mvkStutterNativePhase(mtlCmdBuff,"commitRequested");
     mvkMarkTrackedCommandBufferCommit(mtlCmdBuff);
+	terminal.beginCommit();
 		[mtlCmdBuff commit];
+	terminal.endCommit();
 	[mtlCmdBuff release];		// retained
 
 	// If we need to signal completion, but an error occurred and the MTLCommandBuffer
 	// was not created, call the finish() function directly.
 	if (signalCompletion && !mtlCmdBuff) { finish(); }
+	terminal.finish(); // Saved POD only: this may already have been destroyed.
 
 	return rslt;
 }
@@ -1067,15 +1110,19 @@ VkResult MVKQueuePresentSurfaceSubmission::execute() {
 	// or if the MTLCommandBuffer could not be created, call finish() directly.
 	// Retrieve the result first, because finish() will destroy this instance.
 	VkResult rslt = getConfigurationResult();
+    MVKSubmissionTerminalTrace terminal(true,_stutterSubmissionID,mtlCmdBuff?1:0,mtlCmdBuff,2,rslt);
 	if (mtlCmdBuff) {
 		[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) { this->finish(); }];
 		mvkRecordDependencyPhase(mtlCmdBuff, @"commitRequested");
 		mvkStutterNativePhase(mtlCmdBuff,"commitRequested");
     mvkMarkTrackedCommandBufferCommit(mtlCmdBuff);
+		terminal.beginCommit();
 		[mtlCmdBuff commit];
+		terminal.endCommit();
 	} else {
 		finish();
 	}
+	terminal.finish(); // No submission/queue access after the possible finish().
 	return rslt;
 }
 

@@ -14,6 +14,8 @@ The one-process diagnostic plan covers known submit, resource, compilation, GPU 
 
 2026-10-26: [v37 sampled read-plan source and owned GPU validation](docs/SAMPLED-READ-PLAN-2026-10-26.md); actual game performance is still unvalidated.
 
+2026-10-26: [v38 causal diagnostic source](docs/CAUSAL_DIAGNOSTICS_V38.en.md) adds resource batches, submission tails, presentation lifecycle and capture coverage auditing. Bounded GPU controls passed; the game's presentation delay still needs causal evidence. Downloadable runtimes are unchanged.
+
 ## Download and test
 
 [Latest diagnostic download](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [Testing](docs/TESTING.en.md) · [Known issues](docs/KNOWN_ISSUES.en.md) · [Contributing](CONTRIBUTING.md)

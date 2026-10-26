@@ -48,7 +48,19 @@ void MVKSwapchain::propagateDebugName() {
 	}
 }
 
-CAMetalLayer* MVKSwapchain::getCAMetalLayer() { return _surface->getCAMetalLayer(); }
+static uint64_t mvkNextSwapchainDiagnosticID() {
+	static std::atomic<uint64_t> next{1};
+	return next.fetch_add(1, std::memory_order_relaxed);
+}
+
+static uint64_t mvkSwapchainDiagnosticDoubleBits(double value) {
+	uint64_t bits;
+	static_assert(sizeof(bits) == sizeof(value), "diagnostic double encoding");
+	memcpy(&bits, &value, sizeof(bits));
+	return bits;
+}
+
+CAMetalLayer* MVKSwapchain::getCAMetalLayer(MVKSurfaceDiagnosticInfo* diagnostics) { return _surface->getCAMetalLayer(diagnostics); }
 
 bool MVKSwapchain::isHeadless() { return _surface->isHeadless(); }
 
@@ -82,6 +94,7 @@ VkResult MVKSwapchain::acquireNextImage(uint64_t timeout,
 										uint32_t* pImageIndex) {
 
     MVKForensicsScope forensics("NativeAcquireNextImage",{{"swapchain",uint64_t(uintptr_t(this))},
+        {"swapchainGeneration",_diagnosticGeneration},
         {"timeout",timeout},{"semaphore",uint64_t(uintptr_t(semaphore))},{"fence",uint64_t(uintptr_t(fence))}});
 	if ( _device->getConfigurationResult() != VK_SUCCESS ) { return _device->getConfigurationResult(); }
 	if ( getIsSurfaceLost() ) { return VK_ERROR_SURFACE_LOST_KHR; }
@@ -259,25 +272,40 @@ void MVKSwapchain::beginPresentation(const MVKImagePresentInfo& presentInfo) {
 	_unpresentedImageCount++;
 }
 
-void MVKSwapchain::endPresentation(const MVKImagePresentInfo& presentInfo, uint64_t beginPresentTime, uint64_t actualPresentTime) {
+void MVKSwapchain::endPresentation(const MVKImagePresentInfo& presentInfo, uint64_t beginPresentTime, uint64_t actualPresentTime,
+								  MVKPresentDiagnosticInfo* diagnostics) {
 	_unpresentedImageCount--;
 
-	std::lock_guard<std::mutex> lock(_presentHistoryLock);
+	bool diagnosticActive = diagnostics && diagnostics->session;
+	uint64_t requested = diagnosticActive ? mvkStutterMonotonicNS() : 0, acquired = 0, workEnd = 0;
+	{
+		std::lock_guard<std::mutex> lock(_presentHistoryLock);
+		if (diagnosticActive) { acquired = mvkStutterMonotonicNS(); }
 
-	markFrameInterval();
-	if (_presentHistoryCount < kMaxPresentationHistory) {
-		_presentHistoryCount++;
-	} else {
-		_presentHistoryHeadIndex = (_presentHistoryHeadIndex + 1) % kMaxPresentationHistory;
+		markFrameInterval();
+		if (_presentHistoryCount < kMaxPresentationHistory) {
+			_presentHistoryCount++;
+		} else {
+			_presentHistoryHeadIndex = (_presentHistoryHeadIndex + 1) % kMaxPresentationHistory;
+		}
+
+		_presentTimingHistory[_presentHistoryIndex].presentID = presentInfo.presentIDGoogle;
+		_presentTimingHistory[_presentHistoryIndex].desiredPresentTime = presentInfo.desiredPresentTime;
+		_presentTimingHistory[_presentHistoryIndex].actualPresentTime = actualPresentTime;
+		// These details are not available in Metal, but can estimate earliestPresentTime by using actualPresentTime instead
+		_presentTimingHistory[_presentHistoryIndex].earliestPresentTime = actualPresentTime;
+		_presentTimingHistory[_presentHistoryIndex].presentMargin = actualPresentTime > beginPresentTime ? actualPresentTime - beginPresentTime : 0;
+		_presentHistoryIndex = (_presentHistoryIndex + 1) % kMaxPresentationHistory;
+		if (diagnosticActive) { workEnd = mvkStutterMonotonicNS(); }
 	}
-
-	_presentTimingHistory[_presentHistoryIndex].presentID = presentInfo.presentIDGoogle;
-	_presentTimingHistory[_presentHistoryIndex].desiredPresentTime = presentInfo.desiredPresentTime;
-	_presentTimingHistory[_presentHistoryIndex].actualPresentTime = actualPresentTime;
-	// These details are not available in Metal, but can estimate earliestPresentTime by using actualPresentTime instead
-	_presentTimingHistory[_presentHistoryIndex].earliestPresentTime = actualPresentTime;
-	_presentTimingHistory[_presentHistoryIndex].presentMargin = actualPresentTime > beginPresentTime ? actualPresentTime - beginPresentTime : 0;
-	_presentHistoryIndex = (_presentHistoryIndex + 1) % kMaxPresentationHistory;
+	if (diagnosticActive) {
+		// Pass primitive timings back to the callback; emit outside its detachment lock.
+		diagnostics->historyLockRequestedMachNS = requested;
+		diagnostics->historyLockAcquiredMachNS = acquired;
+		diagnostics->historyWorkEndMachNS = workEnd;
+		diagnostics->historyLockReleasedMachNS = mvkStutterMonotonicNS();
+		diagnostics->historyTimeNS = actualPresentTime;
+	}
 }
 
 void MVKSwapchain::notifyPresentComplete(const MVKImagePresentInfo& presentInfo) {
@@ -292,9 +320,37 @@ void MVKSwapchain::notifyPresentComplete(const MVKImagePresentInfo& presentInfo)
 // and call back. To work around this, if there are any uncompleted presentations, change the
 // drawableSize of the CAMetalLayer, which will trigger presentation completion and callbacks.
 // The drawableSize will be set to a correct size by the next swapchain created on the same surface.
-void MVKSwapchain::forceUnpresentedImageCompletion() {
+void MVKSwapchain::forceUnpresentedImageCompletion(uint64_t reason, uint64_t initiatingSwapchainGeneration) {
+	// Preserve the original condition and setter. Diagnostic rows bracket that
+	// workaround rather than claiming it guarantees presentation to the display.
 	if (_unpresentedImageCount) {
-		getCAMetalLayer().drawableSize = { 1,1 };
+		uint64_t session = mvkForensicsSessionID();
+		if (session) { mvkForensicsRecordForSession(session, "NativeForcePresentationCompletion", {
+			{"phase", 0}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+			{"initiatingSwapchainGeneration", initiatingSwapchainGeneration}, {"reason", reason},
+			{"unpresentedImageCount", _unpresentedImageCount.load()}}); }
+		MVKSurfaceDiagnosticInfo surfaceDiagnostics;
+		auto* layer = getCAMetalLayer(&surfaceDiagnostics);
+		CGSize before = session ? layer.drawableSize : CGSize{};
+		uint64_t intentStart = session ? mvkStutterMonotonicNS() : 0;
+		if (session) { mvkForensicsRecordForSession(session, "NativeLayerSizeChangeIntent", {
+			{"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+			{"surfaceGeneration", surfaceDiagnostics.surfaceGeneration}, {"layer", uint64_t(uintptr_t(layer))},
+			{"layerBindingGeneration", surfaceDiagnostics.layerBindingGeneration}, {"externalLayerBirthKnown", 0},
+			{"reason", reason}, {"initiatingSwapchainGeneration", initiatingSwapchainGeneration},
+			{"beforeWidthBits", mvkSwapchainDiagnosticDoubleBits(before.width)}, {"beforeHeightBits", mvkSwapchainDiagnosticDoubleBits(before.height)},
+			{"targetWidth", 1}, {"targetHeight", 1}, {"intentStartMachNS", intentStart}}); }
+		uint64_t intentEnd = session ? mvkStutterMonotonicNS() : 0;
+		uint64_t callStart = session ? mvkStutterMonotonicNS() : 0;
+		layer.drawableSize = { 1,1 };
+		uint64_t callEnd = session ? mvkStutterMonotonicNS() : 0;
+		if (session) { mvkForensicsRecordForSession(session, "NativeForcePresentationCompletion", {
+			{"phase", 1}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+			{"surfaceGeneration", surfaceDiagnostics.surfaceGeneration}, {"layer", uint64_t(uintptr_t(layer))},
+			{"layerBindingGeneration", surfaceDiagnostics.layerBindingGeneration}, {"reason", reason},
+			{"initiatingSwapchainGeneration", initiatingSwapchainGeneration}, {"unpresentedImageCount", _unpresentedImageCount.load()},
+			{"intentStartMachNS", intentStart}, {"intentEndMachNS", intentEnd},
+			{"callStartMachNS", callStart}, {"callEndMachNS", callEnd}}); }
 	}
 }
 
@@ -397,12 +453,31 @@ MVKSwapchain::MVKSwapchain(MVKDevice* device, const VkSwapchainCreateInfoKHR* pC
 	_surface((MVKSurface*)pCreateInfo->surface),
 	_imageExtent(pCreateInfo->imageExtent) {
 
+	_diagnosticGeneration = mvkNextSwapchainDiagnosticID();
 	// Check if oldSwapchain is properly set
 	auto* oldSwapchain = (MVKSwapchain*)pCreateInfo->oldSwapchain;
+	_diagnosticOldSwapchain = uint64_t(uintptr_t(oldSwapchain));
+	_diagnosticOldSwapchainGeneration = oldSwapchain ? oldSwapchain->_diagnosticGeneration : 0;
+	uint64_t diagnosticSession = mvkForensicsSessionID();
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainCreate", {
+		{"phase", 0}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+		{"oldSwapchain", _diagnosticOldSwapchain}, {"oldSwapchainGeneration", _diagnosticOldSwapchainGeneration},
+		{"activeSwapchain", uint64_t(uintptr_t(_surface->_activeSwapchain))},
+		{"activeSwapchainGeneration", _surface->_activeSwapchain ? _surface->_activeSwapchain->_diagnosticGeneration : 0},
+		{"surface", uint64_t(uintptr_t(_surface))}, {"surfaceGeneration", _surface->_diagnosticGeneration},
+		{"requestedWidth", _imageExtent.width}, {"requestedHeight", _imageExtent.height},
+		{"presentMode", uint64_t(pCreateInfo->presentMode)}, {"minImageCount", pCreateInfo->minImageCount}}); }
 	if (oldSwapchain == _surface->_activeSwapchain) {
 		_surface->setActiveSwapchain(this);
+		if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainActivated", {
+			{"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+			{"retiredSwapchain", _diagnosticOldSwapchain}, {"retiredSwapchainGeneration", _diagnosticOldSwapchainGeneration},
+			{"surface", uint64_t(uintptr_t(_surface))}, {"surfaceGeneration", _surface->_diagnosticGeneration}}); }
 	} else {
 		setConfigurationResult(reportError(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR, "vkCreateSwapchainKHR(): pCreateInfo->oldSwapchain does not match the VkSwapchain that is in use by the surface"));
+		if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainCreate", {
+			{"phase", 1}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+			{"configurationResultBits", uint64_t(int64_t(getConfigurationResult()))}, {"activated", 0}}); }
 		return;
 	}
 
@@ -442,6 +517,9 @@ MVKSwapchain::MVKSwapchain(MVKDevice* device, const VkSwapchainCreateInfoKHR* pC
 							   mtlFeats.maxSwapchainImageCount);
 	initCAMetalLayer(pCreateInfo, pScalingInfo, imgCnt);
     initSurfaceImages(pCreateInfo, imgCnt);		// After initCAMetalLayer()
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainCreate", {
+		{"phase", 1}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+		{"configurationResultBits", uint64_t(int64_t(getConfigurationResult()))}, {"activated", 1}, {"imageCount", imgCnt}}); }
 }
 
 // kCAGravityResize is the Metal default
@@ -486,11 +564,33 @@ void MVKSwapchain::initCAMetalLayer(const VkSwapchainCreateInfoKHR* pCreateInfo,
 									VkSwapchainPresentScalingCreateInfoKHR* pScalingInfo,
 									uint32_t imgCnt) {
 
-	auto* mtlLayer = getCAMetalLayer();
+	uint64_t diagnosticSession = mvkForensicsSessionID();
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainLayerConfigure", {
+		{"phase", 0}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration}}); }
+	MVKSurfaceDiagnosticInfo surfaceDiagnostics;
+	auto* mtlLayer = getCAMetalLayer(&surfaceDiagnostics);
 	if ( !mtlLayer || getIsSurfaceLost() ) { return; }
 
 	auto minMagFilter = getMVKConfig().swapchainMinMagFilterUseNearest ? kCAFilterNearest : kCAFilterLinear;
+	CGSize beforeSize = diagnosticSession ? mtlLayer.drawableSize : CGSize{};
+	uint64_t intentStart = diagnosticSession ? mvkStutterMonotonicNS() : 0;
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeLayerSizeChangeIntent", {
+		{"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+		{"surfaceGeneration", surfaceDiagnostics.surfaceGeneration}, {"layer", uint64_t(uintptr_t(mtlLayer))},
+		{"layerBindingGeneration", surfaceDiagnostics.layerBindingGeneration}, {"externalLayerBirthKnown", 0}, {"reason", 1},
+		{"beforeWidthBits", mvkSwapchainDiagnosticDoubleBits(beforeSize.width)}, {"beforeHeightBits", mvkSwapchainDiagnosticDoubleBits(beforeSize.height)},
+		{"targetWidth", _imageExtent.width}, {"targetHeight", _imageExtent.height}, {"intentStartMachNS", intentStart}}); }
+	uint64_t intentEnd = diagnosticSession ? mvkStutterMonotonicNS() : 0;
+	uint64_t sizeCallStart = diagnosticSession ? mvkStutterMonotonicNS() : 0;
 	mtlLayer.drawableSize = mvkCGSizeFromVkExtent2D(_imageExtent);
+	uint64_t sizeCallEnd = diagnosticSession ? mvkStutterMonotonicNS() : 0;
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeLayerSizeChange", {
+		{"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+		{"surfaceGeneration", surfaceDiagnostics.surfaceGeneration}, {"layer", uint64_t(uintptr_t(mtlLayer))},
+		{"layerBindingGeneration", surfaceDiagnostics.layerBindingGeneration}, {"reason", 1},
+		{"targetWidth", _imageExtent.width}, {"targetHeight", _imageExtent.height},
+		{"intentStartMachNS", intentStart}, {"intentEndMachNS", intentEnd},
+		{"callStartMachNS", sizeCallStart}, {"callEndMachNS", sizeCallEnd}}); }
 	mtlLayer.device = getMTLDevice();
 	mtlLayer.pixelFormat = getPixelFormats()->getMTLPixelFormat(pCreateInfo->imageFormat);
 	mtlLayer.maximumDrawableCount = imgCnt;
@@ -510,7 +610,7 @@ void MVKSwapchain::initCAMetalLayer(const VkSwapchainCreateInfoKHR* pCreateInfo,
 	// is not changing from the previous, we force those completions first.
 	auto* oldSwapchain = (MVKSwapchain*)pCreateInfo->oldSwapchain;
 	if (oldSwapchain && mvkVkExtent2DsAreEqual(pCreateInfo->imageExtent, _surface->getExtent())) {
-		oldSwapchain->forceUnpresentedImageCompletion();
+		oldSwapchain->forceUnpresentedImageCompletion(2, _diagnosticGeneration);
 	}
 
 	if (pCreateInfo->compositeAlpha != VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR) {
@@ -570,6 +670,16 @@ void MVKSwapchain::initCAMetalLayer(const VkSwapchainCreateInfoKHR* pCreateInfo,
 			setConfigurationResult(reportError(VK_ERROR_FORMAT_NOT_SUPPORTED, "vkCreateSwapchainKHR(): Metal does not support VkColorSpaceKHR value %d.", pCreateInfo->imageColorSpace));
 			break;
 	}
+
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainLayerConfigure", {
+		{"phase", 1}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+		{"oldSwapchain", _diagnosticOldSwapchain}, {"oldSwapchainGeneration", _diagnosticOldSwapchainGeneration},
+		{"surfaceGeneration", surfaceDiagnostics.surfaceGeneration}, {"layer", uint64_t(uintptr_t(mtlLayer))},
+		{"layerBindingGeneration", surfaceDiagnostics.layerBindingGeneration}, {"externalLayerBirthKnown", 0},
+		{"observedWidthBits", mvkSwapchainDiagnosticDoubleBits(mtlLayer.drawableSize.width)},
+		{"observedHeightBits", mvkSwapchainDiagnosticDoubleBits(mtlLayer.drawableSize.height)},
+		{"maximumDrawableCount", mtlLayer.maximumDrawableCount}, {"displaySyncEnabled", uint64_t(mtlLayer.displaySyncEnabledMVK)},
+		{"configurationResultBits", uint64_t(int64_t(getConfigurationResult()))}}); }
 
 	// TODO: set additional CAMetalLayer properties before extracting drawables:
 	//	- presentsWithTransaction
@@ -646,17 +756,27 @@ void MVKSwapchain::initSurfaceImages(const VkSwapchainCreateInfoKHR* pCreateInfo
 }
 
 void MVKSwapchain::destroy() {
+	uint64_t diagnosticSession = mvkForensicsSessionID();
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainDestroy", {
+		{"phase", 0}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+		{"surface", uint64_t(uintptr_t(_surface))}, {"surfaceGeneration", _surface->_diagnosticGeneration},
+		{"active", uint64_t(_surface->_activeSwapchain == this)}, {"unpresentedImageCount", _unpresentedImageCount.load()}}); }
 	// If this swapchain was not replaced by a new swapchain, remove this swapchain
 	// from the surface, and force any outstanding presentations to complete.
 	if (_surface->_activeSwapchain == this) {
 		_surface->_activeSwapchain = nullptr;
-		forceUnpresentedImageCompletion();
+		forceUnpresentedImageCompletion(3);
 	}
 	for (auto& img : _presentableImages) { _device->destroyPresentableSwapchainImage(img, NULL); }
+	if (diagnosticSession) { mvkForensicsRecordForSession(diagnosticSession, "NativeSwapchainDestroy", {
+		{"phase", 1}, {"swapchain", uint64_t(uintptr_t(this))}, {"swapchainGeneration", _diagnosticGeneration},
+		{"unpresentedImageCount", _unpresentedImageCount.load()}}); }
 	MVKVulkanAPIDeviceObject::destroy();
 }
 
 MVKSwapchain::~MVKSwapchain() {
+	mvkForensicsRecord("NativeSwapchainDestruct", {{"swapchain", uint64_t(uintptr_t(this))},
+		{"swapchainGeneration", _diagnosticGeneration}});
     if (_licenseWatermark) { _licenseWatermark->destroy(); }
 }
 

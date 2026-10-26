@@ -32,6 +32,11 @@ class MVKSwapchain;
 
 #pragma mark MVKSurface
 
+// An owned retain/release bracket, NOT a claim about external CAMetalLayer birth.
+struct MVKSurfaceDiagnosticInfo {
+	uint64_t surfaceGeneration = 0, layerBindingGeneration = 0;
+};
+
 /** Represents a Vulkan WSI surface. */
 class MVKSurface : public MVKVulkanAPIObject {
 
@@ -47,7 +52,7 @@ public:
 	MVKInstance* getInstance() override { return _mvkInstance; }
 
     /** Returns the CAMetalLayer underlying this surface. */
-	CAMetalLayer* getCAMetalLayer();
+	CAMetalLayer* getCAMetalLayer(MVKSurfaceDiagnosticInfo* diagnostics = nullptr);
 
 	/** Returns the extent of this surface. */
 	VkExtent2D getExtent();
@@ -80,7 +85,10 @@ protected:
 	void propagateDebugName() override {}
 	void setActiveSwapchain(MVKSwapchain* swapchain);
 	void initLayer(CAMetalLayer* mtlLayer, const char* vkFuncName, bool isHeadless);
-	void releaseLayer();
+	void releaseLayer(uint64_t reason = 0);
+	static uint64_t nextDiagnosticGeneration();
+	uint64_t _diagnosticGeneration = nextDiagnosticGeneration();
+	uint64_t _diagnosticLayerBindingGeneration = 0;
 
 	std::mutex _layerLock;
 	MVKInstance* _mvkInstance = nullptr;

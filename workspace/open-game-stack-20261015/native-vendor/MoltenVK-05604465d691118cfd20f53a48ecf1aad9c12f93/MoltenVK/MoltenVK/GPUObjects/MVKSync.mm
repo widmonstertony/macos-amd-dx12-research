@@ -25,6 +25,59 @@
 
 using namespace std;
 
+// Value-only captures survive the existing callback without retaining events or
+// sitters. These rows describe host actions, never a GPU event signal timestamp.
+struct MVKSyncWaitDiagnostic {
+    uint64_t session=0,registrationID=0,waiterThread=0,semaphore=0,event=0,requested=0;
+    MVKCPUContext owner{};
+};
+static uint64_t mvkSyncDiagnosticTime(uint64_t session) {
+    if(!session)return 0;MVKForensics::ErrnoGuard preserve;return mvkStutterMonotonicNS();
+}
+static MVKSyncWaitDiagnostic mvkSyncWaitDiagnostic(const void*semaphore,const void*event,uint64_t requested) {
+    MVKForensics::ErrnoGuard preserve;MVKSyncWaitDiagnostic d;d.session=mvkForensicsSessionID();if(!d.session)return d;
+    static atomic<uint64_t> nextRegistrationID{1};d.registrationID=nextRegistrationID.fetch_add(1,memory_order_relaxed);
+    pthread_threadid_np(nullptr,&d.waiterThread);d.owner=mvkStutterContext();
+    d.semaphore=uint64_t(uintptr_t(semaphore));d.event=uint64_t(uintptr_t(event));d.requested=requested;return d;
+}
+struct MVKSyncIntentDiagnostic {uint64_t writerStart=0,writerEnd=0;bool fileFlushSucceeded=false;};
+static MVKSyncIntentDiagnostic mvkSyncHostSignalIntent(const MVKSyncWaitDiagnostic&d,uint64_t source) {
+    MVKSyncIntentDiagnostic intent;if(!d.session)return intent;
+    intent.writerStart=mvkSyncDiagnosticTime(d.session);
+    mvkForensicsRecordForSession(d.session,"NativeHostSignalBegin",{{"diagnosticSchema",2},{"operationID",d.registrationID},
+        {"semaphore",d.semaphore},{"event",d.event},{"requestedValue",d.requested},{"signalSource",source},
+        {"intentMachNS",intent.writerStart},{"signalThreadMachID",d.waiterThread},
+        {"ownerSubmission",d.owner.submission},{"ownerNativeCB",d.owner.nativeCB},
+        {"ownerQueueFamily",d.owner.queueFamily},{"ownerQueueIndex",d.owner.queueIndex},{"unfinishedUntilMatchingEnd",1}});
+    intent.fileFlushSucceeded=mvkForensicsFlushIntent(d.session);intent.writerEnd=mvkSyncDiagnosticTime(d.session);return intent;
+}
+static void mvkSyncRecordHostSignal(const MVKSyncWaitDiagnostic&d,const MVKSyncIntentDiagnostic&intent,uint64_t before,uint64_t after,uint64_t source) {
+    if(!d.session)return;
+    mvkForensicsRecordForSession(d.session,"NativeHostSignal",{{"diagnosticSchema",2},{"operationID",d.registrationID},
+        {"semaphore",d.semaphore},{"event",d.event},{"requestedValue",d.requested},
+        {"observedValueAvailable",0},{"callStartMachNS",before},{"callEndMachNS",after},
+        {"intentWriterWallNS",intent.writerEnd-intent.writerStart},{"intentFileFlushSucceeded",intent.fileFlushSucceeded},{"writerAdmissionKnown",0},
+        {"signalSource",source},{"setterReturned",1},{"signalThreadMachID",d.waiterThread},
+        {"ownerSubmission",d.owner.submission},{"ownerNativeCB",d.owner.nativeCB},
+        {"ownerQueueFamily",d.owner.queueFamily},{"ownerQueueIndex",d.owner.queueIndex}});
+}
+static void mvkSyncPublishWaitRegistration(const MVKSyncWaitDiagnostic&d,uint64_t observed,uint64_t start,uint64_t disposition,bool installed) {
+    if(!d.session)return;
+    uint64_t end=mvkSyncDiagnosticTime(d.session),writerStart=mvkSyncDiagnosticTime(d.session);
+    mvkForensicsRecordForSession(d.session,"NativeWaitRegistration",{
+        {"diagnosticSchema",2},{"waitRegistrationID",d.registrationID},{"semaphore",d.semaphore},
+        {"event",d.event},{"requestedValue",d.requested},{"observedValue",observed},
+        {"registrationStartMachNS",start},{"registrationEndMachNS",end},
+        {"registrationDisposition",disposition},{"listenerInstalled",installed},{"waiterThreadMachID",d.waiterThread},
+        {"waiterSubmission",d.owner.submission},{"waiterNativeCB",d.owner.nativeCB},
+        {"waiterQueueFamily",d.owner.queueFamily},{"waiterQueueIndex",d.owner.queueIndex}});
+    bool flushed=mvkForensicsFlushIntent(d.session);uint64_t writerEnd=mvkSyncDiagnosticTime(d.session);
+    mvkForensicsRecordForSession(d.session,"NativeWaitRegistrationPublished",{
+        {"diagnosticSchema",2},{"waitRegistrationID",d.registrationID},{"intentWriterStartMachNS",writerStart},
+        {"intentWriterEndMachNS",writerEnd},{"intentWriterWallNS",writerEnd-writerStart},
+        {"intentFileFlushSucceeded",flushed},{"writerAdmissionKnown",0}});
+}
+
 
 #pragma mark -
 #pragma mark MVKSemaphoreImpl
@@ -165,7 +218,12 @@ VkResult MVKSemaphoreMTLEvent::importFd(VkSemaphoreImportFlags flags, VkExternal
 	* imported payload as if a valid file descriptor had been provided.
 	*/
 	uint64_t value = _mtlEventValue.load();
+	auto diagnostic=mvkSyncWaitDiagnostic(this,(__bridge const void*)_mtlEvent,value);
+	auto intent=mvkSyncHostSignalIntent(diagnostic,2);
+	uint64_t signalStart=mvkSyncDiagnosticTime(diagnostic.session);
 	[(id<MTLSharedEvent>)_mtlEvent setSignaledValue:value];
+	uint64_t signalEnd=mvkSyncDiagnosticTime(diagnostic.session);
+	mvkSyncRecordHostSignal(diagnostic,intent,signalStart,signalEnd,2); // imported signaled sync-fd (-1)
 	return VK_SUCCESS;
 }
 
@@ -274,25 +332,72 @@ void MVKTimelineSemaphoreMTLEvent::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff,
 }
 
 void MVKTimelineSemaphoreMTLEvent::signal(const VkSemaphoreSignalInfo* pSignalInfo) {
+	auto diagnostic=mvkSyncWaitDiagnostic(this,(__bridge const void*)_mtlEvent,pSignalInfo->value);
+	auto intent=mvkSyncHostSignalIntent(diagnostic,1);
+	uint64_t signalStart=mvkSyncDiagnosticTime(diagnostic.session);
 	_mtlEvent.signaledValue = pSignalInfo->value;
+	uint64_t signalEnd=mvkSyncDiagnosticTime(diagnostic.session);
+	mvkSyncRecordHostSignal(diagnostic,intent,signalStart,signalEnd,1); // Vulkan host timeline signal
 }
 
 bool MVKTimelineSemaphoreMTLEvent::registerWait(MVKFenceSitter* sitter, const VkSemaphoreWaitInfo* pWaitInfo, uint32_t index) {
-	if (_mtlEvent.signaledValue >= pWaitInfo->pValues[index]) { return true; }
-	lock_guard<mutex> lock(_lock);
-	sitter->await();
-	auto addRslt = _sitters.insert(sitter);
-	if (addRslt.second) {
-		retain();
-		_device->addSemaphore(&sitter->_blocker);
-		[_mtlEvent notifyListener: sitter->getMTLSharedEventListener()
-						  atValue: pWaitInfo->pValues[index]
-							block: ^(id<MTLSharedEvent>, uint64_t) {
-			lock_guard<mutex> blockLock(_lock);
-			if (_sitters.count(sitter)) { sitter->signaled(); }
-			release();
-		}];
+	auto diagnostic=mvkSyncWaitDiagnostic(this,(__bridge const void*)_mtlEvent,pWaitInfo->pValues[index]);
+	uint64_t registrationStart=mvkSyncDiagnosticTime(diagnostic.session);
+	uint64_t observedValue=_mtlEvent.signaledValue; // original single read, also retained as evidence
+	if (observedValue >= pWaitInfo->pValues[index]) {
+		mvkSyncPublishWaitRegistration(diagnostic,observedValue,registrationStart,1,false);
+		return true;
 	}
+	bool listenerInstalled=false;
+	{
+		lock_guard<mutex> lock(_lock);
+		sitter->await();
+		auto addRslt = _sitters.insert(sitter);
+		if (addRslt.second) {
+			listenerInstalled=true;
+			retain();
+			_device->addSemaphore(&sitter->_blocker);
+			[_mtlEvent notifyListener: sitter->getMTLSharedEventListener()
+							  atValue: pWaitInfo->pValues[index]
+								block: ^(id<MTLSharedEvent> notifiedEvent, uint64_t notifiedValue) {
+				uint64_t callbackEntry=mvkSyncDiagnosticTime(diagnostic.session),releaseBefore=0,releaseAfter=0;
+				uint64_t entryWriterStart=0,entryWriterEnd=0;bool entryFlushed=false;
+				if(diagnostic.session){
+					entryWriterStart=mvkSyncDiagnosticTime(diagnostic.session);
+					mvkForensicsRecordForSession(diagnostic.session,"NativeWaitNotifyEntry",{
+						{"diagnosticSchema",2},{"waitRegistrationID",diagnostic.registrationID},{"event",diagnostic.event},
+						{"callbackEvent",uint64_t(uintptr_t((__bridge const void*)notifiedEvent))},{"requestedValue",diagnostic.requested},
+						{"observedValue",notifiedValue},{"callbackEntryMachNS",callbackEntry},{"waiterThreadMachID",diagnostic.waiterThread},
+						{"waiterSubmission",diagnostic.owner.submission},{"unfinishedUntilMatchingEnd",1}});
+					entryFlushed=mvkForensicsFlushIntent(diagnostic.session);entryWriterEnd=mvkSyncDiagnosticTime(diagnostic.session);
+				}
+				bool sitterSignaled=false;
+				{
+					lock_guard<mutex> blockLock(_lock);
+					if (_sitters.count(sitter)) {
+						releaseBefore=mvkSyncDiagnosticTime(diagnostic.session);
+						sitter->signaled();
+						releaseAfter=mvkSyncDiagnosticTime(diagnostic.session);sitterSignaled=true;
+					}
+					release();
+				}
+				// Emit outside the original lock. The passed callback value is raw;
+				// no extra event query or listener is introduced. A sitter signal
+				// requests release; it does not prove the waiter has returned.
+				if(diagnostic.session)mvkForensicsRecordForSession(diagnostic.session,"NativeWaitNotify",{
+					{"diagnosticSchema",2},{"waitRegistrationID",diagnostic.registrationID},{"semaphore",diagnostic.semaphore},
+					{"event",diagnostic.event},{"callbackEvent",uint64_t(uintptr_t((__bridge const void*)notifiedEvent))},
+					{"requestedValue",diagnostic.requested},{"observedValue",notifiedValue},{"callbackEntryMachNS",callbackEntry},
+					{"releaseBeforeMachNS",releaseBefore},{"releaseAfterMachNS",releaseAfter},
+					{"entryWriterWallNS",entryWriterEnd-entryWriterStart},{"entryFileFlushSucceeded",entryFlushed},{"writerAdmissionKnown",0},
+					{"releaseReason",sitterSignaled?1u:2u},{"sitterSignaled",sitterSignaled},
+					{"signalOriginKnown",0},{"waiterThreadMachID",diagnostic.waiterThread},
+					{"waiterSubmission",diagnostic.owner.submission},{"waiterNativeCB",diagnostic.owner.nativeCB},
+					{"waiterQueueFamily",diagnostic.owner.queueFamily},{"waiterQueueIndex",diagnostic.owner.queueIndex}});
+			}];
+		}
+	}
+	mvkSyncPublishWaitRegistration(diagnostic,observedValue,registrationStart,listenerInstalled?2u:3u,listenerInstalled);
 	return false;
 }
 

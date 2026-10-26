@@ -18,6 +18,7 @@
 
 #include "MVKImage.h"
 #include "MVKPresentedFrameTrace.h"
+#include "MVKForensicsTrace.h"
 #include "MVKStutterNativeTrace.h"
 #include "MVKStutterCoverage.h"
 #include "MVKMemoryTrace.h"
@@ -1795,6 +1796,10 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 		lock_guard<mutex> lock(_detachmentLock);
 		if (_device) { addPerformanceInterval(getPerformanceStats().queue.presentSwapchains, _presentationStartTime); }
 		if (_swapchain) {
+            mvkForensicsRecord("NativePresentedFrame",{{"frame",presentInfo.diagnosticFrameID},
+                {"swapchain",uint64_t(uintptr_t(_swapchain))},{"nativeTimestampCANS",nativePresentTime},
+                {"presentId",presentInfo.presentId},{"ownerNativeCB",presentInfo.diagnosticNativeCB},
+                {"nativeTimestampValid",uint64_t(nativePresentTime!=0)}});
             if (_device) mvkTracePresentedFrame(getMVKConfig(), _swapchain, nativePresentTime);
             mvkStutterPresentedFrame(presentInfo.diagnosticFrameID,_swapchain,nativePresentTime,
                 presentInfo.presentId,presentInfo.diagnosticCaptureSession,presentInfo.diagnosticNativeCB,presentInfo.diagnosticPartialPrefix);

@@ -44,6 +44,7 @@ def main():
     ap.add_argument('--gpu-counter-burst',action='store_true',help='Bounded multi-CB/all-queue counter qualification')
     ap.add_argument('--gpu-counter-burst-max-cbs',type=int,help='Owned-control cap used to close a short session for clock validation')
     ap.add_argument('--probe-binary',type=Path,default=ROOT/'build/probes/geometry_specialization_gpu')
+    ap.add_argument('--full-forensics',action='store_true',help='Qualify bounded native causal logs on owned GPU output')
     args = ap.parse_args()
     if args.gpu_counter_burst and not args.gpu_counter_all_draws:ap.error('--gpu-counter-burst requires --gpu-counter-all-draws')
     if args.gpu_counter_burst_max_cbs is not None and (not args.gpu_counter_burst or not 1<=args.gpu_counter_burst_max_cbs<=512):ap.error('Bounded burst cap requires burst mode and 1..512')
@@ -87,6 +88,8 @@ def main():
     if args.stutter_coverage:
         env.update(MVK_AMD_STUTTER_COVERAGE='1',MVK_AMD_STUTTER_DETAIL='1')
         arm=out/'gpu-counter.arm';arm.touch();env['MVK_AMD_STUTTER_ARM_PATH']=str(arm)
+    if args.full_forensics:
+        marker=out/'forensics.arm';marker.touch();env.update(MVK_AMD_FORENSICS_ARM_PATH=str(marker),MVK_AMD_CPU_FINE_SAMPLE_EVERY='64')
     if args.gpu_counter_burst:env['MVK_AMD_GPU_COUNTER_BURST']='1'
     if args.gpu_counter_burst_max_cbs is not None:env['MVK_AMD_GPU_COUNTER_BURST_MAX_CBS']=str(args.gpu_counter_burst_max_cbs)
     if args.geometry_draw_trace_label or args.gpu_counter_all_draws:

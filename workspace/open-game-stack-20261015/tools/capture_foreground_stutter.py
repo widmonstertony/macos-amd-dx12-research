@@ -8,11 +8,39 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from decimal import Decimal
+import math
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def foreground_intervals(rows, max_gap=2.5):
+    """Poll-resolution continuity only; never extrapolate after the last row."""
+    points = {}
+    for row in rows:
+        when = row.get('time')
+        if not isinstance(when, (float, int, Decimal)) or not math.isfinite(float(when)):
+            continue
+        available = row.get('allWindowListAvailable', True) and row.get('nativeApplicationStateAvailable', True)
+        front = row.get('foreground', row.get('active') and row.get('frontmostPID') == row.get('pid'))
+        state = 'foreground' if front and row.get('visible') else 'background' if available else 'unknown'
+        points[when] = dict(time=when, state=state)
+    ordered = sorted(points.values(), key=lambda x: x['time'])
+    intervals = []
+    for a, b in zip(ordered, ordered[1:]):
+        state = a['state'] if b['time']-a['time'] <= max_gap and a['state'] == b['state'] else 'unknown'
+        reason = 'adjacent-equal-polls' if state != 'unknown' else 'gap-transition-or-unavailable'
+        if intervals and intervals[-1]['state'] == state and intervals[-1]['endCF'] == a['time'] and intervals[-1]['reason'] == reason:
+            intervals[-1]['endCF'] = b['time']
+        else:
+            intervals.append(dict(startCF=a['time'], endCF=b['time'], state=state, reason=reason))
+    return dict(intervals=intervals, observations=len(ordered),
+                lastObservationCF=ordered[-1]['time'] if ordered else None,
+                tailExtrapolated=False, precision='Adjacent host polls only; transitions and gaps are unknown, no state inferred after the last poll.')
+
+
 def main():
+    from capture_stutter_session import MarkerLease, marker_paths
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--pid', type=int, required=True)
     p.add_argument('--lstart', required=True)
@@ -47,6 +75,7 @@ def main():
     control.write_text(json.dumps(record, indent=2) + '\n')
     print(json.dumps(dict(ready=True, gateObserverPID=observer.pid, output=str(out))), flush=True)
     armed = {}
+    lease = None
     try:
         deadline = time.monotonic() + a.wait_seconds
         consecutive = 0
@@ -79,12 +108,12 @@ def main():
         trace = profile / 'msl'
         record['logOffsets'] = {n: (trace/n).stat().st_size if (trace/n).exists() else 0
                                 for n in [f'cpu-stutter-{a.pid}.jsonl', f'stutter-native-{a.pid}.jsonl']}
-        for name in ['cpu-stutter.arm', 'gpu-counter.arm']:
-            f = profile/name
-            f.touch()
-            os.utime(f, None)
-            armed[name] = f.stat().st_mtime_ns
+        # This compatibility harness captures the legacy append logs only.
+        # Use the session collector to follow/rearm rolling forensics streams.
+        lease = MarkerLease({k:v for k,v in marker_paths(profile).items() if k != 'forensics'})
+        armed = lease.arm()
         record.update(armed=armed, trigger=row,
+                      rollingForensicsFollowed=False, continuousSessionTool='capture_stutter_session.py',
                       UTC=datetime.datetime.now(datetime.timezone.utc).isoformat())
         control.write_text(json.dumps(record, indent=2) + '\n')
         print(json.dumps(dict(captureStarted=True, UTC=record['UTC'])), flush=True)
@@ -99,10 +128,8 @@ def main():
         record['status'] = 'captured' if result.returncode == 0 else 'collector-failed'
         return result.returncode
     finally:
-        for name, stamp in armed.items():
-            f = profile/name
-            if f.exists() and f.stat().st_mtime_ns == stamp:
-                f.unlink()
+        if lease is not None:
+            record['markerRestore'] = lease.close()
         if observer.poll() is None:
             observer.terminate()  # Only our read-only observer child, never the game.
             observer.wait(timeout=5)

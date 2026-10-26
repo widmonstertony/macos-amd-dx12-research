@@ -28,6 +28,7 @@
 using namespace std;
 using namespace mvk;
 #include "MVKRuntimeTrace.h"
+#include "MVKShaderForensics.h"
 #include "MVKMeshLinkDifferential.h"
 
 MVKMTLFunction::MVKMTLFunction(id<MTLFunction> mtlFunc, const SPIRVToMSLConversionResultInfo scRslts, MTLSize tgSize) {
@@ -79,8 +80,10 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 												VkPipelineCreationFeedback* pShaderFeedback,
 												MVKShaderModule* shaderModule) {
     MVK_CPU_SCOPE_TAG(NativeFunctionSpecialize,shaderModule ? shaderModule->getKey().codeHash : 0);
+    const bool forensicFunction=mvkForensicsArmed();
+    MVKShaderForensicsSpan forensicFunctionSpan(forensicFunction,"shader-function",this);
 
-	if ( !_mtlLibrary ) { return MVKMTLFunctionNull; }
+	if ( !_mtlLibrary ) { forensicFunctionSpan.finish(2); return MVKMTLFunctionNull; }
 
 	id<MTLLibrary> lib = _mtlLibrary;
 
@@ -106,6 +109,7 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 			// Sort the specialization list before it is used as a key to index the variants
 			std::sort(spec_list.begin(), spec_list.end());
 			auto entry = _specializationVariants.find(spec_list);
+            if (mvkForensicsArmed()) mvkSFEvent("shader-macro-cache",this,0,0,entry!=_specializationVariants.end()?1:2,spec_list.size());
 			if (entry != _specializationVariants.end()) {
 				lib = entry->second->_mtlLibrary;
 			} else {
@@ -117,6 +121,7 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 	}
 
 
+	const uint64_t forensic_cpuNativeMonitor1=mvkForensicsArmed()?mvkSFTimeNS():0;
 	MVKStutterCPUTrace::Scope cpuNativeMonitor1(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 
 
@@ -124,6 +129,7 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 
 
 	    cpuNativeMonitor1.finish();
+    if(forensic_cpuNativeMonitor1) mvkSFEvent("native-device-monitor-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuNativeMonitor1);
 		@autoreleasepool {
 			NSString* mtlFuncName = @(_shaderConversionResultInfo.entryPoint.mtlFunctionName.c_str());
 
@@ -190,6 +196,7 @@ MVKMTLFunction MVKShaderLibrary::getMTLFunction(const VkSpecializationInfo* pSpe
 			_owner->setMetalObjectLabel(mtlFunc, dbName);
 
 			auto& wgSize = _shaderConversionResultInfo.entryPoint.workgroupSize;
+            forensicFunctionSpan.finish(mtlFunc?1:2);
 			return MVKMTLFunction(mtlFunc, _shaderConversionResultInfo, MTLSizeMake(getWorkgroupDimensionSize(wgSize.width, pSpecializationInfo),
 																					getWorkgroupDimensionSize(wgSize.height, pSpecializationInfo),
 																					getWorkgroupDimensionSize(wgSize.depth, pSpecializationInfo)));
@@ -353,13 +360,18 @@ MVKShaderLibrary* MVKShaderLibraryCache::getShaderLibrary(SPIRVToMSLConversionCo
 														  bool* pWasAdded, VkPipelineCreationFeedback* pShaderFeedback,
 														  uint64_t startTime) {
     MVK_CPU_SCOPE_TAG(ShaderLibraryGet,shaderModule->getKey().codeHash);
+    const bool forensicCache=mvkForensicsArmed();
+    if(forensicCache) mvkSFEvent("shader-cache-call",this,0,0,mvkSFIdentity(pipeline),shaderModule->getKey().codeSize);
+	const uint64_t forensic_cpuShaderLockWait1=mvkForensicsArmed()?mvkSFTimeNS():0;
 	MVKStutterCPUTrace::Scope cpuShaderLockWait1(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::ShaderCacheLock));
 	lock_guard<mutex> lock(_accessLock);
 	cpuShaderLockWait1.finish();
+    if(forensic_cpuShaderLockWait1) mvkSFEvent("shader-library-cache-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuShaderLockWait1);
 	bool wasAdded = false;
 	MVKShaderLibrary* shLib = findShaderLibrary(pShaderConfig, pShaderFeedback, startTime);
     { MVKStutterCPUTrace::Scope outcome(mvkStutterCPU(), static_cast<size_t>(shLib ? MVKCPUPhase::ShaderCacheHit : MVKCPUPhase::ShaderCacheMiss), shaderModule->getKey().codeHash); }
     if (!shLib && pipeline->shouldFailOnPipelineCompileRequired()) { MVK_CPU_SCOPE_TAG(ShaderCacheCompileRequired,shaderModule->getKey().codeHash); }
+	if(forensicCache) mvkSFEvent("shader-cache-outcome",this,0,0,shLib?1:pipeline->shouldFailOnPipelineCompileRequired()?3:2,mvkSFIdentity(shLib));
 	if ( !shLib && !pipeline->shouldFailOnPipelineCompileRequired() ) {
 		SPIRVToMSLConversionResult conversionResult;
 		if (shaderModule->convert(pShaderConfig, conversionResult)) {
@@ -383,8 +395,13 @@ MVKShaderLibrary* MVKShaderLibraryCache::findShaderLibrary(SPIRVToMSLConversionC
 														   VkPipelineCreationFeedback* pShaderFeedback,
 														   uint64_t startTime) {
     MVK_CPU_SCOPE(ShaderLibraryLookup);
+    const bool forensicLookup=mvkForensicsArmed();uint64_t examined=0,optionMisses=0;
 	for (auto& slPair : _shaderLibraries) {
-		if (slPair.first.matches(*pShaderConfig)) {
+        bool matched=slPair.first.matches(*pShaderConfig);
+        if(forensicLookup){++examined;if(!matched&&!slPair.first.options.matches(pShaderConfig->options))++optionMisses;}
+		if (matched) {
+            if(forensicLookup){mvkSFEvent("shader-cache-match",this,0,1,1,mvkSFIdentity(slPair.second),examined);
+                mvkSFVariantMetadata("matched-cache-key",this,mvkSFContext.shader,slPair.first);}
 			pShaderConfig->alignWith(slPair.first);
 			addPerformanceInterval(getPerformanceStats().shaderCompilation.shaderLibraryFromCache, startTime);
 			if (pShaderFeedback) {
@@ -393,6 +410,7 @@ MVKShaderLibrary* MVKShaderLibraryCache::findShaderLibrary(SPIRVToMSLConversionC
 			return slPair.second;
 		}
 	}
+    if(forensicLookup) mvkSFEvent("shader-cache-match",this,0,1,examined==0?2:optionMisses==examined?3:4,examined,optionMisses);
 	return nullptr;
 }
 
@@ -448,6 +466,12 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
     auto cpuShaderContext=mvkStutterContext(); cpuShaderContext.shader=_key.codeHash;
     MVKCPUContextGuard cpuShaderContextGuard(cpuShaderContext);
     MVK_CPU_SCOPE_TAG(ShaderGetFunction,_key.codeHash);
+    const bool forensicRequest=mvkForensicsArmed();
+    auto forensicContext=mvkSFContext;
+    if(forensicRequest){forensicContext={mvkSFSequence(),_key.codeHash,0,mvkForensicsSessionID()};}
+    MVKShaderForensicsContextGuard forensicContextGuard(forensicContext);
+    if(forensicRequest){mvkSFContext.config=mvkSFVariantMetadata("requested",this,_key.codeHash,*pShaderConfig,pSpecializationInfo);
+        mvkSFEvent("shader-request",this,0,0,mvkSFIdentity(pipeline),_key.codeSize);}
 	bool trace = mvkRuntimeTraceEnabled(getMVKConfig()) && !mvkRuntimeReplayOnly();
 	bool replaySource = mvkRuntimeReplayEnabled(getMVKConfig()) &&
 		(pShaderConfig->options.mslOptions.for_mesh_pipeline || forceReplaySource);
@@ -459,9 +483,11 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
 		if (pipelineCache) {
 			mvkLib = pipelineCache->getShaderLibrary(pShaderConfig, this, pipeline, pShaderFeedback, startTime);
 		} else {
+			const uint64_t forensic_cpuShaderLockWait2=mvkForensicsArmed()?mvkSFTimeNS():0;
 			MVKStutterCPUTrace::Scope cpuShaderLockWait2(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::ShaderCacheLock));
 			lock_guard<mutex> lock(_accessLock);
 			cpuShaderLockWait2.finish();
+    if(forensic_cpuShaderLockWait2) mvkSFEvent("shader-local-cache-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuShaderLockWait2);
 			mvkLib = _shaderLibraryCache.getShaderLibrary(pShaderConfig, this, pipeline, nullptr, pShaderFeedback, startTime);
 		}
 	} else {
@@ -617,12 +643,16 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
 bool MVKShaderModule::convert(SPIRVToMSLConversionConfiguration* pShaderConfig,
 							  SPIRVToMSLConversionResult& conversionResult) {
     MVK_CPU_SCOPE_CPU_TAG(ShaderConvert,_key.codeHash);
+    const bool forensicConvert=mvkForensicsArmed();
+    MVKShaderForensicsSpan forensicConversionSpan(forensicConvert,"shader-convert",this);
 	const auto& mvkCfg = getMVKConfig();
 	bool shouldLogCode = mvkCfg.debugMode;
 	bool shouldLogEstimatedGLSL = shouldLogCode && mvkCfg.shaderLogEstimatedGLSL;
 
 	uint64_t startTime = getPerformanceTimestamp();
 	bool wasConverted = _spvConverter.convert(*pShaderConfig, conversionResult, shouldLogCode, shouldLogCode, shouldLogEstimatedGLSL);
+    if(forensicConvert){forensicConversionSpan.finish(wasConverted?1:2);
+        mvkSFVariantMetadata("converted-key",this,_key.codeHash,*pShaderConfig);}
     if (!wasConverted) mvkStutterFailure(MVKCPUPhase::ShaderConvert,VK_ERROR_INITIALIZATION_FAILED,_key.codeHash);
 	addPerformanceInterval(getPerformanceStats().shaderCompilation.spirvToMSL, startTime);
 
@@ -761,9 +791,13 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 													   const vector<pair<MSLSpecializationMacroInfo, MVKShaderMacroValue>>& specializationMacroDef,
                                                      bool conservativeMeshLibrary) {
     MVK_CPU_SCOPE_CPU(NativeLibraryCompile);
+    const auto forensicCompileContext=mvkSFCurrentContext();
+    MVKShaderForensicsSpan forensicLibraryCall(mvkForensicsArmed(),"shader-library-request",this);
+	const uint64_t forensic_cpuShaderLockWait3=mvkForensicsArmed()?mvkSFTimeNS():0;
 	MVKStutterCPUTrace::Scope cpuShaderLockWait3(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	unique_lock<mutex> lock(_completionLock);
 	cpuShaderLockWait3.finish();
+    if(forensic_cpuShaderLockWait3) mvkSFEvent("shader-compiler-completion-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuShaderLockWait3);
 	_mslSourceCode = mslSourceCode;		// For logMSLSource(), from handleError() within compile().
 	const char* syncOption = getenv("MVK_AMD_SYNC_MESH_LIBRARIES");
 	bool synchronousMesh = conservativeMeshLibrary && syncOption && !strcmp(syncOption, "1");
@@ -771,14 +805,19 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
     const auto cpuCompileContext = mvkStutterContext();
 	compile(lock, ^{
         MVKCPUContextGuard cpuCompilerContext(cpuCompileContext);
+        MVKShaderForensicsContextGuard forensicWorkerContext(forensicCompileContext);
+        const uint64_t forensicLibraryOp=forensicCompileContext.session?mvkSFSequence():0;
+        if(forensicLibraryOp) mvkSFEvent("shader-library-native",this,forensicLibraryOp,0);
 		auto mtlDev = getMTLDevice();
 		MTLCompileOptions* synchronousOptions = nil;
 		NSDictionary* synchronousProvenance = nil;
 		NSDictionary* synchronousContext = nil;
 		uint64_t libraryOperation=0;
+		const uint64_t forensic_cpuNativeMonitor2=mvkForensicsArmed()?mvkSFTimeNS():0;
 		MVKStutterCPUTrace::Scope cpuNativeMonitor2(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::NativeMonitorLock));
 		@synchronized (mtlDev) {
 		    cpuNativeMonitor2.finish();
+    if(forensic_cpuNativeMonitor2) mvkSFEvent("native-device-monitor-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuNativeMonitor2);
 			@autoreleasepool {
 				auto mtlCompileOptions = getDevice()->getMTLCompileOptions(shaderConversionResults.entryPoint.fpFastMathFlags,
 																		   shaderConversionResults.isPositionInvariant);
@@ -806,7 +845,8 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 																					   forKeys: macro_names
 																						 count: macro_count];
 				}
-				logCompilation(mtlCompileOptions);
+				if(mvkForensicsArmed()) mvkSFNativeLibraryMetadata(this,forensicLibraryOp,mslSourceCode,mtlCompileOptions);
+                logCompilation(mtlCompileOptions);
                 NSDictionary* provenance = mvkCompileProvenance(mslSourceCode, mtlCompileOptions);
 				if (provenance) {
 					NSMutableDictionary* detail = [[provenance mutableCopy] autorelease];
@@ -825,11 +865,14 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 					synchronousProvenance = [provenance retain];
 					synchronousContext = [fullContext retain];
 				} else {
-				[mtlDev newLibraryWithSource: mslSourceCode
+				if(forensicLibraryOp) mvkSFEvent("shader-library-metal-submit",this,forensicLibraryOp,0,0,0);
+                [mtlDev newLibraryWithSource: mslSourceCode
 									options: mtlCompileOptions
 						completionHandler: ^(id<MTLLibrary> mtlLib, NSError* error) {
         MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
         MVK_CPU_SCOPE(CallbackCompletion);
+        MVKShaderForensicsContextGuard forensicCompletionContext(forensicCompileContext);
+        if(forensicLibraryOp) mvkSFEvent("shader-library-native",this,forensicLibraryOp,1,mtlLib?1:2,error?uint64_t(error.code):0);
                             if (mtlLib && provenance) objc_setAssociatedObject(mtlLib, mvkCompileProvenanceKey(), provenance, OBJC_ASSOCIATION_COPY);
 							if (mtlLib && fullContext) objc_setAssociatedObject(mtlLib,mvkMeshContextKey(),fullContext,OBJC_ASSOCIATION_RETAIN);
 							mvkLinkOperationEnd(libraryOperation);
@@ -841,7 +884,9 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 		}
 		if (synchronousOptions) {
 			NSError* error = nil;
+			if(forensicLibraryOp) mvkSFEvent("shader-library-metal-submit",this,forensicLibraryOp,0,1,0);
 			id<MTLLibrary> library = [mtlDev newLibraryWithSource:mslSourceCode options:synchronousOptions error:&error];
+            if(forensicLibraryOp) mvkSFEvent("shader-library-native",this,forensicLibraryOp,1,library?1:2,error?uint64_t(error.code):0);
 			if (library && synchronousProvenance)
 				objc_setAssociatedObject(library, mvkCompileProvenanceKey(), synchronousProvenance, OBJC_ASSOCIATION_COPY);
 			if (library && synchronousContext)
@@ -859,6 +904,7 @@ id<MTLLibrary> MVKShaderLibraryCompiler::newMTLLibrary(NSString* mslSourceCode,
 	});
 	_mslSourceCode = nil;
 
+    forensicLibraryCall.finish(_mtlLibrary?1:2);
 	return [_mtlLibrary retain];
 }
 
@@ -1020,9 +1066,11 @@ void MVKShaderLibraryCompiler::logMSLSource() {
 }
 
 bool MVKShaderLibraryCompiler::compileComplete(id<MTLLibrary> mtlLibrary, NSError* compileError) {
+	const uint64_t forensic_cpuShaderLockWait4=mvkForensicsArmed()?mvkSFTimeNS():0;
 	MVKStutterCPUTrace::Scope cpuShaderLockWait4(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	lock_guard<mutex> lock(_completionLock);
 	cpuShaderLockWait4.finish();
+    if(forensic_cpuShaderLockWait4) mvkSFEvent("shader-compiler-completion-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuShaderLockWait4);
 
     if (!mtlLibrary) mvkStutterFailure(MVKCPUPhase::NativeLibraryCompile,compileError ? compileError.code : -1);
 	_mtlLibrary = [mtlLibrary retain];		// retained
@@ -1083,30 +1131,43 @@ MVKShaderLibraryCompiler::~MVKShaderLibraryCompiler() {
 id<MTLFunction> MVKFunctionSpecializer::newMTLFunction(id<MTLLibrary> mtlLibrary,
 													   NSString* funcName,
 													   MTLFunctionConstantValues* constantValues) {
+    const auto forensicCompileContext=mvkSFCurrentContext();
+    MVKShaderForensicsSpan forensicSpecializeCall(mvkForensicsArmed(),"shader-specialize-request",this);
+	const uint64_t forensic_cpuShaderLockWait5=mvkForensicsArmed()?mvkSFTimeNS():0;
 	MVKStutterCPUTrace::Scope cpuShaderLockWait5(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	unique_lock<mutex> lock(_completionLock);
 	cpuShaderLockWait5.finish();
+    if(forensic_cpuShaderLockWait5) mvkSFEvent("shader-compiler-completion-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuShaderLockWait5);
 
     const auto cpuCompileContext = mvkStutterContext();
 	compile(lock, ^{
         MVKCPUContextGuard cpuCompilerContext(cpuCompileContext);
-		[mtlLibrary newFunctionWithName: funcName
+        MVKShaderForensicsContextGuard forensicWorkerContext(forensicCompileContext);
+        const uint64_t forensicSpecializeOp=forensicCompileContext.session?mvkSFSequence():0;
+        if(forensicSpecializeOp) mvkSFEvent("shader-specialize-native",this,forensicSpecializeOp,0);
+		if(forensicSpecializeOp) mvkSFEvent("shader-specialize-metal-submit",this,forensicSpecializeOp,0);
+        [mtlLibrary newFunctionWithName: funcName
 						 constantValues: constantValues
 					  completionHandler: ^(id<MTLFunction> mtlFunc, NSError* error) {
         MVKCPUContextGuard cpuCompletionContext(cpuCompileContext);
         MVK_CPU_SCOPE(CallbackCompletion);
+        MVKShaderForensicsContextGuard forensicCompletionContext(forensicCompileContext);
+        if(forensicSpecializeOp) mvkSFEvent("shader-specialize-native",this,forensicSpecializeOp,1,mtlFunc?1:2,error?uint64_t(error.code):0);
 						  bool isLate = compileComplete(mtlFunc, error);
 						  if (isLate) { destroy(); }
 					  }];
 	});
 
+    forensicSpecializeCall.finish(_mtlFunction?1:2);
 	return [_mtlFunction retain];
 }
 
 bool MVKFunctionSpecializer::compileComplete(id<MTLFunction> mtlFunction, NSError* compileError) {
+	const uint64_t forensic_cpuShaderLockWait6=mvkForensicsArmed()?mvkSFTimeNS():0;
 	MVKStutterCPUTrace::Scope cpuShaderLockWait6(mvkStutterCPU(),static_cast<size_t>(MVKCPUPhase::CompilerCompletionLock));
 	lock_guard<mutex> lock(_completionLock);
 	cpuShaderLockWait6.finish();
+    if(forensic_cpuShaderLockWait6) mvkSFEvent("shader-compiler-completion-lock",this,0,1,0,0,mvkSFTimeNS()-forensic_cpuShaderLockWait6);
 
     if (!mtlFunction) mvkStutterFailure(MVKCPUPhase::NativeFunctionSpecialize,compileError ? compileError.code : -1);
 	_mtlFunction = [mtlFunction retain];		// retained

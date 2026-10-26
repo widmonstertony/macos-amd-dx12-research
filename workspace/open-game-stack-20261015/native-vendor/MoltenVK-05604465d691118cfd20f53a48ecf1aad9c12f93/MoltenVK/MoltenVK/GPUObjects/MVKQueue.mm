@@ -30,6 +30,7 @@
 #include "MVKStutterNativeTrace.h"
 #include "MVKStutterCoverage.h"
 #include "MVKMemoryTrace.h"
+#include "MVKForensicsTrace.h"
 
 using namespace std;
 
@@ -37,6 +38,11 @@ void mvkMarkTrackedCommandBufferCommit(id<MTLCommandBuffer> cb) {
     mvkMarkDependencyCounterCommit(cb);
     mvkQueueTimingCommit(cb);
     mvkStutterMarkNativeCommit(cb);
+    if (mvkForensicsArmed() && cb) {
+        auto p=mvkStutterNativeSnapshot(cb);
+        mvkForensicsRecord("NativeCBCommit",{{"ownerNativeCB",p.nativeID},{"ownerSubmit",p.logical},
+            {"ownerFrame",p.frame},{"ownerFamily",p.family},{"ownerIndex",p.index},{"split",p.split}});
+    }
 }
 
 
@@ -103,6 +109,8 @@ static inline VkResult execute(MVKQueueSubmission* qSubmit) { @autoreleasepool {
 // Relying on the dispatch queue to find time to drain the autoreleasepool can
 // result in significant memory creep under heavy workloads.
 VkResult MVKQueue::submit(MVKQueueSubmission* qSubmit) {
+    MVKForensicsScope forensics("NativeQueueDispatch",{{"vkQueue",uint64_t(uintptr_t(getDiagnosticVkQueue()))},
+        {"queueFamily",_queueFamily->getIndex()},{"queueIndex",_index},{"async",uint64_t(_execQueue!=nullptr)}});
 	if (_device->getConfigurationResult() != VK_SUCCESS) { return _device->getConfigurationResult(); }
 
 	if ( !qSubmit ) { return VK_SUCCESS; }     // Ignore nils
@@ -114,6 +122,8 @@ VkResult MVKQueue::submit(MVKQueueSubmission* qSubmit) {
 	if (_execQueue) {
 		std::unique_lock lock(_execQueueMutex);
 		_execQueueJobCount++;
+        mvkForensicsRecord("NativeDispatchDepth",{{"ownerSubmit",qSubmit->_stutterSubmissionID},
+            {"vkQueue",uint64_t(uintptr_t(getDiagnosticVkQueue()))},{"pendingJobs",_execQueueJobCount}});
 
 		dispatch_async(_execQueue, ^{
 			execute(qSubmit);
@@ -131,8 +141,44 @@ VkResult MVKQueue::submit(MVKQueueSubmission* qSubmit) {
 static inline uint32_t getCommandBufferCount(const VkSubmitInfo2* pSubmitInfo) { return pSubmitInfo->commandBufferInfoCount; }
 static inline uint32_t getCommandBufferCount(const VkSubmitInfo* pSubmitInfo) { return pSubmitInfo->commandBufferCount; }
 
+// Numeric edge records are bounded per VkSubmit. Values are copied from the caller,
+// never inferred for binary semaphores. Dispatchable guest/native handles require a
+// verified mapping; pointer equality across Wine is not assumed by the analyzer.
+static void mvkForensicsSubmitEdges(const VkSubmitInfo2* s, uint32_t ordinal, uint64_t queue) {
+    if(!mvkForensicsArmed()||!s)return;
+    mvkForensicsRecord("NativeSubmitShape",{{"vkQueue",queue},{"ordinal",ordinal},{"commands",s->commandBufferInfoCount},
+        {"waits",s->waitSemaphoreInfoCount},{"signals",s->signalSemaphoreInfoCount},{"edgeCap",64}});
+    for(uint32_t direction=0;direction<2;++direction){
+        uint32_t n=direction?s->signalSemaphoreInfoCount:s->waitSemaphoreInfoCount;
+        auto* edges=direction?s->pSignalSemaphoreInfos:s->pWaitSemaphoreInfos;
+        for(uint32_t i=0;i<std::min(n,64u);++i)mvkForensicsRecord("NativeSubmitEdge",{{"vkQueue",queue},{"ordinal",ordinal},
+            {"direction",direction},{"edgeIndex",i},{"semaphore",uint64_t(uintptr_t(edges[i].semaphore))},
+            {"value",edges[i].value},{"valueSupplied",1},{"stageMask",edges[i].stageMask}});
+    }
+}
+static void mvkForensicsSubmitEdges(const VkSubmitInfo* s, uint32_t ordinal, uint64_t queue) {
+    if(!mvkForensicsArmed()||!s)return;
+    const VkTimelineSemaphoreSubmitInfo* timeline=nullptr;
+    auto* p=static_cast<const VkBaseInStructure*>(s->pNext);uint32_t chainCount=0;
+    for(;p&&chainCount<64;p=p->pNext,++chainCount)if(p->sType==VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO){timeline=reinterpret_cast<const VkTimelineSemaphoreSubmitInfo*>(p);break;}
+    mvkForensicsRecord("NativeSubmitShape",{{"vkQueue",queue},{"ordinal",ordinal},{"commands",s->commandBufferCount},
+        {"waits",s->waitSemaphoreCount},{"signals",s->signalSemaphoreCount},{"edgeCap",64},{"pNextCapped",uint64_t(p&&chainCount>=64)}});
+    for(uint32_t direction=0;direction<2;++direction){
+        uint32_t n=direction?s->signalSemaphoreCount:s->waitSemaphoreCount;
+        auto* edges=direction?s->pSignalSemaphores:s->pWaitSemaphores;
+        for(uint32_t i=0;i<std::min(n,64u);++i){
+            bool supplied=timeline&&i<(direction?timeline->signalSemaphoreValueCount:timeline->waitSemaphoreValueCount);
+            uint64_t value=supplied?(direction?timeline->pSignalSemaphoreValues[i]:timeline->pWaitSemaphoreValues[i]):0;
+            mvkForensicsRecord("NativeSubmitEdge",{{"vkQueue",queue},{"ordinal",ordinal},{"direction",direction},{"edgeIndex",i},
+                {"semaphore",uint64_t(uintptr_t(edges[i]))},{"value",value},{"valueSupplied",uint64_t(supplied)},
+                {"stageMask",direction?0:uint64_t(s->pWaitDstStageMask[i])}});
+        }
+    }
+}
 template <typename S>
 VkResult MVKQueue::submit(uint32_t submitCount, const S* pSubmits, VkFence fence, MVKCommandUse cmdUse) {
+    MVKForensicsScope forensics("NativeSubmitAPI",{{"vkQueue",uint64_t(uintptr_t(getDiagnosticVkQueue()))},
+        {"submitCount",submitCount},{"fence",uint64_t(uintptr_t(fence))},{"commandUse",uint64_t(cmdUse)}});
 
     // Fence-only submission
     if (submitCount == 0 && fence) {
@@ -144,6 +190,7 @@ VkResult MVKQueue::submit(uint32_t submitCount, const S* pSubmits, VkFence fence
         VkFence fenceOrNil = (sIdx == (submitCount - 1)) ? fence : VK_NULL_HANDLE; // last one gets the fence
 
 		const S* pVkSub = &pSubmits[sIdx];
+        mvkForensicsSubmitEdges(pVkSub,sIdx,uint64_t(uintptr_t(getDiagnosticVkQueue())));
 		MVKQueueCommandBufferSubmission* mvkSub;
 		uint32_t cbCnt = getCommandBufferCount(pVkSub);
 		if (cbCnt <= 1) {
@@ -162,6 +209,9 @@ VkResult MVKQueue::submit(uint32_t submitCount, const S* pSubmits, VkFence fence
 			mvkSub = new MVKQueueFullCommandBufferSubmission<512>(this, pVkSub, fenceOrNil, cmdUse);
 		}
 
+        if(mvkForensicsArmed())mvkForensicsRecord("NativeSubmitLink",{{"vkQueue",uint64_t(uintptr_t(getDiagnosticVkQueue()))},
+            {"ordinal",sIdx},{"ownerSubmit",mvkSub->_stutterSubmissionID},{"commandBuffers",cbCnt},
+            {"queueFamily",_queueFamily->getIndex()},{"queueIndex",_index}});
         VkResult subRslt = submit(mvkSub);
         if (rslt == VK_SUCCESS) { rslt = subRslt; }
     }
@@ -177,6 +227,7 @@ VkResult MVKQueue::submit(const VkPresentInfoKHR* pPresentInfo) {
 }
 
 VkResult MVKQueue::waitIdle(MVKCommandUse cmdUse) {
+    MVKForensicsScope forensics("NativeQueueWaitIdle",{{"vkQueue",uint64_t(uintptr_t(getDiagnosticVkQueue()))}});
     MVK_CPU_SCOPE_CPU(HostFenceWait);
 	if (_execQueue) {
 		std::unique_lock lock(_execQueueMutex);
@@ -196,6 +247,8 @@ VkResult MVKQueue::waitIdle(MVKCommandUse cmdUse) {
 
 id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool retainRefs) {
     MVK_CPU_SCOPE_CPU(CommandAllocation);
+    MVKForensicsScope allocation("NativeCommandAllocation",{{"commandUse",uint64_t(cmdUse)},{"retainedRefs",uint64_t(retainRefs)}});
+    const uint64_t forensicsSession=mvkForensicsSessionID();
     mvkStutterReportMetalMemory(_mtlQueue.device);
 	id<MTLCommandBuffer> mtlCmdBuff = nil;
 	uint64_t startTime = getPerformanceTimestamp();
@@ -209,20 +262,33 @@ id<MTLCommandBuffer> MVKQueue::getMTLCommandBuffer(MVKCommandUse cmdUse, bool re
 	[mtlCmdBuffDesc release];														// temp release
 	mvkQueueTimingBegin(mtlCmdBuff, _queueFamily->getIndex(), _index, getMVKConfig().shaderDumpDir);
     mvkStutterBeginNativeCB(mtlCmdBuff,_queueFamily->getIndex(),_index);
+    if(forensicsSession){auto p=mvkStutterNativeSnapshot(mtlCmdBuff);mvkForensicsRecordForSession(forensicsSession,"NativeCBCreated",
+        {{"ownerNativeCB",p.nativeID},{"ownerFamily",p.family},{"ownerIndex",p.index},{"nativeQueue",uint64_t(uintptr_t(_mtlQueue))},
+         {"nativeObject",uint64_t(uintptr_t(mtlCmdBuff))},{"commandUse",uint64_t(cmdUse)}});}
 
 	addPerformanceInterval(getPerformanceStats().queue.retrieveMTLCommandBuffer, startTime);
 	NSString* mtlCmdBuffLabel = getMTLCommandBufferLabel(cmdUse);
 	setMetalObjectLabel(mtlCmdBuff, mtlCmdBuffLabel);
 	mvkBeginDependencyTrace(mtlCmdBuff, _queueFamily->getIndex(), _index, _device, this);
-    if (mvkDependencyTraceEnabled()) [mtlCmdBuff addScheduledHandler:^(id<MTLCommandBuffer> cb) {
+    if (mvkDependencyTraceEnabled()||forensicsSession) [mtlCmdBuff addScheduledHandler:^(id<MTLCommandBuffer> cb) {
         mvkRecordDependencyPhase(cb, @"scheduled");
         mvkStutterNativePhase(cb,"scheduled");
+        if(forensicsSession){auto p=mvkStutterNativeSnapshot(cb);mvkForensicsRecordForSession(forensicsSession,"NativeCBScheduled",
+            {{"ownerNativeCB",p.nativeID},{"ownerSubmit",p.logical},{"ownerFamily",p.family},{"ownerIndex",p.index}});}
     }];
 	[mtlCmdBuff addCompletedHandler: ^(id<MTLCommandBuffer> mtlCB) {
         auto provenance=mvkStutterNativeSnapshot(mtlCB);
         MVKCPUContext context;context.domain=7;context.queueFamily=provenance.family;context.queueIndex=provenance.index;
         context.submission=provenance.logical;context.nativeCB=provenance.nativeID;context.frame=provenance.frame;
         MVKCPUContextGuard contextGuard(context);MVK_CPU_SCOPE_CPU(CallbackCompletion);
+        const uint64_t completionSession=forensicsSession?forensicsSession:mvkForensicsSessionID();
+        if(completionSession)mvkForensicsRecordForSession(completionSession,"NativeCBCompleted",
+            {{"ownerNativeCB",provenance.nativeID},{"ownerSubmit",provenance.logical},{"ownerFrame",provenance.frame},
+             {"ownerFamily",provenance.family},{"ownerIndex",provenance.index},{"split",provenance.split},
+             {"status",uint64_t(mtlCB.status)},{"error",uint64_t(mtlCB.error.code)},
+             {"gpuStartCANS",uint64_t(mtlCB.GPUStartTime*1e9)},{"gpuEndCANS",uint64_t(mtlCB.GPUEndTime*1e9)},
+             {"createdCANS",uint64_t(provenance.createdCA*1e9)},{"committedCANS",uint64_t(provenance.committedCA*1e9)},
+             {"partialPrefix",uint64_t(!forensicsSession)}});
         mvkRecordDependencyPhase(mtlCB, @"completed");
         NSDictionary* counterRecord=objc_getAssociatedObject(mtlCB,mvkDependencyKey());
         if(mvkStutterNativeEnabled()) {
@@ -652,6 +718,10 @@ VkResult MVKQueueCommandBufferSubmission::execute() {
     context.submission=_stutterSubmissionID; context.nativeCB=0; context.frame=0;
     MVKCPUContextGuard contextGuard(context);
     MVK_CPU_SCOPE_TAG(QueueExecute,_stutterSubmissionID);
+    // The submission may destroy itself in commit completion. The scope saves
+    // only numeric context and never dereferences this from its destructor.
+    MVKForensicsScope forensics("NativeQueueExecute",{{"vkQueue",uint64_t(uintptr_t(_queue->getDiagnosticVkQueue()))},
+        {"waitCount",_waitSemaphores.size()},{"signalCount",_signalSemaphores.size()}});
     if(_stutterCreatedNS)mvkStutterAsync(MVKCPUPhase::QueueDispatchDelay,mvkStutterMonotonicNS()-_stutterCreatedNS,_stutterSubmissionID);
     mvkStutterSubmissionPhase(_stutterSubmissionID,context.queueFamily,context.queueIndex,"executing",_stutterCreatedNS);
 
@@ -660,7 +730,7 @@ VkResult MVKQueueCommandBufferSubmission::execute() {
 	// This gate is only enabled together with asynchronous queue submission.
 	// Each VkQueue owns a serial dispatch queue, so waiting here preserves Vulkan
 	// queue order while other queues remain free to produce the required value.
-	for (auto& ws : _waitSemaphores) { ws.gateUnsignaledTimelineWaitOnHost(); }
+	for (auto& ws : _waitSemaphores) { MVKForensicsScope gate("NativeTimelineHostGate"); ws.gateUnsignaledTimelineWaitOnHost(); }
 
 	// If using encoded semaphore waiting, do so now.
 	for (auto& ws : _waitSemaphores) { ws.encodeWait(getActiveMTLCommandBuffer()); }

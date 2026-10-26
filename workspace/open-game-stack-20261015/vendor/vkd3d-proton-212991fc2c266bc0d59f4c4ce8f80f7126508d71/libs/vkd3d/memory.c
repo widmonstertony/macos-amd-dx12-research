@@ -19,6 +19,7 @@
 #define VKD3D_DBG_CHANNEL VKD3D_DBG_CHANNEL_API
 
 #include "vkd3d_private.h"
+#include "vkd3d_forensics.h"
 #include "vkd3d_descriptor_debug.h"
 
 static bool vkd3d_memory_transfer_queue_wait_semaphore(struct vkd3d_memory_transfer_queue *queue,
@@ -533,7 +534,7 @@ static void vkd3d_memory_transfer_queue_fill_allocation(struct vkd3d_memory_tran
         memset(allocation->cpu_address, value, allocation->resource.size);
 
         if (!(device->memory_properties.memoryTypes[allocation->device_allocation.vk_memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-            VK_CALL(vkFlushMappedMemoryRanges(device->vk_device, 1, &mapped_range));
+            vkf_mapped_ranges(vk_procs->vkFlushMappedMemoryRanges,VKF_FLUSH,device->vk_device, 1, &mapped_range);
     }
     else if (allocation->resource.vk_buffer)
     {
@@ -994,7 +995,7 @@ static HRESULT vkd3d_try_allocate_device_memory(struct d3d12_device *device,
     /* In case we get address binding callbacks, ensure driver knows it's not a sparse bind that happens async. */
     vkd3d_address_binding_tracker_mark_user_thread();
 
-    vr = VK_CALL(vkAllocateMemory(device->vk_device, &allocate_info, NULL, &allocation->vk_memory));
+    vr = vkf_allocate_memory(vk_procs->vkAllocateMemory,device->vk_device, &allocate_info, NULL, &allocation->vk_memory);
 
     if (vr == VK_SUCCESS)
     {
@@ -1473,8 +1474,8 @@ static HRESULT vkd3d_memory_allocation_init(struct vkd3d_memory_allocation *allo
 
         if (!(device->memory_properties.memoryTypes[allocation->device_allocation.vk_memory_type].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
         {
-            if ((vr = VK_CALL(vkMapMemory(device->vk_device, allocation->device_allocation.vk_memory,
-                    0, VK_WHOLE_SIZE, 0, &dummy_mapping))))
+            if ((vr = vkf_map_memory(vk_procs->vkMapMemory,device->vk_device, allocation->device_allocation.vk_memory,
+                    0, VK_WHOLE_SIZE, 0, &dummy_mapping)))
                 ERR("Failed to map memory, vr %d.\n", vr);
         }
     }
@@ -1482,8 +1483,8 @@ static HRESULT vkd3d_memory_allocation_init(struct vkd3d_memory_allocation *allo
     {
         allocation->flags |= VKD3D_ALLOCATION_FLAG_CPU_ACCESS;
 
-        if ((vr = VK_CALL(vkMapMemory(device->vk_device, allocation->device_allocation.vk_memory,
-                0, VK_WHOLE_SIZE, 0, &allocation->cpu_address))))
+        if ((vr = vkf_map_memory(vk_procs->vkMapMemory,device->vk_device, allocation->device_allocation.vk_memory,
+                0, VK_WHOLE_SIZE, 0, &allocation->cpu_address)))
         {
             ERR("Failed to map memory, vr %d.\n", vr);
             vkd3d_memory_allocation_free(allocation, device, allocator);
@@ -2154,6 +2155,8 @@ static bool vkd3d_heap_allocation_accept_deferred_resource_placements(struct d3d
 HRESULT vkd3d_allocate_heap_memory(struct d3d12_device *device, struct vkd3d_memory_allocator *allocator,
         const struct vkd3d_allocate_heap_memory_info *info, struct vkd3d_memory_allocation *allocation)
 {
+    VKF_SCOPE(vkf_api,VKF_HEAP_MEMORY,device,info->heap_desc.SizeInBytes,info->heap_desc.Flags);
+
     struct vkd3d_allocate_heap_memory_info heap_info;
     struct vkd3d_allocate_memory_info alloc_info;
     HRESULT hr;
@@ -2191,7 +2194,7 @@ HRESULT vkd3d_allocate_heap_memory(struct d3d12_device *device, struct vkd3d_mem
             /* If the heap was only designed to handle images, the heap is useless,
              * and we can force everything to go through committed path. */
             memset(allocation, 0, sizeof(*allocation));
-            return S_OK;
+            return (HRESULT)vkf_result(&vkf_api, (S_OK));
         }
         else
         {
@@ -2226,7 +2229,7 @@ HRESULT vkd3d_allocate_heap_memory(struct d3d12_device *device, struct vkd3d_mem
         hr = S_OK;
     }
 
-    return hr;
+    return (HRESULT)vkf_result(&vkf_api, (hr));
 }
 
 HRESULT vkd3d_allocate_internal_buffer_memory(struct d3d12_device *device, VkBuffer vk_buffer,

@@ -18,6 +18,7 @@
 
 #include "MVKSurface.h"
 #include "MVKSwapchain.h"
+#include "MVKForensicsTrace.h"
 #include "MVKImage.h"
 #include "MVKQueue.h"
 #include "MVKFoundation.h"
@@ -80,6 +81,8 @@ VkResult MVKSwapchain::acquireNextImage(uint64_t timeout,
 										uint32_t deviceMask,
 										uint32_t* pImageIndex) {
 
+    MVKForensicsScope forensics("NativeAcquireNextImage",{{"swapchain",uint64_t(uintptr_t(this))},
+        {"timeout",timeout},{"semaphore",uint64_t(uintptr_t(semaphore))},{"fence",uint64_t(uintptr_t(fence))}});
 	if ( _device->getConfigurationResult() != VK_SUCCESS ) { return _device->getConfigurationResult(); }
 	if ( getIsSurfaceLost() ) { return VK_ERROR_SURFACE_LOST_KHR; }
 

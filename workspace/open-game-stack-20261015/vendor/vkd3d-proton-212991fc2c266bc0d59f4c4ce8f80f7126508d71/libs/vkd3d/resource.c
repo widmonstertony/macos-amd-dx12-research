@@ -23,6 +23,7 @@
 #include <math.h>
 
 #include "vkd3d_private.h"
+#include "vkd3d_forensics.h"
 #include "vkd3d_d3dkmt.h"
 #include "vkd3d_rw_spinlock.h"
 #include "vkd3d_descriptor_debug.h"
@@ -2365,7 +2366,7 @@ static void d3d12_resource_invalidate_range(struct d3d12_resource *resource,
     if (!d3d12_resource_get_mapped_memory_range(resource, subresource, read_range, &mapped_range))
         return;
 
-    VK_CALL(vkInvalidateMappedMemoryRanges(resource->device->vk_device, 1, &mapped_range));
+    vkf_mapped_ranges(vk_procs->vkInvalidateMappedMemoryRanges,VKF_INVALIDATE,resource->device->vk_device, 1, &mapped_range);
 }
 
 static void d3d12_resource_flush_range(struct d3d12_resource *resource,
@@ -2377,7 +2378,7 @@ static void d3d12_resource_flush_range(struct d3d12_resource *resource,
     if (!d3d12_resource_get_mapped_memory_range(resource, subresource, written_range, &mapped_range))
         return;
 
-    VK_CALL(vkFlushMappedMemoryRanges(resource->device->vk_device, 1, &mapped_range));
+    vkf_mapped_ranges(vk_procs->vkFlushMappedMemoryRanges,VKF_FLUSH,resource->device->vk_device, 1, &mapped_range);
 }
 
 static void d3d12_resource_get_map_ptr(struct d3d12_resource *resource, void **data)
@@ -2398,6 +2399,8 @@ static bool d3d12_resource_texture_validate_map(struct d3d12_resource *resource)
 static HRESULT STDMETHODCALLTYPE d3d12_resource_Map(d3d12_resource_iface *iface, UINT sub_resource,
         const D3D12_RANGE *read_range, void **data)
 {
+    VKF_SAMPLED_SCOPE(vkf_map,VKF_RESOURCE_MAP,iface,sub_resource,1,1);
+
     struct d3d12_resource *resource = impl_from_ID3D12Resource2(iface);
     unsigned int sub_resource_count;
 
@@ -2407,14 +2410,14 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_Map(d3d12_resource_iface *iface,
     if (!d3d12_resource_is_cpu_accessible(resource))
     {
         WARN("Resource is not CPU accessible.\n");
-        return E_INVALIDARG;
+        return (HRESULT)vkf_sampled_result(&vkf_map, (E_INVALIDARG));
     }
 
     sub_resource_count = d3d12_resource_get_sub_resource_count(resource);
     if (sub_resource >= sub_resource_count)
     {
         WARN("Sub-resource index %u is out of range (%u sub-resources).\n", sub_resource, sub_resource_count);
-        return E_INVALIDARG;
+        return (HRESULT)vkf_sampled_result(&vkf_map, (E_INVALIDARG));
     }
 
     if (d3d12_resource_is_texture(resource) && (data || !d3d12_resource_texture_validate_map(resource)))
@@ -2422,13 +2425,13 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_Map(d3d12_resource_iface *iface,
         /* Cannot get pointer to mapped texture.
          * It is only possible to make UNKNOWN textures host visible,
          * and only NULL map + Write/ReadSubresource is allowed in this scenario. */
-        return E_INVALIDARG;
+        return (HRESULT)vkf_sampled_result(&vkf_map, (E_INVALIDARG));
     }
 
     if (resource->flags & VKD3D_RESOURCE_RESERVED)
     {
         FIXME("Not implemented for this resource type.\n");
-        return E_NOTIMPL;
+        return (HRESULT)vkf_sampled_result(&vkf_map, (E_NOTIMPL));
     }
 
     if (data)
@@ -2438,12 +2441,14 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_Map(d3d12_resource_iface *iface,
     }
 
     d3d12_resource_invalidate_range(resource, sub_resource, read_range);
-    return S_OK;
+    return (HRESULT)vkf_sampled_result(&vkf_map, (S_OK));
 }
 
 static void STDMETHODCALLTYPE d3d12_resource_Unmap(d3d12_resource_iface *iface, UINT sub_resource,
         const D3D12_RANGE *written_range)
 {
+    VKF_SAMPLED_SCOPE(vkf_map,VKF_RESOURCE_UNMAP,iface,sub_resource,2,1);
+
     struct d3d12_resource *resource = impl_from_ID3D12Resource2(iface);
     unsigned int sub_resource_count;
 
@@ -2577,7 +2582,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_WriteToSubresource(d3d12_resourc
     mapped_range.size = (extent.depth - 1) * subresource_layout->depth_pitch +
       extent.height * subresource_layout->row_pitch;
     vkd3d_mapped_memory_range_align(device, &mapped_range, resource->mem.device_allocation.size);
-    VK_CALL(vkFlushMappedMemoryRanges(device->vk_device, 1, &mapped_range));
+    vkf_mapped_ranges(vk_procs->vkFlushMappedMemoryRanges,VKF_FLUSH,device->vk_device, 1, &mapped_range);
 
     return vkd3d_memory_transfer_queue_write_subresource(&device->memory_transfers,
             resource, dst_sub_resource, offset, extent);
@@ -2658,7 +2663,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_ReadFromSubresource(d3d12_resour
     mapped_range.size = (src_box->back - src_box->front - 1) * subresource_layout->depth_pitch +
       (src_box->bottom - src_box->top) * subresource_layout->row_pitch;
     vkd3d_mapped_memory_range_align(device, &mapped_range, resource->mem.device_allocation.size);
-    VK_CALL(vkInvalidateMappedMemoryRanges(device->vk_device, 1, &mapped_range));
+    vkf_mapped_ranges(vk_procs->vkInvalidateMappedMemoryRanges,VKF_INVALIDATE,device->vk_device, 1, &mapped_range);
 
     vkd3d_format_copy_data(format, src_data, subresource_layout->row_pitch,
             subresource_layout->depth_pitch, dst_data, dst_row_pitch, dst_slice_pitch,
@@ -4171,6 +4176,9 @@ HRESULT d3d12_resource_create_committed(struct d3d12_device *device, const D3D12
         UINT num_castable_formats, const DXGI_FORMAT *castable_formats,
         HANDLE shared_handle, struct d3d12_resource **resource)
 {
+    VKF_SCOPE(vkf_api,VKF_COMMITTED_RESOURCE,device,desc?desc->Dimension:0,desc?desc->Width:0);
+    vkf_api.output=resource;
+
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     struct d3d12_resource *object;
     HRESULT hr;
@@ -4179,7 +4187,7 @@ HRESULT d3d12_resource_create_committed(struct d3d12_device *device, const D3D12
             desc, heap_properties, heap_flags, initial_state, optimized_clear_value,
             num_castable_formats, castable_formats,
             &object)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
     if (d3d12_resource_is_texture(object))
     {
@@ -4391,11 +4399,11 @@ HRESULT d3d12_resource_create_committed(struct d3d12_device *device, const D3D12
             VKD3D_QUEUE_TIMELINE_TRACE_STATE_TYPE_COMMITTED_RESOURCE_ALLOCATION, object->res.cookie.index);
 
     *resource = object;
-    return S_OK;
+    return (HRESULT)vkf_result(&vkf_api, (S_OK));
 
 fail:
     d3d12_resource_destroy_and_release_device(object, device);
-    return hr;
+    return (HRESULT)vkf_result(&vkf_api, (hr));
 }
 
 static HRESULT d3d12_resource_validate_heap(const D3D12_RESOURCE_DESC1 *resource_desc, struct d3d12_heap *heap)
@@ -4431,6 +4439,9 @@ HRESULT d3d12_resource_create_placed(struct d3d12_device *device, const D3D12_RE
         UINT num_castable_formats, const DXGI_FORMAT *castable_formats,
         struct d3d12_resource **resource)
 {
+    VKF_SCOPE(vkf_api,VKF_PLACED_RESOURCE,device,desc?desc->Dimension:0,desc?desc->Width:0);
+    vkf_api.output=resource;
+
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     struct vkd3d_allocate_memory_info allocate_info;
     VkMemoryRequirements memory_requirements;
@@ -4441,7 +4452,7 @@ HRESULT d3d12_resource_create_placed(struct d3d12_device *device, const D3D12_RE
     HRESULT hr;
 
     if (FAILED(hr = d3d12_resource_validate_heap(desc, heap)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
     if (heap->allocation.device_allocation.vk_memory == VK_NULL_HANDLE)
     {
@@ -4457,14 +4468,14 @@ HRESULT d3d12_resource_create_placed(struct d3d12_device *device, const D3D12_RE
         {
             ERR("Failed to create fallback committed resource.\n");
         }
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
     }
 
     if (FAILED(hr = d3d12_resource_create(device, VKD3D_RESOURCE_PLACED, desc,
             &heap->desc.Properties, heap->desc.Flags, initial_state, optimized_clear_value,
             num_castable_formats, castable_formats,
             &object)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
     /* https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createheap#remarks.
      * Placed resources hold a reference on the heap. */
@@ -4629,11 +4640,11 @@ HRESULT d3d12_resource_create_placed(struct d3d12_device *device, const D3D12_RE
 #endif
 
     *resource = object;
-    return S_OK;
+    return (HRESULT)vkf_result(&vkf_api, (S_OK));
 
 fail:
     d3d12_resource_destroy_and_release_device(object, device);
-    return hr;
+    return (HRESULT)vkf_result(&vkf_api, (hr));
 }
 
 static HRESULT d3d12_resource_create_reserved_fallback(
@@ -4671,6 +4682,9 @@ HRESULT d3d12_resource_create_reserved(struct d3d12_device *device,
         UINT num_castable_formats, const DXGI_FORMAT *castable_formats,
         struct d3d12_resource **resource)
 {
+    VKF_SCOPE(vkf_api,VKF_RESERVED_RESOURCE,device,desc?desc->Dimension:0,desc?desc->Width:0);
+    vkf_api.output=resource;
+
     const struct vkd3d_format *format;
     struct d3d12_resource *object;
     HRESULT hr;
@@ -4679,7 +4693,7 @@ HRESULT d3d12_resource_create_reserved(struct d3d12_device *device,
     {
         format = vkd3d_get_format(device, desc->Format, !!(desc->Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL));
         if (!format)
-            return E_INVALIDARG;
+            return (HRESULT)vkf_result(&vkf_api, (E_INVALIDARG));
 
         /* Check that implementation supports sparse for the format at all.
          * RADV does not support depth-stencil sparse for example.
@@ -4694,8 +4708,8 @@ HRESULT d3d12_resource_create_reserved(struct d3d12_device *device,
                     (unsigned int)desc->Width, desc->Height,
                     desc->MipLevels, desc->DepthOrArraySize);
 
-            return d3d12_resource_create_reserved_fallback(device, desc, initial_state,
-                    optimized_clear_value, num_castable_formats, castable_formats, resource);
+            return (HRESULT)vkf_result(&vkf_api, (d3d12_resource_create_reserved_fallback(device, desc, initial_state,
+                    optimized_clear_value, num_castable_formats, castable_formats, resource)));
         }
     }
 
@@ -4703,7 +4717,7 @@ HRESULT d3d12_resource_create_reserved(struct d3d12_device *device,
             NULL, D3D12_HEAP_FLAG_NONE, initial_state, optimized_clear_value,
             num_castable_formats, castable_formats,
             &object)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
     if (FAILED(hr = d3d12_resource_create_vk_resource(object, num_castable_formats, castable_formats, device)))
         goto fail;
@@ -4719,7 +4733,7 @@ HRESULT d3d12_resource_create_reserved(struct d3d12_device *device,
         if (!object->res.va)
         {
             ERR("Failed to get VA for sparse resource.\n");
-            return E_FAIL;
+            return (HRESULT)vkf_result(&vkf_api, (E_FAIL));
         }
 
         vkd3d_va_map_insert(&device->memory_allocator.va_map, &object->res);
@@ -4729,11 +4743,11 @@ HRESULT d3d12_resource_create_reserved(struct d3d12_device *device,
         d3d12_resource_tag_debug_name(object, device, "Reserved Resource");
 
     *resource = object;
-    return S_OK;
+    return (HRESULT)vkf_result(&vkf_api, (S_OK));
 
 fail:
     d3d12_resource_destroy_and_release_device(object, device);
-    return hr;
+    return (HRESULT)vkf_result(&vkf_api, (hr));
 }
 
 ULONG vkd3d_resource_incref(ID3D12Resource *resource)
@@ -8295,9 +8309,9 @@ static HRESULT d3d12_descriptor_heap_create_descriptor_buffer(struct d3d12_descr
         descriptor_heap->descriptor_buffer.va =
                 vkd3d_get_buffer_device_address(device, descriptor_heap->descriptor_buffer.vk_buffer);
 
-        if ((vr = VK_CALL(vkMapMemory(device->vk_device,
+        if ((vr = vkf_map_memory(vk_procs->vkMapMemory,device->vk_device,
                 descriptor_heap->descriptor_buffer.device_allocation.vk_memory,
-                0, VK_WHOLE_SIZE, 0, (void**)&descriptor_heap->descriptor_buffer.host_allocation))))
+                0, VK_WHOLE_SIZE, 0, (void**)&descriptor_heap->descriptor_buffer.host_allocation)))
         {
             ERR("Failed to map descriptor set memory.\n");
             vkd3d_free_device_memory(device, &descriptor_heap->descriptor_buffer.device_allocation);
@@ -8637,8 +8651,8 @@ static HRESULT d3d12_descriptor_heap_init_data_buffer(struct d3d12_descriptor_he
                 property_flags, &descriptor_heap->device_allocation)))
             return hr;
 
-        if ((vr = VK_CALL(vkMapMemory(device->vk_device, descriptor_heap->device_allocation.vk_memory,
-                0, VK_WHOLE_SIZE, 0, &descriptor_heap->host_memory))))
+        if ((vr = vkf_map_memory(vk_procs->vkMapMemory,device->vk_device, descriptor_heap->device_allocation.vk_memory,
+                0, VK_WHOLE_SIZE, 0, &descriptor_heap->host_memory)))
         {
             ERR("Failed to map buffer, vr %d.\n", vr);
             return hresult_from_vk_result(vr);

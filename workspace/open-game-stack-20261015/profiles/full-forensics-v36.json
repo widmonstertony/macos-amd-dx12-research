@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "name": "full-forensics-v36",
+  "description": "Diagnostic coverage over v35 behavior; not a playability or FPS fix.",
+  "descriptionZh": "基于v35行为的诊断覆盖版，不代表已修复帧率或可玩性。",
+  "builder": "tools/build_profile_candidate.py",
+  "builderArguments": [
+    "--resource-stats",
+    "--snapshot-reuse",
+    "--cross-snapshot-reuse",
+    "--failure-context",
+    "--registration-delta-cache",
+    "--shared-live-snapshots",
+    "--split-command-buffers",
+    "--continuous-work-trace",
+    "--gpu-counters",
+    "--gpu-counter-all-draws",
+    "--suppress-archive-trace",
+    "--normal-mesh-libraries",
+    "--sharded-shader-cache-locks",
+    "--descriptor-write-shards",
+    "--encoder-heap-plans",
+    "--stutter-coverage",
+    "--gpu-counter-burst",
+    "--suppress-link-differential",
+    "--slow-command-buffer-trace-ms",
+    "50.0",
+    "--gpu-counter-pipeline-label",
+    "*",
+    "--geometry-command-buffer-batch-limit",
+    "16",
+    "--full-forensics"
+  ],
+  "automaticStartupCPUCapture": false,
+  "collectorArmsStartupBeforeHumanLaunch": true,
+  "gameLaunchIncluded": false,
+  "playabilityEstablished": false,
+  "functionalBaseline": "buffer-read-plan-v35",
+  "fineScopeSampleEvery": 64,
+  "bounds": {
+    "nativeRollingSlots": 4,
+    "nativeBytesPerSlot": 8388608,
+    "nativeRowsPerSecond": 4096,
+    "cpuHistoryBytes": 67108864
+  },
+  "knownGaps": [
+    "Game internals and closed driver internals",
+    "Exact source for currently loaded DXGI binary is not matched",
+    "Detailed traces cover bounded armed windows; losses and partial tails must remain visible"
+  ],
+  "observerOverheadNotSubtracted": true
+}

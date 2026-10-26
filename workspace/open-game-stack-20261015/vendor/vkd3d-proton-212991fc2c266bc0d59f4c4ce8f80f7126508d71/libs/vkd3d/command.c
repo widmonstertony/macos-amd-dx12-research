@@ -20,6 +20,8 @@
 #define VKD3D_DBG_CHANNEL VKD3D_DBG_CHANNEL_API
 
 #include "vkd3d_private.h"
+#define VKD3D_FORENSICS_IMPLEMENTATION
+#include "vkd3d_forensics.h"
 #include "vkd3d_d3dkmt.h"
 #include "vkd3d_swapchain_factory.h"
 #include "vkd3d_descriptor_debug.h"
@@ -143,6 +145,7 @@ HRESULT vkd3d_queue_create(struct d3d12_device *device, uint32_t family_index, u
     object->timestamp_bits = properties->timestampValidBits;
 
     VK_CALL(vkGetDeviceQueue(device->vk_device, family_index, queue_index, &object->vk_queue));
+    vkf_queue_mapping((uintptr_t)object->vk_queue,family_index,queue_index);
 
     TRACE("Created queue %p for queue family index %u.\n", object, family_index);
 
@@ -255,7 +258,7 @@ void vkd3d_queue_drain(struct vkd3d_queue *queue, struct d3d12_device *device)
         submit_desc.signalSemaphoreInfoCount = 1;
         submit_desc.pSignalSemaphoreInfos = &signal_semaphore;
 
-        if ((vr = VK_CALL(vkQueueSubmit2(vk_queue, 1, &submit_desc, VK_NULL_HANDLE))) < 0)
+        if ((vr = vkf_submit2(vk_procs->vkQueueSubmit2,vk_queue, 1, &submit_desc, VK_NULL_HANDLE)) < 0)
             ERR("Failed to submit queue(s), vr %d.\n", vr);
     }
 
@@ -284,6 +287,8 @@ void vkd3d_queue_destroy(struct vkd3d_queue *queue, struct d3d12_device *device)
 
 VkQueue vkd3d_queue_acquire(struct vkd3d_queue *queue)
 {
+    VKF_SCOPE(vkf_acquire,VKF_QUEUE_ACQUIRE,queue,0,0);
+
     int rc;
 
     TRACE("queue %p.\n", queue);
@@ -598,7 +603,7 @@ static void vkd3d_wait_for_gpu_timeline_semaphore(struct vkd3d_fence_worker *wor
         if (vkd3d_config_flags & (VKD3D_CONFIG_FLAG_BREADCRUMBS | VKD3D_CONFIG_FLAG_FAULT))
             timeout = 5000000000ull;
 
-        if ((vr = VK_CALL(vkWaitSemaphores(device->vk_device, &wait_info, timeout))))
+        if ((vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,device->vk_device, &wait_info, timeout)))
         {
             ERR("Failed to wait for Vulkan timeline semaphore, vr %d.\n", vr);
             VKD3D_DEVICE_REPORT_FAULT_AND_BREADCRUMB_IF(device, vr == VK_ERROR_DEVICE_LOST || vr == VK_TIMEOUT);
@@ -666,7 +671,7 @@ static void *vkd3d_fence_worker_main(void *arg)
 
         if (!worker->enqueued_fence_count && !worker->should_exit)
         {
-            if ((rc = pthread_cond_wait(&worker->cond, &worker->mutex)))
+            if ((rc = vkf_cond_wait(&worker->cond, &worker->mutex, 674)))
             {
                 ERR("Failed to wait on condition variable, error %d.\n", rc);
                 pthread_mutex_unlock(&worker->mutex);
@@ -975,7 +980,7 @@ static bool d3d12_fence_block_until_pending_value_reaches_locked(
         if (pending_value > fence->max_pending_virtual_timeline_value)
         {
             TRACE("Blocking wait on fence %p until it reaches 0x%"PRIx64".\n", fence, pending_value);
-            pthread_cond_wait(&fence->cond, &fence->mutex);
+            vkf_cond_wait(&fence->cond, &fence->mutex, 983);
 
             /* We dropped the lock, so there might have been new tickets being added to ticket counter,
              * or the ticket might have been satisfied through a pulsing event race. */
@@ -1070,7 +1075,7 @@ static void d3d12_fence_wait_until_signal_count_reaches_locked(struct d3d12_fenc
 {
     assert(update_count != 0);
     while (fence->signal_count < update_count)
-        pthread_cond_wait(&fence->cond, &fence->mutex);
+        vkf_cond_wait(&fence->cond, &fence->mutex, 1078);
 }
 
 static void d3d12_fence_update_wait_tickets_locked(struct d3d12_fence *fence)
@@ -1403,7 +1408,7 @@ static HRESULT d3d12_fence_set_native_sync_handle_on_completion_explicit(struct 
     {
         latch = false;
         while (!latch)
-            pthread_cond_wait(&fence->null_event_cond, &fence->mutex);
+            vkf_cond_wait(&fence->null_event_cond, &fence->mutex, 1411);
     }
 
     pthread_mutex_unlock(&fence->mutex);
@@ -1749,7 +1754,7 @@ static void *vkd3d_shared_fence_worker_main(void *userdata)
         pthread_mutex_lock(&fence->mutex);
         while (fence->is_running && list_empty(&fence->events))
         {
-            pthread_cond_wait(&fence->cond_var, &fence->mutex);
+            vkf_cond_wait(&fence->cond_var, &fence->mutex, 1757);
         }
 
         vr = VK_CALL(vkGetSemaphoreCounterValue(fence->device->vk_device, fence->timeline_semaphore, &completed_value));
@@ -1785,7 +1790,7 @@ static void *vkd3d_shared_fence_worker_main(void *userdata)
         pthread_mutex_unlock(&fence->mutex);
 
         completed_value++;
-        vr = VK_CALL(vkWaitSemaphores(fence->device->vk_device, &wait_info, 10000000ull));
+        vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,fence->device->vk_device, &wait_info, 10000000ull);
         if (vr != VK_SUCCESS && vr != VK_TIMEOUT)
         {
             ERR("Failed to wait for semaphore, error %d.\n", vr);
@@ -1869,7 +1874,7 @@ static HRESULT d3d12_shared_fence_set_native_sync_handle_on_completion_explicit(
         wait_info.pSemaphores = &fence->timeline_semaphore;
         wait_info.pValues = &value;
 
-        if ((vr = VK_CALL(vkWaitSemaphores(fence->device->vk_device, &wait_info, UINT64_MAX))))
+        if ((vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,fence->device->vk_device, &wait_info, UINT64_MAX)))
         {
             ERR("Failed to wait on shared fence, vr %d.\n", vr);
             return E_FAIL;
@@ -21669,6 +21674,8 @@ out:
 static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12CommandQueue *iface,
         UINT command_list_count, ID3D12CommandList * const *command_lists)
 {
+    VKF_SCOPE(vkf_api,VKF_EXECUTE,iface,command_list_count,0);
+
     struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
     struct vkd3d_queue_timeline_trace_cookie timeline_cookie;
     struct vkd3d_initial_transition *transitions;
@@ -22584,7 +22591,7 @@ static void d3d12_command_queue_flush_waiters(struct d3d12_command_queue *comman
         submit_info.signalSemaphoreInfoCount = 1;
         submit_info.pSignalSemaphoreInfos = &signal_semaphore;
 
-        if ((vr = VK_CALL(vkQueueSubmit2(vk_queue, 1, &submit_info, VK_NULL_HANDLE))))
+        if ((vr = vkf_submit2(vk_procs->vkQueueSubmit2,vk_queue, 1, &submit_info, VK_NULL_HANDLE)))
             ERR("Failed to submit semaphore waits, vr %d.\n", vr);
 
         if (vr == VK_SUCCESS && (wait_flags & VKD3D_WAIT_SEMAPHORES_SERIALIZING))
@@ -22610,7 +22617,7 @@ static void d3d12_command_queue_wait_idle(struct d3d12_command_queue *command_qu
     semaphore_wait.pSemaphores = &command_queue->vkd3d_queue->submission_timeline;
     semaphore_wait.pValues = &command_queue->last_submission_timeline_value;
 
-    if ((vr = VK_CALL(vkWaitSemaphores(command_queue->device->vk_device, &semaphore_wait, UINT64_MAX))))
+    if ((vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,command_queue->device->vk_device, &semaphore_wait, UINT64_MAX)))
         ERR("Failed to wait for virtual queue idle, vr %d.\n", vr);
 }
 
@@ -22692,7 +22699,7 @@ static void d3d12_command_queue_wait(struct d3d12_command_queue *command_queue,
         wait_info.pValues = &fence_value.vk_semaphore_value;
 
         cookie = vkd3d_queue_timeline_trace_register_generic_region(&fence->device->queue_timeline_trace, "CPU WAIT");
-        if ((vr = VK_CALL(vkWaitSemaphores(command_queue->device->vk_device, &wait_info, UINT64_MAX))))
+        if ((vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,command_queue->device->vk_device, &wait_info, UINT64_MAX)))
             ERR("Failed to wait for timeline semaphore, vr %d.\n", vr);
         vkd3d_queue_timeline_trace_complete_execute(&fence->device->queue_timeline_trace, &command_queue->fence_worker, cookie);
     }
@@ -22770,7 +22777,7 @@ static void d3d12_command_queue_wait_shared(struct d3d12_command_queue *command_
     wait_info.pSemaphores = &fence->timeline_semaphore;
     wait_info.semaphoreCount = 1;
     wait_info.pValues = &value;
-    vr = VK_CALL(vkWaitSemaphores(device->vk_device, &wait_info, UINT64_MAX));
+    vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,device->vk_device, &wait_info, UINT64_MAX);
     VKD3D_DEVICE_REPORT_FAULT_AND_BREADCRUMB_IF(device, vr == VK_ERROR_DEVICE_LOST);
 }
 
@@ -22811,7 +22818,7 @@ static void d3d12_command_queue_signal_shared(struct d3d12_command_queue *comman
     submit_info.signalSemaphoreInfoCount = 1;
     submit_info.pSignalSemaphoreInfos = &signal_semaphore_info;
 
-    vr = VK_CALL(vkQueueSubmit2(vk_queue, 1, &submit_info, VK_NULL_HANDLE));
+    vr = vkf_submit2(vk_procs->vkQueueSubmit2,vk_queue, 1, &submit_info, VK_NULL_HANDLE);
 
     if (vr == VK_SUCCESS)
     {
@@ -22821,7 +22828,7 @@ static void d3d12_command_queue_signal_shared(struct d3d12_command_queue *comman
         signal_semaphore_info.value = vkd3d_queue->submission_timeline_count;
         signal_semaphore_info.semaphore = vkd3d_queue->submission_timeline;
 
-        vr = VK_CALL(vkQueueSubmit2(vk_queue, 1, &submit_info, VK_NULL_HANDLE));
+        vr = vkf_submit2(vk_procs->vkQueueSubmit2,vk_queue, 1, &submit_info, VK_NULL_HANDLE);
 
         command_queue->last_submission_timeline_value = vkd3d_queue->submission_timeline_count;
     }
@@ -22936,7 +22943,7 @@ static void d3d12_command_queue_transition_pool_wait(struct d3d12_command_queue_
     wait_info.pSemaphores = &pool->timeline;
     wait_info.semaphoreCount = 1;
     wait_info.pValues = &value;
-    vr = VK_CALL(vkWaitSemaphores(device->vk_device, &wait_info, ~(uint64_t)0));
+    vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,device->vk_device, &wait_info, ~(uint64_t)0);
     VKD3D_DEVICE_REPORT_FAULT_AND_BREADCRUMB_IF(device, vr == VK_ERROR_DEVICE_LOST);
 }
 
@@ -23153,14 +23160,14 @@ static VkResult d3d12_command_queue_submit_split_locked(struct d3d12_device *dev
                 split_submission.waitSemaphoreInfoCount =
                         cmd_index == 0 ? input_submission->waitSemaphoreInfoCount : 0;
 
-                if ((vr = VK_CALL(vkQueueSubmit2(vk_queue, 1, &split_submission, VK_NULL_HANDLE))) < 0)
+                if ((vr = vkf_submit2(vk_procs->vkQueueSubmit2,vk_queue, 1, &split_submission, VK_NULL_HANDLE)) < 0)
                 {
                     ERR("Failed to submit queue(s), vr %d.\n", vr);
                     return vr;
                 }
             }
         }
-        else if ((vr = VK_CALL(vkQueueSubmit2(vk_queue, 1, input_submission, VK_NULL_HANDLE))) < 0)
+        else if ((vr = vkf_submit2(vk_procs->vkQueueSubmit2,vk_queue, 1, input_submission, VK_NULL_HANDLE)) < 0)
         {
             ERR("Failed to submit queue(s), vr %d.\n", vr);
             return vr;
@@ -23182,7 +23189,7 @@ static void d3d12_command_queue_wait_staggered_submission(struct d3d12_command_q
     wait_info.pSemaphores = &command_queue->vkd3d_queue->submission_timeline;
     wait_info.pValues = &command_queue->last_submission_timeline_value;
 
-    if ((vr = VK_CALL(vkWaitSemaphores(command_queue->device->vk_device, &wait_info, UINT64_MAX))))
+    if ((vr = vkf_wait_semaphores(vk_procs->vkWaitSemaphores,command_queue->device->vk_device, &wait_info, UINT64_MAX)))
         ERR("Failed to wait for semaphore, vr %d.\n", vr);
 }
 
@@ -23502,7 +23509,7 @@ static void d3d12_command_queue_execute(struct d3d12_command_queue *command_queu
         }
         else if (exec->split_submission)
             vr = d3d12_command_queue_submit_split_locked(command_queue->device, vk_queue, num_submits, submit_desc);
-        else if ((vr = VK_CALL(vkQueueSubmit2(vk_queue, num_submits, submit_desc, VK_NULL_HANDLE))) < 0)
+        else if ((vr = vkf_submit2(vk_procs->vkQueueSubmit2,vk_queue, num_submits, submit_desc, VK_NULL_HANDLE)) < 0)
             ERR("Failed to submit queue(s), vr %d.\n", vr);
 
         if (is_first)
@@ -24057,6 +24064,10 @@ static void d3d12_command_queue_add_submission_locked(struct d3d12_command_queue
     vkd3d_array_reserve((void**)&queue->submissions, &queue->submissions_size,
                         queue->submissions_count + 1, sizeof(*queue->submissions));
     queue->submissions[queue->submissions_count++] = *sub;
+    vkf_note_queue(VKF_ENQUEUE,(uintptr_t)queue,sub->type,
+            sub->type==VKD3D_SUBMISSION_EXECUTE?(uintptr_t)sub->execute.cmd:0,
+            queue->submissions_count,(uintptr_t)queue->vkd3d_queue->vk_queue,
+            queue->vkd3d_queue->vk_family_index,queue->vkd3d_queue->vk_queue_index);
     pthread_cond_signal(&queue->queue_cond);
 }
 
@@ -24075,6 +24086,8 @@ static void d3d12_command_queue_add_submission(struct d3d12_command_queue *queue
 
 static void d3d12_command_queue_acquire_serialized(struct d3d12_command_queue *queue)
 {
+    VKF_SCOPE(vkf_drain,VKF_SERIAL_DRAIN,queue,0,0);
+
     /* In order to make sure all pending operations queued so far have been submitted,
      * we build a drain task which will increment the queue_drain_count once the thread has finished all its work. */
     struct d3d12_command_queue_submission sub;
@@ -24088,7 +24101,7 @@ static void d3d12_command_queue_acquire_serialized(struct d3d12_command_queue *q
     d3d12_command_queue_add_submission_locked(queue, &sub);
 
     while (current_drain > queue->queue_drain_count)
-        pthread_cond_wait(&queue->queue_cond, &queue->queue_lock);
+        vkf_cond_wait(&queue->queue_cond, &queue->queue_lock, 24103);
 }
 
 static void d3d12_command_queue_release_serialized(struct d3d12_command_queue *queue)
@@ -24146,12 +24159,18 @@ static void *d3d12_command_queue_submission_worker_main(void *userdata)
     {
         pthread_mutex_lock(&queue->queue_lock);
         while (queue->submissions_count == 0)
-            pthread_cond_wait(&queue->queue_cond, &queue->queue_lock);
+            vkf_cond_wait(&queue->queue_cond, &queue->queue_lock, 24161);
 
         queue->submissions_count--;
         submission = queue->submissions[0];
         memmove(queue->submissions, queue->submissions + 1, queue->submissions_count * sizeof(submission));
         pthread_mutex_unlock(&queue->queue_lock);
+        VKF_WORK_CONTEXT(vkf_worker_context,queue,
+                submission.type==VKD3D_SUBMISSION_EXECUTE?(uintptr_t)submission.execute.cmd:0);
+        VKF_SCOPE(vkf_work,VKF_WORKER,queue,submission.type,vkf_context.work_key);
+        vkf_note_queue(VKF_ACQUIRE,(uintptr_t)queue,submission.type,vkf_context.work_key,0,
+                (uintptr_t)queue->vkd3d_queue->vk_queue,queue->vkd3d_queue->vk_family_index,
+                queue->vkd3d_queue->vk_queue_index);
 
         if (submission.type != VKD3D_SUBMISSION_BIND_SPARSE)
             d3d12_command_queue_flush_bind_sparse(queue);
@@ -24483,7 +24502,7 @@ void vkd3d_release_vk_queue(ID3D12CommandQueue *queue)
     submit_info.signalSemaphoreInfoCount = 1;
     submit_info.pSignalSemaphoreInfos = &semaphore_info;
 
-    vr = VK_CALL(vkQueueSubmit2(d3d12_queue->vkd3d_queue->vk_queue, 1, &submit_info, VK_NULL_HANDLE));
+    vr = vkf_submit2(vk_procs->vkQueueSubmit2,d3d12_queue->vkd3d_queue->vk_queue, 1, &submit_info, VK_NULL_HANDLE);
     VKD3D_DEVICE_REPORT_FAULT_AND_BREADCRUMB_IF(d3d12_queue->device, vr == VK_ERROR_DEVICE_LOST);
 
     d3d12_queue->last_submission_timeline_value = semaphore_info.value;

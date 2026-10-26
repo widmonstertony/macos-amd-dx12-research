@@ -38,25 +38,27 @@ using MVKCPUContextGuard=MVKStutterCPUTrace::ContextGuard;
 inline uint64_t mvkStutterMonotonicNS(){return MVKCPUDefaultClock::toNS(MVKCPUDefaultClock::ticks());}
 inline MVKCPUContext mvkStutterContext(){return MVKStutterCPUTrace::currentContext;}
 inline bool mvkStutterCoverageEnabled(){static const bool enabled=[] {const char*v=getenv("MVK_AMD_STUTTER_COVERAGE");return v&&!strcmp(v,"1");}();return enabled;}
-inline std::array<MVKCPUStageInfo,static_cast<size_t>(MVKCPUPhase::Count)> mvkStutterStageInfo(){return {{
+inline std::array<MVKCPUStageInfo,static_cast<size_t>(MVKCPUPhase::Count)> mvkStutterStageInfo(){std::array<MVKCPUStageInfo,static_cast<size_t>(MVKCPUPhase::Count)> info={{
 #define MVK_CPU_FALLBACK_INFO(name,kind) {#name,MVKCPUTimingKind::kind},
     MVK_CPU_PHASE_LIST(MVK_CPU_FALLBACK_INFO)
 #undef MVK_CPU_FALLBACK_INFO
-}};}
+}};
+    const char* value=getenv("MVK_AMD_CPU_FINE_SAMPLE_EVERY");char*end=nullptr;unsigned long n=value?strtoul(value,&end,10):1;
+    if(!value||!end||*end||n<1||n>4096)n=1;
+    for(auto phase:{MVKCPUPhase::DescriptorCacheLock,MVKCPUPhase::DescriptorWriteCommit,MVKCPUPhase::DescriptorWrites,MVKCPUPhase::DescriptorCacheScan})info[static_cast<size_t>(phase)].scopeSampleEvery=uint32_t(n);
+    return info;
+}
 
 class MVKStutterCPURuntime {
-    static std::array<MVKCPUStageInfo,static_cast<size_t>(MVKCPUPhase::Count)> stageInfo(){return {{
-#define MVK_CPU_INFO(name,kind) {#name,MVKCPUTimingKind::kind},
-        MVK_CPU_PHASE_LIST(MVK_CPU_INFO)
-#undef MVK_CPU_INFO
-    }};}
+    static std::array<MVKCPUStageInfo,static_cast<size_t>(MVKCPUPhase::Count)> stageInfo(){return mvkStutterStageInfo();}
     std::mutex _stopLock,_publishLock;
     std::condition_variable _stopCV;
     std::thread _reporter;
     bool _stop=false;
     std::atomic<bool> _reporterUnavailable{false};
-    uint64_t _lastPublishNS=0,_historyRecords=0;
-    char _history[4096]{},_current[4096]{},_temporary[4096]{};
+    uint64_t _lastPublishNS=0,_historyRecords=0,_historyBytes=0,_historySkipped=0;
+    static constexpr uint64_t HistoryByteCap=64ULL*1024*1024;
+    char _history[4096]{},_current[4096]{},_temporary[4096]{},_status[4096]{};
     const char*_detailArmPath=nullptr;
     const char*_cpuArmPath=nullptr;
     bool _detailEnvironment=false;
@@ -83,6 +85,8 @@ public:
         int b=snprintf(_current,sizeof(_current),"%s/cpu-stutter-current-%d.json",dir,getpid());
         int c=snprintf(_temporary,sizeof(_temporary),"%s/cpu-stutter-current-%d.next",dir,getpid());
         if(a<=0||size_t(a)>=sizeof(_history)||b<=0||size_t(b)>=sizeof(_current)||c<=0||size_t(c)>=sizeof(_temporary))return;
+        snprintf(_status,sizeof(_status),"%s/cpu-stutter-status-%d.json",dir,getpid());
+        struct stat oldHistory{};if(!stat(_history,&oldHistory))_historyBytes=oldHistory.st_size;
         _lastPublishNS=mvkStutterMonotonicNS();trace.setEnabled(true);
         const char*detail=getenv("MVK_AMD_STUTTER_DETAIL");_detailEnvironment=detail&&!strcmp(detail,"1");_detailArmPath=getenv("MVK_AMD_STUTTER_DETAIL_ARM_PATH");_cpuArmPath=getenv("MVK_AMD_STUTTER_CPU_ARM_PATH");refreshDetailedArm();
         try{_reporter=std::thread([this]{try{
@@ -91,7 +95,7 @@ public:
 #endif
             MVKCPUContext ctx;ctx.domain=7;MVKCPUContextGuard context(ctx);
             std::unique_lock<std::mutex> lock(_stopLock);
-            while(!_stop){if(_stopCV.wait_for(lock,std::chrono::seconds(5),[&]{return _stop;}))break;lock.unlock();publish();lock.lock();}
+            while(!_stop){if(_stopCV.wait_for(lock,std::chrono::milliseconds(250),[&]{return _stop;}))break;lock.unlock();refreshDetailedArm();publish();lock.lock();}
         }catch(...){_reporterUnavailable.store(true);trace.markDiagnosticUnavailable();trace.setEnabled(false);writeUnavailable("reporter-loop-exception");}});}catch(...){_reporterUnavailable.store(true);trace.markDiagnosticUnavailable();trace.setEnabled(false);writeUnavailable("reporter-thread-start-failed");}
     }
     ~MVKStutterCPURuntime(){
@@ -111,7 +115,14 @@ private:
         if(!_pending)_pending=trace.snapshot();
         if(!writeCurrent(*_pending)){trace.recordPublicationFailure();trace.recordFailure(static_cast<size_t>(MVKCPUPhase::DiagnosticPublish),errno);return;}
         // Preserve a bounded history, always refresh the separate current file.
-        if(_historyRecords<1024){FILE*f=fopen(_history,"a");if(f){fputc('\n',f);trace.writeJSON(f,*_pending);bool ok=!ferror(f)&&fflush(f)==0;int closed=fclose(f);if(ok&&closed==0)++_historyRecords;else {trace.recordPublicationFailure();trace.recordFailure(static_cast<size_t>(MVKCPUPhase::DiagnosticPublish),errno);}}else {trace.recordPublicationFailure();trace.recordFailure(static_cast<size_t>(MVKCPUPhase::DiagnosticPublish),errno);}}
+        struct stat currentSize{};const bool sizeKnown=!stat(_current,&currentSize);
+        if(sizeKnown&&_historyRecords<1024&&uint64_t(currentSize.st_size)+1<=HistoryByteCap-std::min(_historyBytes,HistoryByteCap)){
+            FILE*f=fopen(_history,"a");if(f){fputc('\n',f);trace.writeJSON(f,*_pending);bool ok=!ferror(f)&&fflush(f)==0;long end=ftell(f);int closed=fclose(f);if(end>=0)_historyBytes=uint64_t(end);if(ok&&closed==0)++_historyRecords;else {trace.recordPublicationFailure();trace.recordFailure(static_cast<size_t>(MVKCPUPhase::DiagnosticPublish),errno);}}
+            else {trace.recordPublicationFailure();trace.recordFailure(static_cast<size_t>(MVKCPUPhase::DiagnosticPublish),errno);}
+        }else ++_historySkipped;
+        // Current remains live after history fills, so one process can be rearmed
+        // without restarting the game. Collector archives each changed current.
+        char statusTemp[4110];snprintf(statusTemp,sizeof(statusTemp),"%s.next",_status);FILE*status=fopen(statusTemp,"w");if(status){fprintf(status,"{\"schema\":1,\"historyByteCap\":%llu,\"historyBytes\":%llu,\"historyRowsWritten\":%llu,\"historyRowsSkipped\":%llu,\"currentStillRefreshed\":true,\"armPollMilliseconds\":250}\n",(unsigned long long)HistoryByteCap,(unsigned long long)_historyBytes,(unsigned long long)_historyRecords,(unsigned long long)_historySkipped);bool good=!ferror(status);if(fclose(status))good=false;if(good)rename(statusTemp,_status);else unlink(statusTemp);}
         _pending.reset();
     }
 };

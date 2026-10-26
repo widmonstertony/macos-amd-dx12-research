@@ -8,7 +8,9 @@ Open-source D3D12 → Vulkan → Metal compatibility research for Intel Macs wit
 
 See the [2026-10-25 CPU scan fix](docs/CPU-DIRTY-BITMAP-2026-10-25.md) and [diagnostic CPU fix](docs/DIAGNOSTIC-CPU-FIX-2026-10-25.md) for current measurements. See the historical [2026-10-23 checkpoint](docs/CHECKPOINT-2026-10-23.md) and [full research state](docs/STATE.md) for exact candidate hashes, tests, and limitations. The public download remains an experimental baseline without a playable-game claim.
 
-Scene and equipment captures are available. Candidate v33 fixes wasted archive builds at quota and diagnostic self-interference; build and isolated controls pass, but game performance awaits human testing. The human operates the game; the agent instruments, analyzes and fixes code. See [coverage and limits](docs/STUTTER-COVERAGE-2026-10-25.md).
+v36 adds known D3D12, resource, compilation, queue, GPU and presentation diagnostics over v35 behavior. Builds, owned CPU/GPU controls and original-Wine probes passed; **actual game FPS improvement is unproven**. The human operates the game, and capture windows can be rearmed in one process. See the [coverage history](docs/STUTTER-COVERAGE-2026-10-25.md).
+
+The one-process diagnostic plan covers known submit, resource, compilation, GPU and presentation paths before one human game run. Capture windows can be rearmed without restarting. See [the plan and limits](docs/ONE-RUN-DIAGNOSTICS.en.md). v36 publishes source and diagnostic tools; existing release downloads are unchanged. It is not a playability claim.
 
 ## Download and test
 

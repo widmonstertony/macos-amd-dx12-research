@@ -57,7 +57,9 @@ class Kernel:
             obj=ThreadInfo();size=self.pidinfo(pid,5,handle,C.byref(obj),C.sizeof(obj))
             if size!=C.sizeof(obj):continue
             result[hex(handle)]={k:(getattr(obj,k).decode(errors='replace') if k=='name' else int(getattr(obj,k))) for k,_ in obj._fields_}
-        return {'available':True,'listMayBeTruncated':n>=C.sizeof(ids),'threadCount':len(result),'threads':result}
+        return {'available':True,'listMayBeTruncated':n>=C.sizeof(ids),'threadCount':len(result),'threads':result,
+                'identifierKind':'PROC_PIDLISTTHREADS opaque identifier / pthread handle',
+                'nativeMachThreadJoin':'unjoinable without an independently measured mapping'}
 
 
 def stamp(kernel=None):
@@ -93,7 +95,8 @@ def thread_delta(now,before):
     total=sum(r['totalCounterDelta'] for r in rows)
     for row in rows:row['fractionOfObservedExistingThreadCPU']=row['totalCounterDelta']/total if total else None
     rows.sort(key=lambda r:r['totalCounterDelta'],reverse=True)
-    return {'totalExistingThreadCounterDelta':total,'rows':rows,'newThreadHandles':sorted(set(now.get('threads',{}))-set(old)),'exitedThreadHandles':sorted(set(old)-set(now.get('threads',{}))),'counterUnits':'raw kernel CPU counters; normalized fractions are unit-independent; exited-thread CPU is only covered by process totals'}
+    return {'totalExistingThreadCounterDelta':total,'rows':rows,'newThreadHandles':sorted(set(now.get('threads',{}))-set(old)),'exitedThreadHandles':sorted(set(old)-set(now.get('threads',{}))),'counterUnits':'raw kernel CPU counters; normalized fractions are unit-independent; exited-thread CPU is only covered by process totals',
+            'identifierKind':'PROC_PIDLISTTHREADS opaque identifier / pthread handle','nativeMachThreadJoin':'unjoinable without an independently measured mapping'}
 
 def host_cpu_snapshot():
     """Public aggregate host ticks; no other process memory or private data."""
@@ -155,13 +158,29 @@ def numeric_json(path,cf_now):
     except (OSError,ValueError) as ex:return result|{'transientReadError':type(ex).__name__}
 
 class NativeReader:
-    def __init__(self,pid,trace):self.pid=pid;self.trace=trace;self.previous_counts=None;self.previous_faults=set()
+    def __init__(self,pid,trace,inventory_every=0):
+        self.pid=pid;self.trace=trace;self.previous_counts=None;self.previous_faults=set()
+        self.inventory_every=inventory_every;self.inventory_at=0;self.cached_inventory=None
     def read(self,cf_now):
         if not self.trace:return {'available':False,'reason':'no trace directory supplied'}
-        names=[];present_candidates=[];latest_present=None;latest_index=-1;counts={'MSLSources':0,'computeMapRecords':0,'slowCommandBuffers':0,'GPUTimeoutFiles':0};faults=[];queue=[]
+        if self.cached_inventory is not None and time.monotonic()-self.inventory_at<self.inventory_every:
+            result=dict(self.cached_inventory)
+            result['directoryInventoryAgeSeconds']=time.monotonic()-self.inventory_at
+            result['fileCountDelta']=None
+            result['newGPUTimeoutFiles']=[]
+            if result.get('latestPresent',{}).get('name'):result['latestPresent']=numeric_json(self.trace/result['latestPresent']['name'],cf_now)
+            result['queues']=[numeric_json(self.trace/name,cf_now) for name in result.pop('_queueNames',[])]
+            for prefix in ('memory-current','resource-use-current','resource-use','residency-cost','shared-snapshot-stats','descriptor-dirty','heap-plan-stats','cpu-stutter-current','forensics-current'):
+                for ext in ('.json','.jsonl'):
+                    path=self.trace/f'{prefix}-{self.pid}{ext}'
+                    if path.is_file():result[prefix]=numeric_json(path,cf_now)
+            return result
+        names=[];present_candidates=[];latest_present=None;latest_index=-1;counts={'MSLSources':0,'computeMapRecords':0,'slowCommandBuffers':0,'GPUTimeoutFiles':0};faults=[];queue=[];examined=0;inventory_capped=False
         try:
             with os.scandir(self.trace) as scan:
                 for entry in scan:
+                    examined+=1
+                    if examined>100000:inventory_capped=True;break
                     name=entry.name
                     if name.startswith('source-') and name.endswith('.metal'):counts['MSLSources']+=1
                     if name.startswith(f'trace-compute-map-{self.pid}-'):counts['computeMapRecords']+=1
@@ -173,7 +192,7 @@ class NativeReader:
                         present_candidates.append(Path(entry.path))
                         if int(m.group(1))>latest_index:latest_index=int(m.group(1));latest_present=Path(entry.path)
         except OSError as ex:return {'available':False,'errno':ex.errno}
-        result={'available':True,'directory':str(self.trace),'fileCounts':counts,'fileCountDelta':{k:counts[k]-self.previous_counts[k] for k in counts} if self.previous_counts else None,'queues':[numeric_json(p,cf_now) for p in sorted(queue)[:16]]}
+        result={'available':True,'directory':str(self.trace),'directoryInventoryEntriesExamined':min(examined,100000),'directoryInventoryCapped':inventory_capped,'queueSnapshotFileCap':len(queue)>16,'fileCounts':counts,'fileCountDelta':{k:counts[k]-self.previous_counts[k] for k in counts} if self.previous_counts else None,'queues':[numeric_json(p,cf_now) for p in sorted(queue)[:16]]}
         if latest_present:
             result['latestPresent']=numeric_json(latest_present,cf_now)
             # Counters are normally process-global. If a writer was recreated
@@ -187,14 +206,16 @@ class NativeReader:
                         alternate=numeric_json(by_mtime,cf_now)
                         if alternate.get('sourceCFAbsoluteTime',0)>result['latestPresent'].get('sourceCFAbsoluteTime',0):
                             result['latestPresent']=alternate;result['presentFilenameSequenceReused']=True
-        for prefix in ('memory-current','resource-use-current','resource-use','residency-cost','shared-snapshot-stats','descriptor-dirty','heap-plan-stats'):
+        for prefix in ('memory-current','resource-use-current','resource-use','residency-cost','shared-snapshot-stats','descriptor-dirty','heap-plan-stats','cpu-stutter-current','forensics-current'):
             for ext in ('.json','.jsonl'):
                 p=self.trace/f'{prefix}-{self.pid}{ext}'
                 if p.is_file():result[prefix]=numeric_json(p,cf_now)
         existing={p.name for p in faults};result['newGPUTimeoutFiles']=sorted(existing-self.previous_faults) if self.previous_counts else []
         result['faultFileMetadata']=[file_meta(p) for p in sorted(faults,key=lambda p:p.name)[-16:]]
         result['limits']='File growth proves observed progress only; no growth does not prove compilation stopped. JSONL writers may be capped; source age is authoritative. Numeric summary omits raw shaders, resource labels and fault payload details.'
-        self.previous_faults=existing;self.previous_counts=counts;return result
+        self.previous_faults=existing;self.previous_counts=counts
+        self.inventory_at=time.monotonic();self.cached_inventory=dict(result,_queueNames=[p.name for p in sorted(queue)[:16]])
+        return result
 
 def crash_metadata(directories,started_unix,comm):
     # Metadata only; no crash contents, register dumps, login or reporter DB.

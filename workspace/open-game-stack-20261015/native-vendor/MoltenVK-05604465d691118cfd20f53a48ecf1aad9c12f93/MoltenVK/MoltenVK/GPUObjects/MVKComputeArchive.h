@@ -11,6 +11,9 @@
 #include <utility>
 #include <cstdint>
 #include <limits>
+#if !defined(MVK_ARCHIVE_ADMISSION_CPU_CONTROL)
+#include "MVKForensicsTrace.h"
+#endif
 
 // Process-local reservation ledger, shared by compute/render writers. No Metal
 // work is needed when admission is impossible. Reserve the maximum accepted
@@ -86,14 +89,33 @@ public:
                                                   Inventory&&inventory){
         std::shared_ptr<State> state;
         {std::lock_guard<std::mutex> guard(_rootsLock);auto&slot=_roots[root];if(!slot)slot=std::make_shared<State>();state=slot;}
+#if !defined(MVK_ARCHIVE_ADMISSION_CPU_CONTROL) || defined(MVK_ARCHIVE_ADMISSION_FORENSICS_CONTROL)
+        // Only copy decision POD while locked. Emit after guard destruction so
+        // diagnostics never add the writer lock beneath the admission lock.
+        struct DecisionObservation {
+            bool armed;const void*ledger;const void*state;uint64_t maximum,shard;
+            Decision decision=Decision::Invalid;Stats stats{};bool noted=false;
+            void note(Decision d,const Stats&s){if(armed){decision=d;stats=s;noted=true;}}
+            ~DecisionObservation(){if(armed&&noted&&mvkForensicsArmed())
+                mvkForensicsRecord("archive-admission",{{"ledgerInstance",reinterpret_cast<uintptr_t>(ledger)},
+                    {"rootStateInstance",reinterpret_cast<uintptr_t>(state)},{"decision",uint64_t(decision)},
+                    {"maximumBytes",maximum},{"shardMaximumBytes",shard},{"committedBytes",stats.committed},
+                    {"reservedBytes",stats.reserved},{"pending",stats.pending},
+                    {"budgetSkippedTotal",stats.budgetSkipped},{"pendingSkippedTotal",stats.pendingSkipped}});}
+        } observation{mvkForensicsArmed(),this,state.get(),maximum,shardMaximum};
+        auto observe=[&](Decision decision,const Stats&stats){observation.note(decision,stats);};
+#else
+        auto observe=[](Decision,const Stats&){};
+#endif
         std::lock_guard<std::mutex> guard(state->lock);
         if(!state->initialized){++state->stats.inventoryRuns;state->stats.committed=inventory();state->maximum=maximum;state->initialized=true;}
         auto&stats=state->stats;
-        if(!maximum||!shardMaximum||maximum!=state->maximum){++stats.invalid;return Reservation(Decision::Invalid);}
-        if(state->pending.find(key)!=state->pending.end()){++stats.pendingSkipped;return Reservation(Decision::Pending);}
+        if(!maximum||!shardMaximum||maximum!=state->maximum){++stats.invalid;observe(Decision::Invalid,stats);return Reservation(Decision::Invalid);}
+        if(state->pending.find(key)!=state->pending.end()){++stats.pendingSkipped;observe(Decision::Pending,stats);return Reservation(Decision::Pending);}
         if(stats.committed>maximum||stats.reserved>maximum-stats.committed||
-           shardMaximum>maximum-stats.committed-stats.reserved){++stats.budgetSkipped;return Reservation(Decision::Budget);}
+           shardMaximum>maximum-stats.committed-stats.reserved){++stats.budgetSkipped;observe(Decision::Budget,stats);return Reservation(Decision::Budget);}
         state->pending.insert(key);stats.reserved+=shardMaximum;stats.pending=state->pending.size();++stats.accepted;
+        observe(Decision::Accepted,stats);
         return Reservation(state,std::move(key),shardMaximum);
     }
     Stats snapshot(const std::string&root){

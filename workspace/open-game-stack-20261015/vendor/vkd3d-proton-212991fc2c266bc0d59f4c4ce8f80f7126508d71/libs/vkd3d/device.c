@@ -19,6 +19,7 @@
 #define VKD3D_DBG_CHANNEL VKD3D_DBG_CHANNEL_API
 
 #include "vkd3d_private.h"
+#include "vkd3d_forensics.h"
 #include "vkd3d_sonames.h"
 #include "vkd3d_descriptor_debug.h"
 #include "vkd3d_timestamp_profiler.h"
@@ -4796,6 +4797,9 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommandAllocator(d3d12_devic
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateGraphicsPipelineState(d3d12_device_iface *iface,
         const D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc, REFIID riid, void **pipeline_state)
 {
+    VKF_SCOPE(vkf_api,VKF_PSO_GRAPHICS,iface,(uintptr_t)desc,0);
+    vkf_api.output=pipeline_state;
+
     struct d3d12_device *device = impl_from_ID3D12Device(iface);
     struct d3d12_pipeline_state_desc pipeline_desc;
     struct d3d12_pipeline_state *object;
@@ -4805,19 +4809,22 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateGraphicsPipelineState(d3d12_
             iface, desc, debugstr_guid(riid), pipeline_state);
 
     if (FAILED(hr = vkd3d_pipeline_state_desc_from_d3d12_graphics_desc(&pipeline_desc, desc)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
     if (FAILED(hr = d3d12_pipeline_state_create(device,
             VK_PIPELINE_BIND_POINT_GRAPHICS, &pipeline_desc, &object)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
-    return return_interface(&object->ID3D12PipelineState_iface,
-            &IID_ID3D12PipelineState, riid, pipeline_state);
+    return (HRESULT)vkf_result(&vkf_api, (return_interface(&object->ID3D12PipelineState_iface,
+            &IID_ID3D12PipelineState, riid, pipeline_state)));
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateComputePipelineState(d3d12_device_iface *iface,
         const D3D12_COMPUTE_PIPELINE_STATE_DESC *desc, REFIID riid, void **pipeline_state)
 {
+    VKF_SCOPE(vkf_api,VKF_PSO_COMPUTE,iface,(uintptr_t)desc,0);
+    vkf_api.output=pipeline_state;
+
     struct d3d12_device *device = impl_from_ID3D12Device(iface);
     struct d3d12_pipeline_state_desc pipeline_desc;
     struct d3d12_pipeline_state *object;
@@ -4827,14 +4834,14 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateComputePipelineState(d3d12_d
             iface, desc, debugstr_guid(riid), pipeline_state);
 
     if (FAILED(hr = vkd3d_pipeline_state_desc_from_d3d12_compute_desc(&pipeline_desc, desc)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
     if (FAILED(hr = d3d12_pipeline_state_create(device,
             VK_PIPELINE_BIND_POINT_COMPUTE, &pipeline_desc, &object)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
-    return return_interface(&object->ID3D12PipelineState_iface,
-            &IID_ID3D12PipelineState, riid, pipeline_state);
+    return (HRESULT)vkf_result(&vkf_api, (return_interface(&object->ID3D12PipelineState_iface,
+            &IID_ID3D12PipelineState, riid, pipeline_state)));
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommandList1(d3d12_device_iface *iface,
@@ -6430,6 +6437,8 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptors(d3d12_device_iface *i
         const UINT *src_descriptor_range_sizes,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
+    VKF_COPY_SCOPE(vkf_copy_range_count(dst_descriptor_range_count,dst_descriptor_range_sizes),descriptor_heap_type,0);
+
     TRACE("iface %p, dst_descriptor_range_count %u, dst_descriptor_range_offsets %p, "
             "dst_descriptor_range_sizes %p, src_descriptor_range_count %u, "
             "src_descriptor_range_offsets %p, src_descriptor_range_sizes %p, "
@@ -6451,6 +6460,8 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple_descriptor_buff
         const D3D12_CPU_DESCRIPTOR_HANDLE src_descriptor_range_offset,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
+    VKF_COPY_SCOPE(descriptor_count,descriptor_heap_type,1);
+
     /* Optimized NVIDIA path. Buffers are 16 byte, but images and samplers are just 4 byte indices,
      * so we cannot use embedded mutable style copies. */
 
@@ -6556,6 +6567,8 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple_descriptor_buff
         const D3D12_CPU_DESCRIPTOR_HANDLE src_descriptor_range_offset,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
+    VKF_COPY_SCOPE(descriptor_count,descriptor_heap_type,2);
+
     /* Optimized Intel Arc path. */
 
     struct d3d12_device *device;
@@ -6660,6 +6673,8 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple_embedded_64_16_
         const D3D12_CPU_DESCRIPTOR_HANDLE src_descriptor_range_offset,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
+    VKF_COPY_SCOPE(descriptor_count,descriptor_heap_type,3);
+
     struct d3d12_device *device;
     TRACE("iface %p, descriptor_count %u, dst_descriptor_range_offset %#lx, "
           "src_descriptor_range_offset %#lx, descriptor_heap_type %#x.\n",
@@ -6753,6 +6768,8 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple_embedded_32_16_
         const D3D12_CPU_DESCRIPTOR_HANDLE src_descriptor_range_offset,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
+    VKF_COPY_SCOPE(descriptor_count,descriptor_heap_type,4);
+
     struct d3d12_device *device;
     TRACE("iface %p, descriptor_count %u, dst_descriptor_range_offset %#lx, "
           "src_descriptor_range_offset %#lx, descriptor_heap_type %#x.\n",
@@ -6810,6 +6827,8 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple_embedded_generi
         const D3D12_CPU_DESCRIPTOR_HANDLE src_descriptor_range_offset,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
+    VKF_COPY_SCOPE(descriptor_count,descriptor_heap_type,5);
+
     struct d3d12_device *device;
     TRACE("iface %p, descriptor_count %u, dst_descriptor_range_offset %#lx, "
           "src_descriptor_range_offset %#lx, descriptor_heap_type %#x.\n",
@@ -6846,6 +6865,8 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple_default(d3d12_d
         const D3D12_CPU_DESCRIPTOR_HANDLE src_descriptor_range_offset,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
+    VKF_COPY_SCOPE(descriptor_count,descriptor_heap_type,6);
+
     struct d3d12_device *device;
     TRACE("iface %p, descriptor_count %u, dst_descriptor_range_offset %#lx, "
             "src_descriptor_range_offset %#lx, descriptor_heap_type %#x.\n",
@@ -7822,6 +7843,9 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetResidencyPriority(d3d12_device_
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePipelineState(d3d12_device_iface *iface,
         const D3D12_PIPELINE_STATE_STREAM_DESC *desc, REFIID riid, void **pipeline_state)
 {
+    VKF_SCOPE(vkf_api,VKF_PSO_STREAM,iface,(uintptr_t)desc,0);
+    vkf_api.output=pipeline_state;
+
     struct d3d12_device *device = impl_from_ID3D12Device(iface);
     struct d3d12_pipeline_state_desc pipeline_desc;
     struct d3d12_pipeline_state *object;
@@ -7832,13 +7856,13 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePipelineState(d3d12_device_i
             iface, desc, debugstr_guid(riid), pipeline_state);
 
     if (FAILED(hr = vkd3d_pipeline_state_desc_from_d3d12_stream_desc(&pipeline_desc, desc, &pipeline_type)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
     if (FAILED(hr = d3d12_pipeline_state_create(device, pipeline_type, &pipeline_desc, &object)))
-        return hr;
+        return (HRESULT)vkf_result(&vkf_api, (hr));
 
-    return return_interface(&object->ID3D12PipelineState_iface,
-            &IID_ID3D12PipelineState, riid, pipeline_state);
+    return (HRESULT)vkf_result(&vkf_api, (return_interface(&object->ID3D12PipelineState_iface,
+            &IID_ID3D12PipelineState, riid, pipeline_state)));
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_OpenExistingHeapFromAddress(d3d12_device_iface *iface,

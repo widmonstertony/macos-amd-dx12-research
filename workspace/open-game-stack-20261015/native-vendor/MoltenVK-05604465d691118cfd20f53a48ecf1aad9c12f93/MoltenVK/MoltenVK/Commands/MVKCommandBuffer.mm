@@ -17,6 +17,7 @@
  */
 
 #include "MVKCommandBuffer.h"
+#include "MVKForensicsTrace.h"
 #include "MVKStutterCoverage.h"
 #include "MVKStutterNativeTrace.h"
 #include "MVKFramebuffer.h"
@@ -428,6 +429,7 @@ void MVKCommandEncoder::encode(id<MTLCommandBuffer> mtlCmdBuff,
     }
     MVKCPUContextGuard cpuContextGuard(cpuContext);
     MVK_CPU_SCOPE_CPU(HostEncode);
+    MVKForensicsScope forensics("NativeEncodeCommandBuffer",{{"nativeCommandBufferObject",uint64_t(uintptr_t(_cmdBuffer))}});
 	uint64_t startTime = getPerformanceTimestamp();
 
 	_cmdBuffSubmit = cmdBuffSubmit;
@@ -792,6 +794,7 @@ void MVKCommandEncoder::encodeBarrierUpdates() {
 
 // Creates _mtlRenderEncoder and marks cached render state as dirty so it will be set into the _mtlRenderEncoder.
 void MVKCommandEncoder::beginMetalRenderPass(MVKCommandUse cmdUse) {
+    MVKForensicsScope forensics("NativeRenderPassCreate",{{"commandUse",uint64_t(cmdUse)}});
     MVK_CPU_SCOPE(NativeEncoderCreate);
 
     endCurrentMetalEncoding();
@@ -1149,6 +1152,8 @@ void MVKCommandEncoder::endMetalRenderEncoding() {
 }
 
 void MVKCommandEncoder::endCurrentMetalEncoding() {
+    MVKForensicsScope forensics("NativeEncoderTransition",{{"render",uint64_t(_mtlRenderEncoder!=nil)},
+        {"compute",uint64_t(_mtlComputeEncoder!=nil)},{"blit",uint64_t(_mtlBlitEncoder!=nil)}});
 	encodeBarrierUpdates();
 	endMetalRenderEncoding();
 
@@ -1164,6 +1169,7 @@ void MVKCommandEncoder::endCurrentMetalEncoding() {
 }
 
 bool MVKCommandEncoder::splitMetalCommandBufferInRenderPass() {
+    MVKForensicsScope forensics("NativeRenderCommandSplit");
 	if (!_cmdBuffSubmit || !isInRenderPass() || !_mtlCmdBuffer) { return false; }
 	encodeStoreActions(true);
 	endCurrentMetalEncoding();

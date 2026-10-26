@@ -23,6 +23,18 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+
+def runtime_records(directory, kind):
+    """Read both legacy files and bounded full-forensics metadata, unchanged."""
+    records=[json.loads(f.read_text()) for f in directory.glob('trace-'+kind+'-*.json')]
+    for path in directory.glob('forensics-*.jsonl'):
+        for line in path.read_text().splitlines():
+            row=json.loads(line)
+            if row.get('type')=='forensics' and row.get('kind')=='RuntimeMetadata':
+                payload=row.get('payload',{})
+                if payload.get('recordKind')==kind:records.append(payload['record'])
+    return records
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--private-directory', type=Path, default=PRIVATE)
@@ -61,6 +73,7 @@ def main():
     parser.add_argument('--gpu-counter-burst',action='store_true',help='Qualify bounded all-queue/multi-command-buffer counters in original Wine')
     parser.add_argument('--probe-timeout', type=int, default=40,
                         help='Per-probe timeout in seconds (10..180) for bounded diagnostics')
+    parser.add_argument('--full-forensics',action='store_true',help='Qualify bounded native and staged D3D12 causal logs')
     args = parser.parse_args()
     if not 10 <= args.probe_timeout <= 180:
         parser.error('--probe-timeout must be between 10 and 180 seconds')
@@ -95,6 +108,8 @@ def main():
                MVK_AMD_RENDER_BINARY_ARCHIVE_PATH=str(out / "render.metalar"),
                MVK_AMD_BINARY_ARCHIVE_FLUSH_INTERVAL="1",
                MVK_AMD_RUNTIME_REPLAY_ONLY="1")
+    if args.full_forensics:
+        marker=out/'forensics.arm';marker.touch();(out/'msl').mkdir(exist_ok=True);env.update(MVK_AMD_FORENSICS_ARM_PATH=str(marker),MVK_AMD_CPU_FINE_SAMPLE_EVERY='64')
     if args.shared_live_snapshots:env['MVK_AMD_SHARED_LIVE_SNAPSHOTS']='1'
     if args.compute_shards:
         env.pop('MVK_AMD_BINARY_ARCHIVE_PATH', None)
@@ -204,6 +219,11 @@ def main():
         for dll in ("d3d12.dll", "d3d12core.dll", "dxgi.dll"):
             dll_source = d3d12_directory / dll if d3d12_directory and dll != 'dxgi.dll' else probe_source / dll
             shutil.copy2(dll_source, d / dll)
+        if args.full_forensics:
+            # Owned probe DLL directory only. No prefix/registry/Steam changes.
+            drive_root=(qualified.PREFIX/'dosdevices/z:').resolve()
+            win=lambda p:'Z:'+chr(92)+str(p.resolve().relative_to(drive_root)).replace('/',chr(92))
+            (d/'vkd3d-forensics-paths.txt').write_text(win(out/'forensics.arm')+'\n'+win(out/'msl')+'\n')
         run_env = env | {"YYB_OPEN_GUARD_FORCE": "1",
                          "YYB_OPEN_GUARD_RECORD": str(d / "guard.trace"),
                          "MVK_CONFIG_SHADER_DUMP_DIR": str(d / "msl"),
@@ -253,7 +273,7 @@ def main():
         entry['d3d12DLLSHA256'] = {n: digest(d / n) for n in ('d3d12.dll', 'd3d12core.dll')}
         entry['probeExecutableSHA256'] = digest(executable)
         if args.compute_shards:
-            traces = [json.loads(f.read_text()) for f in (d / 'msl').glob('trace-compute-archive-*.json')]
+            traces = runtime_records(d/'msl','compute-archive')
             entry['computeArchiveRecords'] = traces
             entry['nativeArchiveHitVerified'] = bool(traces) and all(
                 row['loaded'] and row['requireHit'] and row['pipelineCreated'] for row in traces)
@@ -263,7 +283,7 @@ def main():
         if args.compute_shards and name == 'compute-load':
             entry['passed'] = entry['passed'] and entry['nativeArchiveHitVerified']
         if args.render_shards and name.startswith('present-'):
-            traces = [json.loads(f.read_text()) for f in (d / 'msl').glob('trace-render-archive-*.json')]
+            traces = runtime_records(d/'msl','render-archive')
             entry['renderArchiveRecords'] = traces
             entry['strictNativeRenderHitVerified'] = bool(traces) and all(
                 row['strictArchiveHit'] and not row['fallback'] and row['pipelineCreated']

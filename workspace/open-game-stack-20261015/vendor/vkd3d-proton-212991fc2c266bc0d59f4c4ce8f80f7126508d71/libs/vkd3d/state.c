@@ -20,6 +20,7 @@
 #define VKD3D_DBG_CHANNEL VKD3D_DBG_CHANNEL_API
 
 #include "vkd3d_private.h"
+#include "vkd3d_forensics.h"
 #include "vkd3d_descriptor_debug.h"
 #include "vkd3d_rw_spinlock.h"
 #include "vkd3d_timestamp_profiler.h"
@@ -3035,6 +3036,8 @@ static HRESULT vkd3d_create_compute_pipeline(struct d3d12_pipeline_state *state,
         struct d3d12_device *device,
         const D3D12_SHADER_BYTECODE *code)
 {
+    VKF_SCOPE(vkf_build,VKF_PSO_BUILD,&state->ID3D12PipelineState_iface,__LINE__,0);
+
     VkPipelineShaderStageRequiredSubgroupSizeCreateInfo required_subgroup_size_info;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     VkPipelineCreationFeedbackCreateInfo feedback_info;
@@ -3119,8 +3122,8 @@ static HRESULT vkd3d_create_compute_pipeline(struct d3d12_pipeline_state *state,
 
     cookie = vkd3d_queue_timeline_trace_register_pso_compile(&device->queue_timeline_trace);
 
-    vr = VK_CALL(vkCreateComputePipelines(device->vk_device,
-            vk_cache, 1, &pipeline_info, NULL, &state->compute.vk_pipeline));
+    vr = vkf_create_compute(vk_procs->vkCreateComputePipelines,device->vk_device,
+            vk_cache, 1, &pipeline_info, NULL, &state->compute.vk_pipeline);
 
     if (vkd3d_queue_timeline_trace_cookie_is_valid(cookie))
     {
@@ -3177,8 +3180,8 @@ static HRESULT vkd3d_create_compute_pipeline(struct d3d12_pipeline_state *state,
 
         cookie = vkd3d_queue_timeline_trace_register_pso_compile(&device->queue_timeline_trace);
 
-        vr = VK_CALL(vkCreateComputePipelines(device->vk_device,
-                vk_cache, 1, &pipeline_info, NULL, &state->compute.vk_pipeline));
+        vr = vkf_create_compute(vk_procs->vkCreateComputePipelines,device->vk_device,
+                vk_cache, 1, &pipeline_info, NULL, &state->compute.vk_pipeline);
 
         if (vkd3d_queue_timeline_trace_cookie_is_valid(cookie))
         {
@@ -4066,8 +4069,8 @@ VkPipeline vkd3d_vertex_input_pipeline_create(struct d3d12_device *device,
     if (d3d12_device_uses_descriptor_buffers(device))
         create_info.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
 
-    if ((vr = VK_CALL(vkCreateGraphicsPipelines(device->vk_device,
-            VK_NULL_HANDLE, 1, &create_info, NULL, &vk_pipeline))))
+    if ((vr = vkf_create_graphics(vk_procs->vkCreateGraphicsPipelines,device->vk_device,
+            VK_NULL_HANDLE, 1, &create_info, NULL, &vk_pipeline)))
     {
         ERR("Failed to create vertex input pipeline, vr %d.\n", vr);
         return VK_NULL_HANDLE;
@@ -4217,8 +4220,8 @@ VkPipeline vkd3d_fragment_output_pipeline_create(struct d3d12_device *device,
     if (d3d12_device_uses_descriptor_buffers(device))
         create_info.flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
 
-    if ((vr = VK_CALL(vkCreateGraphicsPipelines(device->vk_device,
-            VK_NULL_HANDLE, 1, &create_info, NULL, &vk_pipeline))))
+    if ((vr = vkf_create_graphics(vk_procs->vkCreateGraphicsPipelines,device->vk_device,
+            VK_NULL_HANDLE, 1, &create_info, NULL, &vk_pipeline)))
     {
         ERR("Failed to create fragment output pipeline, vr %d.\n", vr);
         return VK_NULL_HANDLE;
@@ -6198,6 +6201,8 @@ static VkResult d3d12_pipeline_state_link_pipeline_variant(struct d3d12_pipeline
         const struct vkd3d_pipeline_key *key, const struct vkd3d_format *dsv_format, VkPipelineCache vk_cache,
         uint32_t dynamic_state_flags, VkPipeline *vk_pipeline)
 {
+    VKF_SCOPE(vkf_build,VKF_PSO_BUILD,&state->ID3D12PipelineState_iface,__LINE__,0);
+
     const struct vkd3d_vk_device_procs *vk_procs = &state->device->vk_procs;
     struct d3d12_graphics_pipeline_state *graphics = &state->graphics;
     struct vkd3d_fragment_output_pipeline_desc fragment_output_desc;
@@ -6251,8 +6256,8 @@ static VkResult d3d12_pipeline_state_link_pipeline_variant(struct d3d12_pipeline
 
     cookie = vkd3d_queue_timeline_trace_register_pso_compile(&state->device->queue_timeline_trace);
 
-    vr = VK_CALL(vkCreateGraphicsPipelines(state->device->vk_device,
-            vk_cache, 1, &create_info, NULL, vk_pipeline));
+    vr = vkf_create_graphics(vk_procs->vkCreateGraphicsPipelines,state->device->vk_device,
+            vk_cache, 1, &create_info, NULL, vk_pipeline);
 
     if (vkd3d_queue_timeline_trace_cookie_is_valid(cookie))
     {
@@ -6274,6 +6279,8 @@ VkPipeline d3d12_pipeline_state_create_pipeline_variant(struct d3d12_pipeline_st
         const struct vkd3d_pipeline_key *key, const struct vkd3d_format *dsv_format, VkPipelineCache vk_cache,
         VkGraphicsPipelineLibraryFlagsEXT library_flags, uint32_t *dynamic_state_flags)
 {
+    VKF_SCOPE(vkf_build,VKF_PSO_BUILD,&state->ID3D12PipelineState_iface,__LINE__,0);
+
     const struct vkd3d_vk_device_procs *vk_procs = &state->device->vk_procs;
     VkDynamicState dynamic_state_buffer[ARRAY_SIZE(vkd3d_dynamic_state_list)];
     struct d3d12_graphics_pipeline_state *graphics = &state->graphics;
@@ -6457,7 +6464,7 @@ VkPipeline d3d12_pipeline_state_create_pipeline_variant(struct d3d12_pipeline_st
 
     cookie = vkd3d_queue_timeline_trace_register_pso_compile(&device->queue_timeline_trace);
 
-    vr = VK_CALL(vkCreateGraphicsPipelines(device->vk_device, vk_cache, 1, &pipeline_desc, NULL, &vk_pipeline));
+    vr = vkf_create_graphics(vk_procs->vkCreateGraphicsPipelines,device->vk_device, vk_cache, 1, &pipeline_desc, NULL, &vk_pipeline);
 
     if (vkd3d_queue_timeline_trace_cookie_is_valid(cookie))
     {
@@ -6506,7 +6513,7 @@ VkPipeline d3d12_pipeline_state_create_pipeline_variant(struct d3d12_pipeline_st
         pipeline_desc.pStages = state->graphics.stages;
 
         cookie = vkd3d_queue_timeline_trace_register_pso_compile(&device->queue_timeline_trace);
-        vr = VK_CALL(vkCreateGraphicsPipelines(device->vk_device, vk_cache, 1, &pipeline_desc, NULL, &vk_pipeline));
+        vr = vkf_create_graphics(vk_procs->vkCreateGraphicsPipelines,device->vk_device, vk_cache, 1, &pipeline_desc, NULL, &vk_pipeline);
 
         if (vkd3d_queue_timeline_trace_cookie_is_valid(cookie))
         {

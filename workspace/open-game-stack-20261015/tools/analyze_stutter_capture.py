@@ -12,10 +12,12 @@ import argparse
 from collections import Counter, defaultdict, deque
 from decimal import Decimal, localcontext
 import hashlib
+import heapq
 import json
 from pathlib import Path
 import re
 import time
+from capture_foreground_stutter import foreground_intervals
 
 ROOT = Path(__file__).resolve().parents[1]
 D = Decimal
@@ -109,6 +111,39 @@ def true_field_paths(obj, field, prefix=""):
             yield from true_field_paths(value, field, prefix + "/" + str(index))
 
 
+def cumulative_counter_windows(rows, fields, pid_key):
+    """Run counters never reset on arm; initial nonzero is unknown prefix."""
+    groups=defaultdict(list)
+    for row in rows:groups[(row.get(pid_key),row.get('runID'))].append(row)
+    result=[]
+    for (pid,run),values in groups.items():
+        first,last=values[0],values[-1]
+        delta={k:integer(last.get(k))-integer(first.get(k)) for k in fields}
+        result.append(dict(pid=pid,runID=run,sourceBegin=ref(first),sourceEnd=ref(last),snapshots=len(values),
+            observedDelta={k:v for k,v in delta.items() if v>0},nonmonotonic=[k for k,v in delta.items() if v<0],
+            alreadyNonzeroAtFirstSnapshot={k:integer(first.get(k)) for k in fields if integer(first.get(k))},
+            meaning='Run-cumulative counters; positive deltas apply between observed metadata snapshots. Initial nonzero counters are an unknown prefix, never charged to every later arm.'))
+    return result
+
+
+def cumulative_counter_sessions(rows, fields, pid_key):
+    previous={};sessions={}
+    for row in rows:
+        run=(row.get(pid_key),row.get('runID'));key=run+(row.get('session'),)
+        dest=sessions.setdefault(key,dict(pid=run[0],runID=run[1],session=key[-1],snapshots=0,withinSessionIncreases=Counter(),boundaryUnassignedIncreases=Counter(),initialPrefixUnknown={},nonmonotonic=[]))
+        dest['snapshots']+=1;before=previous.get(run)
+        if before is None:dest['initialPrefixUnknown']={k:integer(row.get(k)) for k in fields if integer(row.get(k))}
+        else:
+            for field in fields:
+                change=integer(row.get(field))-integer(before.get(field))
+                if change>0:dest['withinSessionIncreases' if before.get('session')==row.get('session') else 'boundaryUnassignedIncreases'][field]+=change
+                elif change<0:dest['nonmonotonic'].append(field)
+        previous[run]=row
+    return [dict(v,withinSessionIncreases=dict(v['withinSessionIncreases']),boundaryUnassignedIncreases=dict(v['boundaryUnassignedIncreases']),
+                 statuses=['observed']+(['capped'] if v['withinSessionIncreases'] else [])+(['unjoinable'] if v['boundaryUnassignedIncreases'] or v['initialPrefixUnknown'] or v['nonmonotonic'] else []),
+                 meaning='Metadata intervals grouped by observed arm session, not counter resets. Boundary increases/late tails are not charged exclusively to either user stage.') for v in sessions.values()]
+
+
 class Analyzer:
     def __init__(self, *, target_pid=None, freshness_seconds=15, target_fps=30,
                  max_bytes=MAX_INPUT_BYTES, max_rows=MAX_INPUT_ROWS):
@@ -134,6 +169,11 @@ class Analyzer:
         self.cpu_historical_skipped = 0
         self.event_alias_counts = Counter()
         self.cpu_report_provenance = []
+        self.forensic_rows, self.forensic_current, self.forensic_copy_index = [], [], []
+        self.guest_rows, self.guest_current, self.guest_copy_index, self.cpu_fine_sampling = [], [], [], []
+        self.cpu_spans=[];self.cpu_span_count=0
+        self.cpu_status=[];self.cpu_copy_index=[]
+        self.requested_windows=[]
 
     def issue(self, code, *, scope="global", severity="incomplete", **details):
         record = dict(code=code, scope=scope, severity=severity, **details)
@@ -160,7 +200,7 @@ class Analyzer:
             source["sha256"] = hashlib.sha256(raw).hexdigest()
             if len(raw) != state.st_size:
                 self.issue("source-mutated-during-read", source=str(path))
-            pid = re.search(r"(?:stutter-native|cpu-stutter(?:-current)?|gpu-counter-clock-sessions|trace-gpu-timestamps)-(\d+)", path.name)
+            pid = re.search(r"(?:stutter-native|cpu-stutter(?:-current)?|gpu-counter-clock-sessions|trace-gpu-timestamps|forensics(?:-current)?)-(\d+)", path.name)
             source["pidFromName"] = int(pid.group(1)) if pid else None
             rows = []
             if path.suffix == ".jsonl":
@@ -206,7 +246,10 @@ class Analyzer:
             self.pid = integer(target_pid)
         self.timebase = self.system_metadata.get("timebase")
         self.system_rows += self.read(directory / "timeline.jsonl", "system-timeline")
-        if (directory / "foreground.jsonl").exists():
+        chunks = sorted(directory.glob('foreground-chunk-*.jsonl'))
+        if chunks:
+            for chunk in chunks:self.foreground += self.read(chunk, 'foreground')
+        elif (directory / "foreground.jsonl").exists():
             self.foreground += self.read(directory / "foreground.jsonl", "foreground")
         clocks = [dec(r.get("clock", {}).get("CFAbsoluteTime")) for r in self.system_rows]
         clocks = [x for x in clocks if x is not None]
@@ -221,6 +264,47 @@ class Analyzer:
     def load_cpu(self, paths):
         for path in paths:
             self.cpu_reports += self.read(path, "cpu-report")
+
+    def load_forensics(self, paths=(), current=(), copy_index=()):
+        for path in paths:self.forensic_rows += self.read(path, 'forensics')
+        for path in current:self.forensic_current += self.read(path, 'forensics-current')
+        for path in copy_index:self.forensic_copy_index += self.read(path, 'forensics-copy-index')
+
+    def load_guest(self, paths=(), current=(), copy_index=()):
+        for path in paths:self.guest_rows += self.read(path,'guest-d3d12')
+        for path in current:self.guest_current += self.read(path,'guest-d3d12-current')
+        for path in copy_index:self.guest_copy_index += self.read(path,'guest-d3d12-copy-index')
+
+    def load_session(self, directory):
+        self.load_system(directory)
+        directory=Path(directory)
+        if (directory/'segments.jsonl').exists():self.requested_windows+=self.read(directory/'segments.jsonl','requested-diagnostic-windows')
+        self.load_cpu(sorted(directory.glob('cpu-stutter-current-*-snapshots.jsonl')))
+        for path in directory.glob('cpu-stutter-status-*-snapshots.jsonl'):self.cpu_status+=self.read(path,'cpu-history-status')
+        if (directory/'cpu-snapshot-copy-index.jsonl').exists():self.cpu_copy_index+=self.read(directory/'cpu-snapshot-copy-index.jsonl','cpu-copy-index')
+        self.load_forensics(sorted(directory.glob('forensics-*-run-*-generation-*.jsonl')),
+                            current=[directory/'forensics-current-snapshots.jsonl'] if (directory/'forensics-current-snapshots.jsonl').exists() else [],
+                            copy_index=[directory/'forensics-copy-index.jsonl'] if (directory/'forensics-copy-index.jsonl').exists() else [])
+        self.load_guest(sorted(directory.glob('vkd3d-forensics-*-run-*-generation-*.jsonl')),
+                        current=[directory/'vkd3d-forensics-current-snapshots.jsonl'] if (directory/'vkd3d-forensics-current-snapshots.jsonl').exists() else [],
+                        copy_index=[directory/'vkd3d-forensics-copy-index.jsonl'] if (directory/'vkd3d-forensics-copy-index.jsonl').exists() else [])
+        for text in self.system_summary.get('rawLogReferences', []):
+            path=Path(text).resolve()
+            if not path.is_relative_to(ROOT/'evidence'):
+                self.issue('session-log-reference-outside-owned-evidence', scope='global');continue
+            if path.name.startswith('cpu-stutter-'):self.load_cpu([path])
+            elif path.name.startswith('stutter-native-'):self.load_native([path])
+            elif path.name.startswith('forensics-current-'):self.load_forensics(current=[path])
+        profile=self.system_metadata.get('profile')
+        if profile and Path(profile).resolve().is_relative_to(ROOT/'evidence'):
+            trace=Path(profile)/'msl';minimum=number(self.system_metadata.get('processStartUnixEstimate'),number(self.system_metadata.get('start',{}).get('unixSeconds')))-.2
+            artifacts=[p for p in trace.glob(f'trace-gpu-timestamps-{self.pid}-*.json') if p.stat().st_mtime>=minimum]
+            clocks=[p for p in trace.glob(f'gpu-counter-clock-sessions-{self.pid}*.jsonl') if p.stat().st_mtime>=minimum]
+            self.load_gpu(artifacts[:256],clocks[:16])
+            guest_dir=self.system_metadata.get('budgets',{}).get('d3d_directory')
+            if guest_dir and Path(guest_dir).resolve().is_relative_to(ROOT/'evidence'):
+                self.load_guest(current=list(Path(guest_dir).glob('vkd3d-forensics-current-*.json'))[:64])
+            if len(artifacts)>256:self.issue('session-gpu-input-file-cap',scope='gpu-counters',count=len(artifacts))
 
     def load_gpu(self, artifacts=(), clocks=()):
         for path in artifacts:
@@ -576,13 +660,17 @@ class Analyzer:
                 self.issue("cpu-report-stale", scope="cpu", ageSeconds=self.reference_cf - when, **ref(report))
             if self.system_interval is not None and when is not None and when < self.system_interval[0] - self.freshness:
                 self.issue("cpu-outside-system-capture", scope="cpu", **ref(report))
+            sampling={(integer(x.get('domain')),integer(x.get('stage'))):x for x in report.get('fineScopeSampling',[])}
+            for sample in sampling.values():self.cpu_fine_sampling.append(dict(report=ref(report),**sample,fineScopeTimingsSampled=report.get('fineScopeTimingsSampled'),
+                extrapolated=False,meaning='Offered is counted at scope begin; timing count/NS are completed measured samples. Unsampled child work remains in parent scope.'))
             stage_info = {}
             for row in report.get("rows", []):
                 stage_info[(integer(row.get("domain")), integer(row.get("stage")))] = (row.get("name", "unknown"), row.get("kind", "unknown"))
                 self.cpu_aggregate.append(dict(pid=pid, domain=integer(row.get("domain")), stage=integer(row.get("stage")),
                                                name=row.get("name", "unknown"), kind=row.get("kind", "unknown"),
                                                selfWallNS=integer(row.get("selfWallNS")), inclusiveWallNS=integer(row.get("inclusiveWallNS")),
-                                               count=integer(row.get("count")), report=ref(report),
+                                               threadCPUCount=integer(row.get('threadCPUCount')),inclusiveThreadCPUNS=integer(row.get('inclusiveThreadCPUNS')),
+                                               count=integer(row.get("count")), samplingEvery=integer(sampling.get((integer(row.get("domain")),integer(row.get("stage"))),{}).get("scopeSampleEvery"),1), report=ref(report),
                                                windowStartNS=integer(report.get("windowStartNS")), windowEndNS=integer(report.get("windowEndNS"))))
             for sub in report.get("submissions", []):
                 for flag in ("mixedNativeCB", "mixedFrame", "mixedArm", "beganBeforeArm", "beganBeforeWindow", "openAtReport"):
@@ -607,10 +695,22 @@ class Analyzer:
                     detail["phases"].append(dict(stage=integer(phase.get("stage")), name=name, kind=kind,
                                                   selfWallNS=integer(phase.get("selfWallNS")),
                                                   inclusiveWallNS=integer(phase.get("inclusiveWallNS")),
-                                                  count=integer(phase.get("count")), failures=integer(phase.get("failures"))))
+                                                  count=integer(phase.get("count")), failures=integer(phase.get("failures")),
+                                                  samplingEvery=integer(sampling.get((detail["domain"],integer(phase.get("stage"))),{}).get("scopeSampleEvery"),1)))
                 self.cpu_details.append(detail)
+            for source_kind in ('slowSpans','inFlight'):
+                for span in report.get(source_kind,[]):
+                    self.cpu_span_count+=1
+                    if len(self.cpu_spans)>=2000:continue
+                    stage=integer(span.get('stage'));domain=integer(span.get('domain'));name,kind=stage_info.get((domain,stage),('unknown','unknown'))
+                    start_ca=self.mono_to_ca(span.get('startNS'),pid);end_ca=self.mono_to_ca(span.get('endNS'),pid) if integer(span.get('endNS')) else None
+                    self.cpu_spans.append(dict(pid=pid,observation=source_kind,name=name,kind=kind,report=ref(report),inFlightAtReportCF=when if source_kind=='inFlight' else None,
+                        measured={k:v for k,v in span.items() if not k.startswith('_')},samplingEvery=integer(sampling.get((domain,stage),{}).get('scopeSampleEvery'),1),
+                        startCF=self.ca_to_cf(start_ca,pid),endCF=self.ca_to_cf(end_ca,pid),
+                        meaning='Observed thread/span/tag provenance only; inclusive CPU and wall span may overlap nested scopes/other threads and are not exclusive frame costs'))
         if not self.cpu_details:
             self.issue("cpu-submission-detail-unavailable", scope="cpu")
+        if self.cpu_span_count>len(self.cpu_spans):self.issue('cpu-span-output-cap',scope='cpu',offered=self.cpu_span_count,limit=len(self.cpu_spans))
 
     def _ancestor_nodes(self, targets, lo):
         reverse = defaultdict(set)
@@ -755,7 +855,7 @@ class Analyzer:
             logicals = {(cb["pid"], integer(cb.get("logicalSubmit")), cb.get("family"), cb.get("index")) for cb in relevant
                         if (cb["pid"], cb["nativeCB"]) in targets or lo is None
                         or positive(cb.get("gpuEndCA")) is None or positive(cb["gpuEndCA"]) >= lo}
-            phases = defaultdict(lambda: dict(selfWallNS=0, inclusiveWallNS=0, count=0, failures=0))
+            phases = defaultdict(lambda: dict(selfWallNS=0, inclusiveWallNS=0, count=0, failures=0, samplingEvery=1))
             cpu_refs = []
             matched = set()
             for index, detail in enumerate(self.cpu_details):
@@ -767,6 +867,7 @@ class Analyzer:
                 cpu_refs.append({k: v for k, v in detail.items() if k != "phases"})
                 for p in detail["phases"]:
                     dest = phases[(detail["domain"], p["stage"], p["name"], p["kind"])]
+                    dest["samplingEvery"]=max(dest["samplingEvery"],p.get("samplingEvery",1))
                     for field in ("selfWallNS", "inclusiveWallNS", "count", "failures"):
                         dest[field] += p[field]
             unmatched = sorted(str(k) for k in logicals if not any((d["pid"], d["submission"], d["queueFamily"], d["queueIndex"]) == k for d in self.cpu_details))
@@ -824,10 +925,15 @@ class Analyzer:
             latest_state = {k: latest.get(k) for k in ("time", "pid", "alive", "active", "frontmostPID", "visible", "pointWidth", "pointHeight")}
             latest_state["ageAtPresentSeconds"] = hi_cf - dec(latest["time"])
             latest_state["freshWithin2Seconds"] = hi_cf - dec(latest["time"]) <= 2
+            latest_state['contextOnlyNotIntervalProof'] = True
+        continuity=foreground_intervals(self.foreground)
+        intervals=[r for r in continuity['intervals'] if lo_cf is not None and hi_cf is not None and
+                   overlap(dec(r['startCF']),dec(r['endCF']),lo_cf,hi_cf)]
         return dict(windowCF=[lo_cf, hi_cf], exactInsidePolls=len(selected),
                     pollReferences=[ref(r) for r in selected], neighboringPollReferences=[ref(r) for r in surrounding],
                     foregroundSamples=[{k: r.get(k) for k in ("time", "pid", "alive", "active", "frontmostPID", "visible", "pointWidth", "pointHeight")} for r in front],
                     lastForegroundObservation=latest_state,
+                    foregroundContinuity=intervals, foregroundTailExtrapolated=False,
                     precision="Host polling is coarse; neighboring counter deltas are not assigned proportionally to individual frames.")
 
     def system_report(self):
@@ -870,6 +976,8 @@ class Analyzer:
                 for name in ("userCounterDelta", "systemCounterDelta", "totalCounterDelta"):
                     dest[name] += max(0, integer(thread.get(name)))
             native = row.get("native", {})
+            if native.get('directoryInventoryCapped') or native.get('queueSnapshotFileCap'):
+                self.issue('system-native-inventory-cap',scope='system',**ref(row))
             graphics = row.get("graphicsLog", {})
             host = row.get("system", {})
             if host:
@@ -887,7 +995,8 @@ class Analyzer:
                                             newGPUTimeoutFiles=native.get("newGPUTimeoutFiles"),
                                             queues=native.get("queues"), latestPresent=native.get("latestPresent"),
                                             memory=native.get("memory-current"), residency=native.get("residency-cost"),
-                                            resourceUse=native.get("resource-use-current")))
+                                            resourceUse=native.get("resource-use-current"),heapPlan=native.get('heap-plan-stats'),
+                                            sharedSnapshots=native.get('shared-snapshot-stats'),descriptorDirty=native.get('descriptor-dirty')))
             # Numeric snapshots are already filtered by the harness. Their age is
             # evaluated rather than treating an old file as active instrumentation.
             def snapshots(obj):
@@ -1185,13 +1294,257 @@ class Analyzer:
                     records=records, knownUnarmedNativeCBs=unarmed, nativeCounterEligibilityUnknownCBs=unknown,
                     limits="A complete provided artifact set only covers its known sampled portion; unknown native eligibility is not assumed captured and finite arms do not promise capture of future CBs.")
 
+    def guest_report(self):
+        # Guest IDs/clocks stay separate from native Mach identities.
+        epoch=D(116444736000000000);anchors=defaultdict(list);records=[];begins=defaultdict(list);spans=[];kinds=Counter();unclocked=0
+        names={1:'ExecuteCommandLists',2:'worker',3:'workerEnqueue',4:'workerAcquire',5:'vkQueueSubmit2',6:'waitSemaphoreEdge',7:'signalSemaphoreEdge',8:'VkCommandBuffer',9:'CreateGraphicsPipelineState',10:'CreateComputePipelineState',11:'CreatePipelineStateStream',12:'vkCreateGraphicsPipelines',13:'vkCreateComputePipelines',14:'returnedVkPipeline',15:'pthread_cond_wait',16:'nativeQueueAcquire',17:'serializedQueueDrain',18:'vkWaitSemaphores',19:'VkQueueMapping',20:'PSOBuild',21:'createCommittedResource',22:'createPlacedResource',23:'createReservedResource',24:'allocateHeapMemory',25:'vkAllocateMemory',26:'VkDeviceMemoryHandle',27:'vkMapMemory',28:'ResourceMap',29:'ResourceUnmap',30:'vkFlushMappedMemoryRanges',31:'vkInvalidateMappedMemoryRanges'}
+        seen=set();sequences=defaultdict(set);copy_rows=defaultdict(list);missing=[];edge_caps=[];unpaired_ends=0
+        for row in self.guest_rows:
+            if row.get('type')!='clockCalibration':continue
+            before,after,freq,wall=[dec(row.get(k)) for k in ('qpcBefore','qpcAfter','qpcFrequency','fileTimeUTC100ns')]
+            if row.get('clockDomain')!='windows-qpc' or None in (before,after,freq,wall) or freq<=0 or after<before or not row.get('session'):
+                missing.append(dict(reason='invalid-or-missing-guest-calibration',source=ref(row)));continue
+            anchors[(row.get('windowsPID'),row.get('runID'))].append(dict(mid=(before+after)/2,freq=freq,cf=(wall-epoch)/D(10000000)-CF_UNIX_OFFSET,bound=(after-before)/2/freq,session=row.get('session')))
+        for row in sorted(self.guest_rows,key=lambda r:integer(r.get('qpc'))):
+            if row.get('type') in ('copyCumulative','resourceAPICumulative'):
+                copy_rows[(row.get('type'),row.get('runID'),row.get('shardIndex'),integer(row.get('operation')))].append(row);continue
+            if row.get('type')!='event':continue
+            pid,run=row.get('windowsPID'),row.get('runID');seq=row.get('seq');key=(pid,run,seq)
+            if seq is None:key=(pid,run,ref(row).get('source'),ref(row).get('line'))
+            if key in seen:continue
+            seen.add(key)
+            if isinstance(seq,int):sequences[(pid,run)].add(seq)
+            qpc=dec(row.get('qpc'));available=[a for a in anchors.get((pid,run),[]) if a['session']==row.get('session')]
+            anchor=min(available,key=lambda a:abs(a['mid']-qpc)) if available and qpc is not None and row.get('schema')==1 and row.get('session') else None
+            cf=anchor['cf']+(qpc-anchor['mid'])/anchor['freq'] if anchor else None
+            unclocked+=cf is None;kind=integer(row.get('kind'),-1);kinds[str(kind)]+=1
+            session_filetime=dec(row.get('session'));arm_unix_ns=(session_filetime-epoch)*100 if session_filetime is not None and session_filetime>0 else None
+            args=row.get('args') if isinstance(row.get('args'),list) and len(row['args'])==8 else None
+            if args is None:missing.append(dict(reason='missing-eight-guest-args',source=ref(row)))
+            if row.get('phase')==2 and args and ((kind==5 and integer(args[5])) or (kind==6 and integer(args[6]) and not integer(args[0])) or (kind==14 and integer(args[4]))):edge_caps.append(ref(row))
+            record=dict(guestPID=pid,runID=run,kind=kind,kindName=names.get(kind,'unknown'),phase=row.get('phase'),id=row.get('id'),parent=row.get('parent'),
+                windowsThreadID=row.get('windowsThreadID'),timeCF=cf,qpc=row.get('qpc'),args=args,
+                sessionFileTime100ns=row.get('session'),sessionUnixNS=arm_unix_ns,sessionQuantumNS=100,
+                calibrationBracketHalfSeconds=anchor['bound'] if anchor else None,UTCGranularityBound='unknown; GetSystemTimeAsFileTime resolution can exceed QPC bracket',
+                hostPIDOrMachThreadJoin='unjoinable without an independently measured map',source=ref(row))
+            if row.get('phase')==2 and kind in (28,30,31) and args and integer(args[3])==1:
+                failure=integer(args[1]);failure=failure-(1<<64) if failure>=1<<63 else failure
+                record['unsampledFailureDetail']=dict(object=args[0],originalSignedResult=failure,subresourceOrRangeCount=args[2],partialSuffix=bool(args[4]),timedSampleNotImplied=True)
+            elif row.get('phase')==2 and kind==26 and args:
+                record['memoryHandleDetail']=dict(VkDeviceMemory=args[0],allocationSizeBytes=args[1],memoryTypeIndex=args[2])
+            pair=(pid,run,row.get('windowsThreadID'),row.get('id'),row.get('parent'),kind)
+            if row.get('phase')==0:begins[pair].append(record)
+            elif row.get('phase')==1:
+                start=begins[pair].pop() if begins[pair] else None
+                if start and anchor and qpc is not None and dec(start['qpc']) is not None and qpc>=dec(start['qpc']):
+                    body=dec(args[3]) if args else None;body_start=dec(args[7]) if args else None
+                    valid_body=body is not None and body>=0 and body_start is not None and dec(start['qpc'])<=body_start<=qpc and body<=qpc-dec(start['qpc'])
+                    result=integer(args[4]) if args and integer(args[5]) else None
+                    if result is not None and result>=1<<63:result-=1<<64
+                    spans.append(dict(guestPID=pid,runID=run,kind=kind,kindName=names.get(kind,'unknown'),id=row.get('id'),windowsThreadID=row.get('windowsThreadID'),
+                        envelopeElapsedMs=(qpc-dec(start['qpc']))/anchor['freq']*1000,actualBodyElapsedMs=body/anchor['freq']*1000 if valid_body else None,
+                        originalSignedResult=result,partialSuffixSessionChanged=bool(args and integer(args[6])),sourceBegin=start['source'],sourceEnd=record['source'],
+                        meaning='Guest API wall span, not GPU execution or exclusive frame cost'))
+                else:unpaired_ends+=1
+            if len(records)<2000:records.append(record)
+        copy_deltas=[];resource_deltas=[];cumulative_streams=[]
+        operations={0:'CopyDescriptors',1:'ResourceMap',2:'ResourceUnmap',3:'FlushMappedRanges',4:'InvalidateMappedRanges'}
+        for (record_type,run,shard,operation),rows in copy_rows.items():
+            rows=sorted(rows,key=lambda r:integer(r.get('qpc')))
+            units='offeredDescriptors' if record_type=='copyCumulative' else 'offeredUnits'
+            fields=('offeredCalls',units,'sampledCalls','sampledWallQPC')
+            boundaries={}
+            for sample in rows:
+                session_key=str(sample.get('session'));boundaries[session_key]=boundaries.get(session_key,False) or bool(sample.get('finalBoundary'))
+            cumulative_streams.append(dict(type=record_type,runID=run,shardIndex=shard,operation=operation,operationName=operations.get(operation,'unknown'),
+                snapshots=len(rows),lastRunArmedCumulative={k:rows[-1].get(k) for k in fields},lastSamplePeriod=rows[-1].get('samplePeriod'),finalBoundaryBySession=boundaries,
+                nonAtomicCumulativeSnapshot=any(r.get('nonAtomicCumulativeSnapshot') for r in rows),sourceFirst=ref(rows[0]),sourceLast=ref(rows[-1]),
+                statuses=['observed','sampled']+(['missing'] if not all(boundaries.values()) else []),
+                meaning='Run+operation+shard counters across arms; absolute run-armed totals are not a user-stage delta. finalBoundary is explicit but the tuple can straddle in-flight sampled work.'))
+            if record_type=='resourceAPICumulative' and operation not in (1,2,3,4):missing.append(dict(reason='unknown-resource-api-operation',source=ref(rows[-1])))
+            for a,b in zip(rows,rows[1:]):
+                delta={k:integer(b.get(k))-integer(a.get(k)) for k in fields}
+                if any(v<0 for v in delta.values()):missing.append(dict(reason='api-cumulative-nonmonotonic',source=ref(b)));continue
+                entry=dict(type=record_type,runID=run,shardIndex=shard,operation=operation,operationName=operations.get(operation,'unknown'),
+                    fromSession=a.get('session'),toSession=b.get('session'),samplePeriod=b.get('samplePeriod'),
+                    finalBoundaryAtEnd=bool(b.get('finalBoundary')),measuredCumulativeDelta=delta,extrapolated=False,
+                    nonAtomicCumulativeSnapshot=bool(a.get('nonAtomicCumulativeSnapshot') or b.get('nonAtomicCumulativeSnapshot')),
+                    sourceBegin=ref(a),sourceEnd=ref(b),meaning='Same run+operation+shard differences across arms; sampledWallQPC is measured samples only, never extrapolated to total API CPU or wall cost')
+                (copy_deltas if record_type=='copyCumulative' else resource_deltas).append(entry)
+        # Detail.id is the Vulkan scope id; parent remains its OUTER scope.
+        # Merge generations before this pass. Never pair by detail.parent.
+        vulkan_scopes={};details=[];link_seen=set();link_cap=False
+        for row in self.guest_rows:
+            if row.get('type')!='event':continue
+            key=(row.get('windowsPID'),row.get('runID'),row.get('session'),row.get('id'))
+            dedup=(key,row.get('seq')) if row.get('seq') is not None else (key,ref(row).get('source'),ref(row).get('line'))
+            if dedup in link_seen:continue
+            link_seen.add(dedup);kind=integer(row.get('kind'));phase=row.get('phase')
+            if phase in (0,1) and kind in (5,12,13,18,25) and integer(row.get('id')):
+                if key not in vulkan_scopes and len(vulkan_scopes)>=8192:link_cap=True;continue
+                scope=vulkan_scopes.setdefault(key,dict(guestPID=key[0],runID=key[1],session=key[2],id=key[3],kind=kind,kindName=names[kind],outerParent=row.get('parent'),begin=None,end=None,details=[]))
+                if scope['kind']!=kind:missing.append(dict(reason='vulkan-scope-id-kind-conflict',source=ref(row)));continue
+                scope['begin' if phase==0 else 'end']=ref(row)
+            elif phase==2 and kind in (5,6,7,8,14,26):
+                if len(details)<32768:details.append((key,row))
+                else:link_cap=True
+        unresolved=[];scope_expect={5:(5,),6:(5,18),7:(5,),8:(5,),14:(12,13),26:(25,)}
+        for key,row in details:
+            scope=vulkan_scopes.get(key);kind=integer(row.get('kind'))
+            if scope is None or scope['kind'] not in scope_expect[kind] or scope['outerParent']!=row.get('parent'):
+                unresolved.append(dict(guestPID=key[0],runID=key[1],session=key[2],id=key[3],kind=kind,outerParent=row.get('parent'),source=ref(row),reason='same-id-vulkan-scope-missing-or-conflicting'));continue
+            if len(scope['details'])<256:scope['details'].append(dict(kind=kind,kindName=names[kind],args=row.get('args'),source=ref(row)))
+            else:link_cap=True
+        for scope in vulkan_scopes.values():scope['paired']=scope['begin'] is not None and scope['end'] is not None
+        bad=cumulative_counter_windows(self.guest_current,('producerDropped','lockDrops','ringDrops','rateDrops','IOFailures','copyUntrackedCalls','copyUntrackedDescriptors'),'windowsPID')
+        if not self.guest_current:missing.append(dict(reason='guest-current-metadata-not-observed'))
+        losses=[r for r in self.guest_copy_index if r.get('status') in ('missing','capped','unjoinable')]
+        gaps=[]
+        for (pid,run),values in sequences.items():
+            ordered=sorted(values);ranges=[dict(after=a,before=b,missing=b-a-1) for a,b in zip(ordered,ordered[1:]) if b>a+1]
+            if ranges:gaps.append(dict(guestPID=pid,runID=run,ranges=ranges[:32]))
+        statuses=['observed'] if kinds else ['missing'];statuses.append('unjoinable')
+        if missing or unclocked or gaps or unpaired_ends or any(begins.values()) or unresolved or any(not s['paired'] for s in vulkan_scopes.values()) or any('missing' in r['statuses'] for r in cumulative_streams):
+            if 'missing' not in statuses:statuses.append('missing')
+        if any(r['observedDelta'] for r in bad) or losses or edge_caps or link_cap or sum(kinds.values())>len(records) or len(copy_deltas)>512 or len(resource_deltas)>512 or len(cumulative_streams)>512 or len(spans)>500:statuses.append('capped')
+        return dict(available=bool(kinds),statuses=statuses,clockDomain='guest QPC paired with Windows FILETIME UTC; session FILETIME epoch differs from native Unix mtimeNS',
+            kinds=dict(kinds),records=records,recordsTruncated=sum(kinds.values())>len(records),clockUnjoinable=unclocked,
+            pairedSoftwareSpans=spans[:500],softwareSpansTruncated=len(spans)>500,unclosedBeginEvents=sum(len(v) for v in begins.values()),unpairedEndEvents=unpaired_ends,
+            unclosedSoftwareScopeRecords=[r for values in begins.values() for r in values][:128],unclosedSoftwareScopeOutputCapped=sum(len(v) for v in begins.values())>128,
+            copyDescriptorCumulativeDeltas=copy_deltas[:512],copyDeltaOutputCapped=len(copy_deltas)>512,
+            resourceAPICumulativeDeltas=resource_deltas[:512],resourceDeltaOutputCapped=len(resource_deltas)>512,cumulativeStreams=cumulative_streams[:512],cumulativeStreamOutputCapped=len(cumulative_streams)>512,cumulativeAvailable=bool(copy_rows),
+            vulkanScopeDetails=list(vulkan_scopes.values()),unresolvedVulkanScopeDetails=unresolved[:128],unresolvedVulkanScopeDetailCount=len(unresolved),vulkanScopeLinkCapped=link_cap,
+            vulkanScopeLinkRule='Actual guest (windowsPID,runID,session,id) and compatible scope kind; detail.parent is outer provenance, never used as target id. No native-host handle equivalence is inferred.',
+            resourceKindCounts={names[k]:kinds[str(k)] for k in range(21,32) if kinds[str(k)]},resourceAPILimits='Map/Unmap all offers counted; only1:64 calls timed. Flush/invalidate units are range counts. Unsampled failures are explicit details; sampled times are never extrapolated. Legacy copyUntracked fields cover all sampled API operations.',missingMetadata=missing[:128],sequenceGaps=gaps,edgeMetadataCapped=edge_caps[:128],
+            counterWindows=bad,counterSessions=cumulative_counter_sessions(self.guest_current,('producerDropped','lockDrops','ringDrops','rateDrops','IOFailures','copyUntrackedCalls','copyUntrackedDescriptors'),'windowsPID'),budgetOrIOIssues=[r for r in bad if r['observedDelta'] or r['nonmonotonic']],counterPrefixUnknown=[r for r in bad if r['alreadyNonzeroAtFirstSnapshot']],copyCoverageLosses=[ref(r)|{k:r[k] for k in ('status','reason') if k in r} for r in losses[:128]],
+            argSemantics='vendor/vkd3d-proton-212991fc2c266bc0d59f4c4ce8f80f7126508d71/libs/vkd3d/vkd3d_forensics.h; actual body elapsed comes from end args[3], body-start args[7]; raw args preserved',
+            limits='Only guest software timing and observed user-stage overlap; FIFO workKey association is not a unique submission ticket. No implicit host-process/thread/pipeline mapping or exclusive slow-frame attribution',allCausesFound=False)
+
+    def forensics_report(self):
+        anchors=defaultdict(list)
+        for row in self.forensic_rows:
+            if row.get('type')!='clockCalibration':continue
+            before,after,cf=dec(row.get('machBeforeNS')),dec(row.get('machAfterNS')),dec(row.get('timeCF'))
+            if row.get('clockDomain')!='mach-absolute-nanoseconds' or None in (before,after,cf) or after<before:
+                self.issue('forensics-clock-invalid',scope='forensics',**ref(row));continue
+            anchors[(self._pid_for(row),row.get('runID'))].append(dict(mid=(before+after)/2,cf=cf,ca=dec(row.get('timeCA')),
+                bound=(after-before)/2,session=row.get('session'),source=ref(row)))
+        categories={'d3d12-entry':('d3d12','guest','entry'), 'shader-pipeline-cache':('shader','pipeline','compile','archive'),
+                    'resource-heap-descriptors':('resource','heap','descriptor','residency'),
+                    'queue-sync':('queue','submit','wait','signal','barrier'), 'draw-dispatch':('draw','dispatch','geometry'),
+                    'presentation':('present','drawable'), 'coarse-gpu-timeline':('gpu_cb_completed','nativecb')}
+        stages={key:dict(observed=0,clockUnjoinable=0,contextUnjoinable=0) for key in categories}
+        records=[];kinds=Counter();seen=set();capped=False;sequences=defaultdict(set)
+        coarse_cbs={};coarse_presents=[];scope_starts={};slow_scopes=[];scope_total=0;scope_unpaired_end=0;scope_start_cap=False;coarse_cap=False
+        for row in self.forensic_rows:
+            if row.get('type')!='forensics':continue
+            pid=self._pid_for(row);run=row.get('runID');seq=row.get('seq');key=(pid,run,seq)
+            if run is None or seq is None:key=(pid,run,ref(row).get('source'),ref(row).get('line'))
+            if key in seen:continue
+            seen.add(key);kind=str(row.get('kind','unknown'));kinds[kind]+=1
+            if isinstance(seq,int):sequences[(pid,run)].add(seq)
+            clock=dec(row.get('machNS'));available=anchors.get((pid,run),[])
+            anchor=min(available,key=lambda a:abs(a['mid']-clock)) if available and clock is not None and row.get('schema')==1 else None
+            cf=anchor['cf']+(clock-anchor['mid'])/NS if anchor else None
+            ctx=row.get('context',{}) if isinstance(row.get('context'),dict) else {}
+            fields=row.get('fields',{}) if isinstance(row.get('fields'),dict) else {};payload=row.get('payload',{}) if isinstance(row.get('payload'),dict) else {}
+            owner_names={'nativeCB':('ownerNativeCB',),'logicalSubmit':('ownerSubmission','ownerSubmit'),'frame':('ownerFrame',),'queueFamily':('ownerQueueFamily','ownerFamily'),'queueIndex':('ownerQueueIndex','ownerIndex'),'shader':('ownerShader',)}
+            owner={key:next((fields[name] for name in names if name in fields),None) for key,names in owner_names.items()}
+            # Encoding may split to a different ambient CB before an earlier
+            # encoder scope is emitted. Saved owner fields win, including0.
+            has_owner='ownerNativeCB' in fields
+            native=integer(owner['nativeCB'] if has_owner else ctx.get('nativeCB'))
+            logical=integer(owner['logicalSubmit'] if has_owner else ctx.get('logicalSubmit'))
+            joined=bool(native and logical and (pid,native) in self.cbs and integer(self.cbs[(pid,native)].get('logicalSubmit'))==logical)
+            if any(t in kind.lower() for t in ('denied','dropped','truncated')) or any(re.search(r'(dropped|truncated|denied|overflow)$',k,re.I) and integer(v)>0 for k,v in fields.items()):capped=True
+            pipeline=fields.get('pipeline',fields.get('vulkanPipeline',payload.get('ownerPipeline')))
+            record=dict(pid=pid,runID=run,session=row.get('session'),seq=seq,kind=kind,machNS=row.get('machNS'),timeCF=cf,
+                clockStatus='observed' if cf is not None else 'unjoinable',
+                calibrationBracketHalfNS=anchor['bound'] if anchor else None,
+                calibrationSessionMatched=bool(anchor and anchor['session']==row.get('session')),
+                context={k:ctx.get(k) for k in ('domain','queueFamily','queueIndex','logicalSubmit','nativeCB','frame','shader')},
+                savedOwnerContext=owner if has_owner else None,linkedNativeCB=native,linkedLogicalSubmit=logical,linkContextSource='saved-owner-fields' if has_owner else 'ambient-context',
+                pipeline=pipeline,nativePipeline=fields.get('nativePipeline'),threadMachID=row.get('threadMachID'),nativeGraphJoined=joined,fields=fields,payload=payload,source=ref(row),
+                meaning='Software observation, not exclusive GPU/shader duration or proven cause of a frame stall')
+            if anchor and anchor['session']!=row.get('session'):
+                self.issue('forensics-clock-session-mismatch',scope='forensics',runID=run,session=row.get('session'))
+            if 'spanID' in fields and fields.get('phase') in (0,1):
+                scope_key=(pid,run,fields['spanID'])
+                if fields['phase']==0:
+                    if len(scope_starts)<16384:scope_starts[scope_key]=ref(row)
+                    else:scope_start_cap=True
+                else:
+                    begin=scope_starts.pop(scope_key,None);scope_total+=1;scope_unpaired_end+=begin is None
+                    item=dict(kind=kind,pid=pid,runID=run,fields=fields,sourceBegin=begin,sourceEnd=ref(row),endCF=cf,
+                        elapsedWallNS=integer(fields.get('elapsedWallNS')),pairedBeginObserved=begin is not None,
+                        meaning='Software wall span with saved owner fields; not exclusive thread CPU or GPU duration')
+                    entry=(item['elapsedWallNS'],scope_total,item)
+                    if len(slow_scopes)<500:heapq.heappush(slow_scopes,entry)
+                    elif entry[:2]>slow_scopes[0][:2]:heapq.heapreplace(slow_scopes,entry)
+            cbid=integer(fields.get('ownerNativeCB'))
+            if kind.startswith('NativeCB') and cbid:
+                cbkey=(pid,run,cbid)
+                if cbkey in coarse_cbs or len(coarse_cbs)<20000:
+                    cb=coarse_cbs.setdefault(cbkey,dict(pid=pid,runID=run,nativeCB=cbid,phases={},fields={}))
+                    cb['phases'][kind]=dict(timeCF=cf,source=ref(row));cb['fields'].update(fields)
+                    for key in ('gpuStartCANS','gpuEndCANS','createdCANS','committedCANS'):
+                        if integer(fields.get(key)) and anchor and anchor['ca'] is not None:cb[key[:-4]+'CF']=D(integer(fields[key]))/NS+anchor['cf']-anchor['ca']
+                else:coarse_cap=True
+            if kind=='NativePresentedFrame':
+                timestamp=integer(fields.get('nativeTimestampCANS'));mapped=D(timestamp)/NS+anchor['cf']-anchor['ca'] if timestamp and fields.get('nativeTimestampValid') and anchor and anchor['ca'] is not None else None
+                if len(coarse_presents)<10000:coarse_presents.append(dict(pid=pid,runID=run,nativeTimestampCF=mapped,fields=fields,source=ref(row)))
+                else:coarse_cap=True
+            for name,tokens in categories.items():
+                if any(token in kind.lower() for token in tokens):
+                    stages[name]['observed']+=1;stages[name]['clockUnjoinable']+=cf is None;stages[name]['contextUnjoinable']+=not joined
+            if len(records)<2000:records.append(record)
+            else:capped=True
+        losses=[r for r in self.forensic_copy_index if r.get('status') in ('missing','capped','unjoinable')]
+        budgets=cumulative_counter_windows(self.forensic_current,('dropped','IOFailures','serializationFailures','lowDiskDrops'),'pid')
+        capped=capped or any(r['observedDelta'] for r in budgets) or any(r.get('status')=='capped' for r in losses)
+        sequence_gaps=[]
+        for (pid,run),values in sequences.items():
+            values=sorted(values)
+            gaps=[dict(after=a,before=b,missing=b-a-1) for a,b in zip(values,values[1:]) if b>a+1]
+            if gaps:sequence_gaps.append(dict(pid=pid,runID=run,ranges=gaps[:32],missing=sum(g['missing'] for g in gaps)))
+        matrix=[]
+        input_gaps=[r for r in self.issues if r['code'] in ('input-json-invalid','source-unavailable','source-mutated-during-read','input-byte-cap','input-row-cap') and 'forensics-' in r.get('source','') and 'vkd3d-forensics' not in r.get('source','')]
+        for name,values in stages.items():
+            statuses=['observed'] if values['observed'] else ['missing']
+            if values['clockUnjoinable'] or values['contextUnjoinable']:statuses.append('unjoinable')
+            if capped:statuses.append('capped')
+            if (losses or sequence_gaps or input_gaps) and 'missing' not in statuses:statuses.append('missing')
+            matrix.append(dict(stage=name,statuses=statuses,**values,
+                scope='Provided software events only; missing/unclocked/unjoined records are not attributed exclusively to slow frames'))
+        matrix += [dict(stage='thread-counter-to-native-thread',statuses=['unjoinable'],reason='PROC_PIDLISTTHREADS pthread/opaque handles have no measured mapping to native threadMachID; numeric equality or names are not a join'),
+                   dict(stage='forensics-writer-health',statuses=(['observed'] if self.forensic_current else ['missing'])+(['capped'] if any(r['observedDelta'] for r in budgets) else [])+(['unjoinable'] if any(r['alreadyNonzeroAtFirstSnapshot'] or r['nonmonotonic'] for r in budgets) else []),reason='Run-cumulative metadata deltas; pre-first-snapshot losses are an unknown prefix'),
+                   dict(stage='closed-driver-internals',statuses=['missing','unjoinable'],reason='Public coarse native timelines can contain waits. Private driver scheduler/compiler internals and exclusive shader execution costs are unknown')]
+        return dict(available=bool(kinds),clockDomain='mach-absolute-nanoseconds; never C++ steady-clock subtraction',
+            stageMatrix=matrix,kinds=dict(kinds),records=records,recordsTruncated=sum(kinds.values())>len(records),
+            slowSoftwareScopes=[item for _,_,item in sorted(slow_scopes,reverse=True)],softwareScopeCount=scope_total,softwareScopeRankingCapped=scope_total>len(slow_scopes),unpairedSoftwareScopeEnds=scope_unpaired_end,openSoftwareScopes=len(scope_starts),softwareScopePairingCap=scope_start_cap,
+            coarseCommandBuffers=list(coarse_cbs.values()),coarsePresents=coarse_presents,coarseTimelineOutputCapped=coarse_cap,
+            coarseTimelineLimits='Actual per-CB/public present observations only; callback observation time is not substituted for native CA timestamps. Coarse CB intervals can contain waits and do not form a complete dependency graph.',
+            copyCoverageLosses=[{k:v for k,v in r.items() if not k.startswith('_')} for r in losses[:128]],
+            inputCoverageIssues=input_gaps,
+            nativeCounterWindows=budgets,nativeCounterSessions=cumulative_counter_sessions(self.forensic_current,('dropped','IOFailures','serializationFailures','lowDiskDrops'),'pid'),nativeBudgetOrIOIssues=[r for r in budgets if r['observedDelta'] or r['nonmonotonic']],nativeCounterPrefixUnknown=[r for r in budgets if r['alreadyNonzeroAtFirstSnapshot']],sequenceGaps=sequence_gaps,allCausesFound=False)
+
     def report(self):
         self.build_native()
         self.build_cpu()
+        for row in self.cpu_copy_index:
+            if row.get('status') in ('capped','missing','unjoinable'):self.issue('cpu-current-copy-'+row['status'],scope='cpu',reason=row.get('reason'),**ref(row))
         clocks = self._clock_report()
         system = self.system_report()
         gpu = self.gpu_report()
         frames = self.frame_reports()
+        forensics=self.forensics_report()
+        guest=self.guest_report()
+        for frame in frames:
+            ids={r['nativeCB'] for r in frame['GPU']['commandBuffers']}
+            matched=[r for r in forensics['records'] if r['pid']==frame['pid'] and r['nativeGraphJoined'] and
+                     str(r['pid'])+':'+str(r['linkedNativeCB']) in ids]
+            frame['Forensics']=dict(records=matched[:100],truncated=len(matched)>100,
+                meaning='Shared software/native-CB context only; no aggregate/event is charged exclusively to a frame')
         path_gaps = sorted({r["code"] for r in self.issues if r["scope"] in ("native", "wait", "clock", "presentation", "global")})
         for frame in frames:
             frame["GPU"]["criticalPath"]["observedCoverageComplete"] = not path_gaps
@@ -1205,13 +1558,17 @@ class Analyzer:
                         boundaries.append(dict(boundary, nativeCBID=artifact["nativeCBID"], logicalSubmit=artifact["logicalSubmissionID"],
                                                split=artifact["nativeSplitIndex"], source=artifact["source"]))
             frame["GPUCounterBoundaryRanking"] = sorted(boundaries, key=lambda r: r["observedMs"], reverse=True)[:100]
-        cpu_totals = defaultdict(lambda: dict(selfWallNS=0, count=0))
+        cpu_totals = defaultdict(lambda: dict(selfWallNS=0, count=0, samplingEvery=1,threadCPUCount=0,inclusiveThreadCPUNS=0))
         for row in self.cpu_aggregate:
             key = (row["domain"], row["stage"], row["name"], row["kind"])
             cpu_totals[key]["selfWallNS"] += row["selfWallNS"]
             cpu_totals[key]["count"] += row["count"]
+            cpu_totals[key]['threadCPUCount']+=row.get('threadCPUCount',0)
+            cpu_totals[key]['inclusiveThreadCPUNS']+=row.get('inclusiveThreadCPUNS',0)
+            cpu_totals[key]["samplingEvery"]=max(cpu_totals[key]["samplingEvery"],row.get("samplingEvery",1))
         ranking = [dict(domain=k[0], stage=k[1], name=k[2], kind=k[3], selfWallNS=v["selfWallNS"],
-                        selfWallMs=D(v["selfWallNS"]) / 1000000, count=v["count"]) for k, v in cpu_totals.items()]
+                        selfWallMs=D(v["selfWallNS"]) / 1000000, count=v["count"],samplingEvery=v["samplingEvery"],sampled=v["samplingEvery"]>1,extrapolated=False,
+                        threadCPUCount=v['threadCPUCount'],inclusiveThreadCPUNS=v['inclusiveThreadCPUNS'],threadCPUMeaning='Measured inclusive CPU samples only; not additive across nested stages') for k, v in cpu_totals.items()]
         ranking.sort(key=lambda r: r["selfWallNS"], reverse=True)
         matrix = []
         for scope, available, detail in (
@@ -1223,8 +1580,21 @@ class Analyzer:
             ("system", bool(self.system_rows), "PID/start identity, threads, faults, memory/IO/pressure and graphics/compiler progress polls."),
             ("gpu-counters", bool(gpu["artifacts"]) or bool(gpu["nativeCommandBufferCoverage"]["knownCaptureCBs"]), "Optional paired-clock boundaries plus native per-CB skip/allocated/session/midCB checks within the known counter window; not an all-queue capture promise.")):
             problems = sorted({r["code"] for r in self.issues if r["scope"] in (scope, "global")})
+            statuses=['observed'] if available else ['missing']
+            if any(any(token in code for token in ('cap','drop','trunc','budget')) for code in problems):statuses.append('capped')
+            if problems:statuses.append('unjoinable')
             matrix.append(dict(layer=scope, available=available, observedCoverageComplete=available and not problems,
-                               issues=problems, detail=detail))
+                               statuses=statuses, issues=problems, detail=detail))
+        matrix += [dict(layer='forensics:'+r['stage'],available=bool(r.get('observed')),observedCoverageComplete=False,
+                        statuses=r['statuses'],detail=r.get('reason',r.get('scope'))) for r in forensics['stageMatrix']]
+        matrix.append(dict(layer='guest-d3d12-entry',available=guest['available'],observedCoverageComplete=False,statuses=guest['statuses'],detail='Guest QPC/FILETIME software timeline; no implicit Windows/native PID or thread join'))
+        resource_api_observed=bool(guest['resourceKindCounts'] or any(r['type']=='resourceAPICumulative' for r in guest['cumulativeStreams']))
+        matrix.append(dict(layer='guest-resource-memory-map',available=resource_api_observed,observedCoverageComplete=False,statuses=(['observed','sampled','unjoinable'] if resource_api_observed else ['missing'])+(['capped'] if 'capped' in guest['statuses'] else []),detail='Kinds21–31 and run+operation+shard cumulative deltas; all offers vs1:64 timing kept separate; no exact full-CPU or closed-driver attribution'))
+        if self.cpu_fine_sampling:matrix.append(dict(layer='cpu-fine-scopes',available=True,observedCoverageComplete=False,statuses=['observed']+(['sampled'] if any(integer(r.get('scopeSampleEvery'),1)>1 for r in self.cpu_fine_sampling) else []),detail='Measured completed timing samples only; no extrapolation or independent full-cost claim; unsampled child work remains in parent'))
+        heap_observed=any(r.get('native',{}).get('heap-plan-stats') for r in self.system_rows)
+        matrix.append(dict(layer='resource-heap-plan-stats',available=heap_observed,statuses=['observed'] if heap_observed else ['missing'],
+            observedCoverageComplete=False,detail='Coarse counter snapshots only; never exclusive slow-frame cost'))
+        matrix.append(dict(layer='cpu-history-archive',available=bool(self.cpu_status),observedCoverageComplete=False,statuses=(['observed'] if self.cpu_status else ['missing'])+(['capped'] if any(integer(r.get('historyRowsSkipped')) for r in self.cpu_status) else []),detail='Native history cap is separate from changed-current archives; current/status copy gaps and caps remain explicit'))
         return dict(schema=1, tool="analyze_stutter_capture.py", rawInputsPreserved=True,
                     targetPID=self.pid, targetFPS=self.target_fps, referenceCF=self.reference_cf,
                     allCausesFound=False,
@@ -1238,8 +1608,11 @@ class Analyzer:
                                      eventPhaseAliasesNormalized=dict(self.event_alias_counts),
                                      scope="captured nativeCB and event IDs in one PID, not a complete host/device scheduler trace"),
                     CPUPhaseRanking=ranking, CPUReportProvenance=self.cpu_report_provenance,
-                    CPUHistoricalReportWindowsSkipped=self.cpu_historical_skipped,
-                    frames=frames, system=system, GPUCounterArtifacts=gpu,
+                    CPUHistoricalReportWindowsSkipped=self.cpu_historical_skipped,CPUHistoryStatus=[ref(r)|{k:v for k,v in r.items() if not k.startswith('_')} for r in self.cpu_status],CPUCurrentCopyIssues=self.cpu_copy_index,
+                    CPUObservedSpans=self.cpu_spans,CPUObservedSpanOutputCapped=self.cpu_span_count>len(self.cpu_spans),
+                    frames=frames, system=system, GPUCounterArtifacts=gpu, Forensics=forensics, GuestD3D12=guest, CPUFineScopeSampling=self.cpu_fine_sampling,
+                    foregroundContinuity=foreground_intervals(self.foreground),
+                    requestedDiagnosticWindows=[{k:v for k,v in r.items() if not k.startswith('_')} for r in self.requested_windows],
                     inputs=self.sources, inputBytesRead=self.bytes_read, inputRowsRead=self.rows_read,
                     limitations=["CPU self wall time across threads can overlap GPU execution and other threads. Contributor columns must not be added into a frame budget.",
                                  "CPU aggregates use span-completion windows; crossing/mixed submission records cannot be split precisely per present.",
@@ -1318,6 +1691,13 @@ def main():
     parser.add_argument("--native-trace", type=Path, action="append", default=[])
     parser.add_argument("--cpu-report", type=Path, action="append", default=[])
     parser.add_argument("--system-capture", type=Path)
+    parser.add_argument("--session-capture",type=Path)
+    parser.add_argument("--guest-trace",type=Path,action="append",default=[])
+    parser.add_argument("--guest-current",type=Path,action="append",default=[])
+    parser.add_argument("--guest-copy-index",type=Path,action="append",default=[])
+    parser.add_argument("--forensics-trace",type=Path,action="append",default=[])
+    parser.add_argument("--forensics-current",type=Path,action="append",default=[])
+    parser.add_argument("--forensics-copy-index",type=Path,action="append",default=[])
     parser.add_argument("--gpu-artifact", type=Path, action="append", default=[])
     parser.add_argument("--gpu-clock-sidecar", type=Path, action="append", default=[])
     parser.add_argument("--pid", type=int)
@@ -1346,8 +1726,12 @@ def main():
         print(json.dumps(json_ready(result), indent=2))
         return 0 if result["passed"] else 1
     analyzer = Analyzer(target_pid=args.pid, freshness_seconds=args.freshness_seconds, target_fps=args.target_fps)
-    if args.system_capture:
+    if args.session_capture:
+        analyzer.load_session(args.session_capture)
+    elif args.system_capture:
         analyzer.load_system(args.system_capture)
+    analyzer.load_forensics(args.forensics_trace,args.forensics_current,args.forensics_copy_index)
+    analyzer.load_guest(args.guest_trace,args.guest_current,args.guest_copy_index)
     analyzer.load_native(args.native_trace)
     analyzer.load_cpu(args.cpu_report)
     analyzer.load_gpu(args.gpu_artifact, args.gpu_clock_sidecar)

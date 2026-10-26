@@ -240,7 +240,7 @@ def main() -> int:
                                       "--launch-record", str(out / "launch.json"), "--seconds", "900"],
                                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                      start_new_session=True)
-            record["diskBudgetMonitor"] = {"pid": guard.pid, "maximumSeconds":900, "minimumReserveBytes":3*1024**3}
+            record["diskBudgetMonitor"] = {"pid": guard.pid, "maximumSeconds":900, "minimumReserveBytes":3*1024**3, "gameStopAuthorized":False, "mode":"observe-only"}
             temporary_record = out / "launch.with-budget.json"
             temporary_record.write_text(json.dumps(record, indent=2)+"\n")
             os.replace(temporary_record, out / "launch.json")

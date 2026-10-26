@@ -6,6 +6,7 @@
 #include <objc/runtime.h>
 #include <CommonCrypto/CommonDigest.h>
 #include "MVKMeshLinkDifferential.h"
+#include "MVKForensicsTrace.h"
 static inline bool mvkRuntimeEnvFlagEnabled(const char* name) {
     const char* value = getenv(name);
     return value && !strcmp(value, "1");
@@ -82,6 +83,19 @@ static inline void mvkWriteRuntimeTrace(const MVKConfiguration& config, NSString
         !(mvkGPUFailureTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"queue-config"])) &&
         !(mvkGPUTimeoutTraceEnabled() && ([kind isEqualToString:@"gpu-timeout"] || [kind isEqualToString:@"present-progress"] || [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"queue-config"] ||
           ([kind isEqualToString:@"queue-dependencies"] && getenv("MVK_AMD_QUEUE_DEPENDENCY_DUMP_ALL"))))) return;
+    // Only file output is redirected in the optional full-forensics profile.
+    // Replay source files, library selection and native GPU counter artifacts are
+    // unaffected. Outside armed windows high-volume metadata is deliberately not
+    // retained; the collector records those boundaries and all ring losses.
+    static const bool boundedMetadata=[] {const char*p=getenv("MVK_AMD_FORENSICS_ARM_PATH");return p&&*p;}();
+    if(boundedMetadata && ([kind isEqualToString:@"function"] || [kind isEqualToString:@"pipeline"] ||
+        [kind isEqualToString:@"compute-request"] || [kind isEqualToString:@"compute-result"] ||
+        [kind isEqualToString:@"compute-map"] || [kind isEqualToString:@"fresh-mesh-function"] ||
+        [kind isEqualToString:@"render-archive"] || [kind isEqualToString:@"compute-archive"] ||
+        [kind isEqualToString:@"slow-compute"] || [kind isEqualToString:@"present-progress"])) {
+        if(mvkForensicsArmed())mvkForensicsJSON("RuntimeMetadata",@{@"recordKind":kind,@"record":record});
+        return;
+    }
     static std::atomic<uint64_t> sequence{0};
     NSString* dir = @(config.shaderDumpDir);
     mkdir(dir.UTF8String, 0755);

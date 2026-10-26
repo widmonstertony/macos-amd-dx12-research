@@ -47,7 +47,7 @@ struct MVKCPUDefaultClock {
     static uint64_t unixNS() {return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();}
 };
 enum class MVKCPUTimingKind : uint8_t { Work, Wait, Async };
-struct MVKCPUStageInfo {const char* name;MVKCPUTimingKind kind=MVKCPUTimingKind::Work;};
+struct MVKCPUStageInfo {const char* name;MVKCPUTimingKind kind=MVKCPUTimingKind::Work;uint32_t scopeSampleEvery=1;};
 
 template<size_t StageCount,size_t DomainCount=8,class Clock=MVKCPUDefaultClock>
 class MVKCPUTimingTrace {
@@ -103,6 +103,7 @@ public:
         uint64_t detailedArmEpoch=0,detailedArmStartNS=0;
         bool detailedEnabled=false,captureEnabled=false;
         std::array<Metric,StageCount*DomainCount> rows{};
+        std::array<uint64_t,StageCount*DomainCount> fineScopesOffered{};
         std::array<uint64_t,DomainCount> detailDomainEntries{},detailDomainOverflowEvents{};
         std::array<bool,DomainCount> detailDomainAllocated{};
         std::vector<Span> slowSpans,inFlight;
@@ -120,6 +121,8 @@ private:
         std::mutex lock;
         uint64_t thread=0,slowCount=0;
         uint64_t unattributedEvents=0,unattributedSelfNS=0;
+        std::array<std::atomic<uint64_t>,StageCount*DomainCount> fineScopesOffered{};
+        Shard(){for(auto&x:fineScopesOffered)x.store(0,std::memory_order_relaxed);}
         std::array<std::unique_ptr<Block>,DomainCount> domains{};
         std::array<Span,SlowCapacity> slow{};
         std::array<Span,ActiveCapacity> active{};
@@ -239,6 +242,7 @@ private:
         auto out=std::make_unique<Report>();out->windowStartNS=_windowStartNS;out->windowEndNS=now;out->unixTimeNS=Clock::unixNS();_windowStartNS=now;out->captureEnabled=enabled();out->detailedEnabled=_detailedEnabled.load(std::memory_order_relaxed);out->detailedArmEpoch=_detailArmEpoch.load(std::memory_order_relaxed);out->detailedArmStartNS=_detailArmStartNS.load(std::memory_order_relaxed);
         std::vector<Shard*> shards;{std::lock_guard<std::mutex> g(_registryLock);for(auto&x:_shards)shards.push_back(x.get());}out->registeredThreads=shards.size();out->aggregateReservedBytes=_aggregateBlockCount.load()*sizeof(Block);out->detailedReservedBytes=_detailedShardCount.load()*sizeof(DetailTable);out->threadShardReservedBytes=shards.size()*sizeof(Shard);
         for(Shard*shard:shards){std::lock_guard<std::mutex> g(shard->lock);
+            for(size_t i=0;i<StageCount*DomainCount;++i)out->fineScopesOffered[i]+=shard->fineScopesOffered[i].exchange(0,std::memory_order_relaxed);
             for(size_t domain=0;domain<DomainCount;++domain)if(shard->domains[domain])for(size_t stage=0;stage<StageCount;++stage){auto&m=shard->domains[domain]->stages[stage];add(out->rows[domain*StageCount+stage],m);m=Metric{};}
             out->detailedUnattributedEvents+=shard->unattributedEvents;shard->unattributedEvents=0;
             out->detailedUnattributedSelfNS+=shard->unattributedSelfNS;shard->unattributedSelfNS=0;
@@ -303,8 +307,12 @@ public:
             int priorErrno=errno;
             try {
             if(stage>=StageCount||trace._info[stage].kind==Kind::Async){++trace._invalidIDs;return;}
-            _trace=&trace;_stage=uint32_t(stage);_tag=tag ? tag : currentContext.shader;_captureCPU=captureThreadCPU;_context=currentContext;_context.domain=trace.checkedDomain(_context.domain);
-            auto local=trace.local(_context.domain);_shard=local.first;_block=local.second;_parent=top;_depth=_parent?_parent->_depth+1:0;top=this;
+            _context=currentContext;_context.domain=trace.checkedDomain(_context.domain);
+            auto local=trace.local(_context.domain);
+            uint32_t every=std::max(uint32_t(1),trace._info[stage].scopeSampleEvery);
+            if(every>1){auto ordinal=local.first->fineScopesOffered[_context.domain*StageCount+stage].fetch_add(1,std::memory_order_relaxed);if(ordinal%every){errno=priorErrno;return;}}
+            _trace=&trace;_stage=uint32_t(stage);_tag=tag ? tag : currentContext.shader;_captureCPU=captureThreadCPU;
+            _shard=local.first;_block=local.second;_parent=top;_depth=_parent?_parent->_depth+1:0;top=this;
             trace.prepareDetail(_context);
             if(_captureCPU)_cpuStart=Clock::threadNS();_start=Clock::ticks();
             std::lock_guard<std::mutex> g(_shard->lock);
@@ -352,7 +360,13 @@ public:
 
     std::unique_ptr<Report> snapshot(){std::lock_guard<std::mutex> g(_publishLock);return snapshotLocked(Clock::toNS(Clock::ticks()));}
     void writeJSON(FILE*f,const Report&r)const{
-        fprintf(f,"{\"schema\":1,\"captureEnabled\":%s,\"time\":%.9f,\"unixTimeNS\":%llu,\"windowStartNS\":%llu,\"windowEndNS\":%llu,\"windowAssignment\":\"span completion\",\"selfMeaning\":\"same-thread measured-child subtraction; async self is zero; not process CPU utilization\",\"diagnosticOverheadNotSubtracted\":true,\"detailStorage\":\"stable-domain\",\"unattributedStorage\":\"originating-thread-shard\",\"unattributedWindowAssignment\":\"detail arm checked at aggregate completion update; paired with same thread-shard drain; report is not a globally atomic instant\",\"threadBudgetApplicable\":false,\"submissionSelfMeaning\":\"sum of same-thread self spans; mixed-thread entries are cumulative work, not one-thread wall or a critical path\",\"rows\":[",r.captureEnabled?"true":"false",double(r.unixTimeNS)/1e9-978307200.0,(unsigned long long)r.unixTimeNS,(unsigned long long)r.windowStartNS,(unsigned long long)r.windowEndNS);
+        fprintf(f,"{\"schema\":1,\"captureEnabled\":%s,\"time\":%.9f,\"unixTimeNS\":%llu,\"windowStartNS\":%llu,\"windowEndNS\":%llu,\"windowAssignment\":\"span completion\",\"selfMeaning\":\"same-thread measured-child subtraction; async self is zero; not process CPU utilization\",\"diagnosticOverheadNotSubtracted\":true,\"detailStorage\":\"stable-domain\",\"unattributedStorage\":\"originating-thread-shard\",\"unattributedWindowAssignment\":\"detail arm checked at aggregate completion update; paired with same thread-shard drain; report is not a globally atomic instant\",\"threadBudgetApplicable\":false,\"submissionSelfMeaning\":\"sum of same-thread self spans; mixed-thread entries are cumulative work, not one-thread wall or a critical path\"",r.captureEnabled?"true":"false",double(r.unixTimeNS)/1e9-978307200.0,(unsigned long long)r.unixTimeNS,(unsigned long long)r.windowStartNS,(unsigned long long)r.windowEndNS);
+        bool sampling=false;for(const auto&i:_info)sampling|=i.scopeSampleEvery>1;
+        // Scope offers are assigned at begin; measured timings at completion.
+        // No extrapolation: untimed children remain part of measured parents.
+        fputs(",\"fineScopeSampling\":[",f);bool sampleComma=false;
+        for(size_t domain=0;domain<DomainCount;++domain)for(size_t stage=0;stage<StageCount;++stage)if(_info[stage].scopeSampleEvery>1){if(sampleComma)fputc(',',f);sampleComma=true;fprintf(f,"{\"domain\":%zu,\"stage\":%zu,\"scopeSampleEvery\":%u,\"offeredAtScopeBegin\":%llu}",domain,stage,_info[stage].scopeSampleEvery,(unsigned long long)r.fineScopesOffered[domain*StageCount+stage]);}
+        fprintf(f,"],\"fineScopeTimingsSampled\":%s,\"fineScopeSamplingLimits\":\"deterministic per-thread/domain sampling; count/timing rows are measured completions only, not estimated totals; unsampled child costs remain in measured parents; begin offers and completion windows differ\",\"rows\":[",sampling?"true":"false");
         bool comma=false;for(size_t domain=0;domain<DomainCount;++domain)for(size_t stage=0;stage<StageCount;++stage){const auto&m=r.rows[domain*StageCount+stage];if(!m.count&&!m.failures)continue;if(comma)fputc(',',f);comma=true;fprintf(f,"{\"domain\":%zu,\"stage\":%zu,\"name\":",domain,stage);printString(f,_info[stage].name);fprintf(f,",\"kind\":\"%s\",\"count\":%llu,\"inclusiveWallNS\":%llu,\"selfWallNS\":%llu,\"maxInclusiveNS\":%llu,\"maxSelfNS\":%llu,\"threadCPUCount\":%llu,\"inclusiveThreadCPUNS\":%llu,\"failures\":%llu,\"lastFailureCode\":%lld,\"p50UpperNS\":%llu,\"p95UpperNS\":%llu,\"p99UpperNS\":%llu,\"inclusiveHistogram\":[",_info[stage].kind==Kind::Work?"work":(_info[stage].kind==Kind::Wait?"wait":"async"),(unsigned long long)m.count,(unsigned long long)m.inclusiveNS,(unsigned long long)m.selfNS,(unsigned long long)m.maxInclusiveNS,(unsigned long long)m.maxSelfNS,(unsigned long long)m.threadCPUCount,(unsigned long long)m.inclusiveThreadCPUNS,(unsigned long long)m.failures,(long long)m.lastFailureCode,(unsigned long long)quantileUpper(m.inclusiveHistogram,50),(unsigned long long)quantileUpper(m.inclusiveHistogram,95),(unsigned long long)quantileUpper(m.inclusiveHistogram,99));
             for(size_t i=0;i<HistogramBins;++i)fprintf(f,"%s%llu",i?",":"",(unsigned long long)m.inclusiveHistogram[i]);fputs("],\"selfHistogram\":[",f);for(size_t i=0;i<HistogramBins;++i)fprintf(f,"%s%llu",i?",":"",(unsigned long long)m.selfHistogram[i]);fputs("]}",f);}
         fprintf(f,"],\"slowSpansDropped\":%llu,\"invalidIDs\":%llu,\"badNesting\":%llu,\"depthOverflow\":%llu,\"publicationFailures\":%llu,\"slowSpans\":[",(unsigned long long)r.slowSpansDropped,(unsigned long long)r.invalidIDs,(unsigned long long)r.badNesting,(unsigned long long)r.depthOverflow,(unsigned long long)r.publicationFailures);for(size_t i=0;i<r.slowSpans.size();++i){if(i)fputc(',',f);printSpan(f,r.slowSpans[i]);}fputs("],\"inFlight\":[",f);for(size_t i=0;i<r.inFlight.size();++i){if(i)fputc(',',f);printSpan(f,r.inFlight[i]);}

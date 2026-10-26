@@ -25,6 +25,7 @@
 #include "MVKHeapUseTable.h"
 #include "MVKStableUseMap.h"
 #include "MVKEncoderHeapLedger.h"
+#include "MVKResourceForensics.h"
 #include "MVKPipeline.h"
 #include "MVKSmallVector.h"
 #include "MVKBitArray.h"
@@ -190,6 +191,15 @@ enum class MVKResourceUsageStages : uint8_t {
 };
 
 struct MVKUseResourceHelper {
+    MVKResourceForensics resourceForensics;
+    void finishResourceForensics(uint64_t reason) {
+        resourceForensics.heapPlansEnabled=encoderHeapPlans;
+        resourceForensics.usedNodes=used.size();
+        resourceForensics.heldResources=retainedLiveResources.size();
+        resourceForensics.heldLeases=retainedSnapshotLeases.size();
+        resourceForensics.heldSnapshotEntries=declaredSnapshots.size()+heapReadSnapshots.size();
+        resourceForensics.finish(reason);
+    }
 	MVKUseResourceHelper() {
 		// Retain nodes that are actually used across encoder transitions below,
 		// without imposing a large fixed allocation on every command buffer.

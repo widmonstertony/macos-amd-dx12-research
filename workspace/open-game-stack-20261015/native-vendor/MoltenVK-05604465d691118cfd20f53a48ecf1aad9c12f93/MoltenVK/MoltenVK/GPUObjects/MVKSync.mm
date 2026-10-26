@@ -17,6 +17,8 @@
  */
 
 #include "MVKSync.h"
+#include "MVKForensicsTrace.h"
+#include "MVKStutterNativeTrace.h"
 #include "MVKFoundation.h"
 #include "MVKInstance.h"
 #include "MVKQueueDependencyTrace.h"
@@ -120,6 +122,8 @@ MVKSemaphoreSingleQueue::~MVKSemaphoreSingleQueue() = default;
 void MVKSemaphoreMTLEvent::encodeWait(id<MTLCommandBuffer> mtlCmdBuff, uint64_t) {
 	if (mtlCmdBuff) {
 		uint64_t value = _mtlEventValue++;
+        if(mvkForensicsArmed())mvkForensicsRecord("NativeSemaphoreEdge",{{"semaphore",uint64_t(uintptr_t(this))},{"event",uint64_t(uintptr_t(_mtlEvent))},
+            {"nativeCB",mvkStutterNativeID(mtlCmdBuff)},{"value",value},{"signal",0},{"timeline",0}});
 		mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"wait", @"binary");
 		[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: value];
 	}
@@ -128,6 +132,8 @@ void MVKSemaphoreMTLEvent::encodeWait(id<MTLCommandBuffer> mtlCmdBuff, uint64_t)
 void MVKSemaphoreMTLEvent::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff, uint64_t) {
 	if (mtlCmdBuff) {
 		uint64_t value = _mtlEventValue;
+        if(mvkForensicsArmed())mvkForensicsRecord("NativeSemaphoreEdge",{{"semaphore",uint64_t(uintptr_t(this))},{"event",uint64_t(uintptr_t(_mtlEvent))},
+            {"nativeCB",mvkStutterNativeID(mtlCmdBuff)},{"value",value},{"signal",1},{"timeline",0}});
 		mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"signal", @"binary");
 		[mtlCmdBuff encodeSignalEvent: _mtlEvent value: value];
 	}
@@ -215,6 +221,7 @@ MVKSemaphoreMTLEvent::~MVKSemaphoreMTLEvent() {
 #pragma mark MVKSemaphoreEmulated
 
 void MVKSemaphoreEmulated::encodeWait(id<MTLCommandBuffer> mtlCmdBuff, uint64_t) {
+    MVKForensicsScope forensics("NativeSemaphoreEmulatedWait",{{"semaphore",uint64_t(uintptr_t(this))},{"hostWait",uint64_t(!mtlCmdBuff)}});
 	if ( !mtlCmdBuff ) {
 		_device->addSemaphore(&_blocker);
 		_blocker.wait(UINT64_MAX, true);
@@ -252,12 +259,16 @@ MVKSemaphoreEmulated::MVKSemaphoreEmulated(MVKDevice* device,
 
 // Nil mtlCmdBuff will do nothing.
 void MVKTimelineSemaphoreMTLEvent::encodeWait(id<MTLCommandBuffer> mtlCmdBuff, uint64_t value) {
+    if(mvkForensicsArmed())mvkForensicsRecord("NativeSemaphoreEdge",{{"semaphore",uint64_t(uintptr_t(this))},{"event",uint64_t(uintptr_t(_mtlEvent))},
+        {"nativeCB",mvkStutterNativeID(mtlCmdBuff)},{"value",value},{"signal",0},{"timeline",1}});
 	mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"wait", @"timeline");
 	[mtlCmdBuff encodeWaitForEvent: _mtlEvent value: value];
 }
 
 // Nil mtlCmdBuff will do nothing.
 void MVKTimelineSemaphoreMTLEvent::encodeSignal(id<MTLCommandBuffer> mtlCmdBuff, uint64_t value) {
+    if(mvkForensicsArmed())mvkForensicsRecord("NativeSemaphoreEdge",{{"semaphore",uint64_t(uintptr_t(this))},{"event",uint64_t(uintptr_t(_mtlEvent))},
+        {"nativeCB",mvkStutterNativeID(mtlCmdBuff)},{"value",value},{"signal",1},{"timeline",1}});
 	mvkRecordEventDependency(mtlCmdBuff, _mtlEvent, value, @"signal", @"timeline");
 	[mtlCmdBuff encodeSignalEvent: _mtlEvent value: value];
 }

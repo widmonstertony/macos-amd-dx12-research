@@ -128,6 +128,10 @@ public:
      */
     VkQueue getVkQueue() { return (VkQueue)getVkHandle(); }
 
+    // Diagnostics must never call getVkHandle(): it resets loaderData magic.
+    // Read identity only, preserving the loader dispatch table byte-for-byte.
+    const void* getDiagnosticVkQueue() const { return &_icdRef; }
+
     /**
      * Retrieves the MVKQueue instance referenced by the VkQueue handle.
      * This is the compliment of the getVkQueue() method.

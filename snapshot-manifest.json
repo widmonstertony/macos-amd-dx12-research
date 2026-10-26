@@ -34818,8 +34818,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "bytes": 16170,
-      "sha256": "86b83b93eac886c718f7e669bbc3d953ea346a63a2f9d1014b43db76aedb4061",
+      "bytes": 16508,
+      "sha256": "f16d4939a0d04b91ecc554c7d92570f4144b3324408265f453968c54f5d1479f",
       "executable": false
     },
     {
@@ -35225,6 +35225,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/tools/test_render_stall_stacks.py",
+      "bytes": 29628,
+      "sha256": "304d59afcb1215041cc07ef187e4f9e1b53ae7c0689e10eb47d543ea848baa29",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/tools/test_sample_only_image_access.cpp",
       "bytes": 5350,
       "sha256": "1950ade59882fbc08bca3ef71bbbdfd77dd95f2ac09df620114e5d0ed26459c6",
@@ -35257,6 +35263,12 @@
       "path": "open-game-stack-20261015/tools/watch_game_disk_budget.py",
       "sha256": "ba4952b19ef5ed179491fde2ca15a64b5447814550964da3e05d1eb4cb6fb13c",
       "bytes": 2131,
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/watch_render_stall_stacks.py",
+      "bytes": 43443,
+      "sha256": "386e0215a3cfbadbbe8dc3c4fcf8c5611784680d6f9792118bf7929f2ddb2995",
       "executable": false
     },
     {
@@ -70871,8 +70883,8 @@
     }
   ],
   "updatedUTC": "2026-10-24T03:54:53.820584+00:00",
-  "currentSourceState": "v38 diagnosis first; complete parsed-row sync/acquisition/memory analysis with explicit coverage, identity and pending-allocation limits; runtime/performance configuration unchanged; no playable release claim.",
+  "currentSourceState": "v38: real game run hit a120s RenderThread watchdog; underlying block unresolved. Add bounded prelaunch native/forensics and automatic stack/tail recorder. Native/performance implementation and historical runtimes unchanged; no playable claim.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-25T22:54:40.983777+00:00",
-  "lastSourceOnlyUpdateUTC": "2026-10-26T11:34:10.614553+00:00"
+  "lastSourceOnlyUpdateUTC": "2026-10-26T17:12:02.396197+00:00"
 }

@@ -6,7 +6,9 @@ p=argparse.ArgumentParser();p.add_argument('--label',required=True);p.add_argume
 p.add_argument('--startup-cpu-capture', action='store_true', help='Opt in to one bounded startup CPU capture; otherwise arm explicitly after scene entry')
 p.add_argument('--full-forensics',action='store_true',help='Bounded rearmable causal diagnostics; no performance algorithm changes')
 p.add_argument('--sampled-texture-heap-plans',action='store_true',help='Pipeline-qualified sampled texture heap plans with precise exceptions; requires encoder heap plans')
+p.add_argument('--separate-native-arm',action='store_true',help='Give native graph diagnostics a separate marker from optional GPU counter bursts')
 a=p.parse_args()
+if a.separate_native_arm and not a.stutter_coverage:p.error('Separate native arm requires stutter coverage')
 if a.sampled_texture_heap_plans and not a.encoder_heap_plans:p.error('Sampled texture plans require encoder heap plans')
 if a.full_forensics and not a.stutter_coverage:p.error('Full forensics requires stutter coverage')
 if a.startup_cpu_capture and not a.stutter_coverage:p.error('Startup CPU capture requires stutter coverage')
@@ -48,7 +50,7 @@ for name,value in [('MVK_AMD_SHARED_LIVE_SNAPSHOTS',a.shared_live_snapshots),('M
  config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("{name}", "{int(value)}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
 config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("MVK_AMD_SAMPLED_TEXTURE_HEAP_PLANS", "{int(a.sampled_texture_heap_plans)}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
 if a.stutter_coverage:
- for name,value in [('MVK_AMD_STUTTER_CPU_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_DETAIL_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_ARM_PATH',str(evidence/('gpu-counter.arm' if a.gpu_counters else 'stutter.arm')))]:
+ for name,value in [('MVK_AMD_STUTTER_CPU_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_DETAIL_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_ARM_PATH',str(evidence/('gpu-counter.arm' if a.gpu_counters and not a.separate_native_arm else 'stutter.arm')))]:
   config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("{name}", "{value}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
 if a.full_forensics:
  for name,value in [('MVK_AMD_FORENSICS_ARM_PATH',str(evidence/'forensics.arm')),('MVK_AMD_CPU_FINE_SAMPLE_EVERY','64')]:
@@ -123,6 +125,7 @@ for kind in ['probe','game']:
  record['fullForensics']=a.full_forensics
  record['cpuFineSampleEvery']=64 if a.full_forensics else 1
  record['stutterCoverage']=a.stutter_coverage
+ record['separateNativeArm']=a.separate_native_arm
  record['gpuCounterBurst']=a.gpu_counter_burst
  record['linkDifferentialSuppressed']=a.suppress_link_differential
  (folder/'build.json').write_text(json.dumps(record,indent=2)+'\n');records.append(record)

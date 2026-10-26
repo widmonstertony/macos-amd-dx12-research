@@ -41,4 +41,12 @@ Each allocation journal retains the first 128 events; each snapshot ring retains
 
 ## Public backup boundary
 
+## RenderThread timeout evidence
+
+The latest human-operated run reached UE4's 120-second RenderThread wait watchdog. The blocking call is still unresolved. Graphics progress had already stopped before scene sampling, so empty stage records do not establish a healthy renderer. Passing isolated heap-plan GPU controls also did not establish use in the game; published local counters did not show a successful application.
+
+Add `watch_render_stall_stacks.py`: wait for the human to launch one uniquely identified game process, verify PID/start/kernel identity, and collect bounded native stacks with the system `sample` tool. Stale progress plus raw VM-fault growth is a diagnostic trigger, not a root-cause verdict. Optional continuous mode refreshes separate native/forensics markers every 20/60 seconds; CPU/GPU counter markers remain separate. Limits include eight two-second bursts, 128 MiB output, two bounded raw-tail banks, ownership checks and disk-aware cleanup.
+
+Thirty-three CPU mock controls and fixes from independent review passed. Actual game stack quality, trigger sensitivity and performance gains remain unverified. Only observation tools and diagnostic paths change; the graphics library and performance configuration are unchanged. Raw local logs, crash files and stacks remain private.
+
 This update copies source only. It contains no private checkpoints, raw game logs, shaders, binaries or runtime packages, and creates no new release. Historical checkpoint data is unchanged. Existing historical results retain their original scope; the new diagnostics do not retroactively validate them.

@@ -1554,6 +1554,20 @@ void MVKSwapchainImage::destroy() {
 #pragma mark -
 #pragma mark MVKPresentableSwapchainImage
 
+// Primitive, process-local identities only. No layer association, global object
+// table, retained diagnostic object, or additional identity lock is introduced.
+static uint64_t mvkNextPresentDiagnosticID() {
+	static std::atomic<uint64_t> next{1};
+	return next.fetch_add(1, std::memory_order_relaxed);
+}
+
+static uint64_t mvkPresentDiagnosticDoubleBits(double value) {
+	uint64_t bits;
+	static_assert(sizeof(bits) == sizeof(value), "diagnostic double encoding");
+	memcpy(&bits, &value, sizeof(bits));
+	return bits;
+}
+
 bool MVKSwapchainImageAvailability::operator< (const MVKSwapchainImageAvailability& rhs) const {
 	if (  isAvailable && !rhs.isAvailable) { return true; }
 	if ( !isAvailable &&  rhs.isAvailable) { return false; }
@@ -1656,6 +1670,7 @@ id<CAMetalDrawable> MVKPresentableSwapchainImage::getCAMetalDrawable() {
 				setConfigurationResult(reportError(VK_ERROR_OUT_OF_POOL_MEMORY, "CAMetalDrawable could not be acquired after %d attempts.", attemptCnt));
 			}
 		}
+		if (_mtlDrawable) { _diagnosticDrawableGeneration.fetch_add(1, std::memory_order_relaxed); }
 	}
 	return _mtlDrawable;
 }
@@ -1663,6 +1678,42 @@ id<CAMetalDrawable> MVKPresentableSwapchainImage::getCAMetalDrawable() {
 // If not headless, retrieve the MTLTexture directly from the CAMetalDrawable.
 id<MTLTexture> MVKPresentableSwapchainImage::getMTLTexture(uint8_t planeIndex) {
 	return _mtlTextureHeadless ? _mtlTextureHeadless : getCAMetalDrawable().texture;
+}
+
+MVKPresentDiagnosticInfo MVKPresentableSwapchainImage::getPresentDiagnostics(
+		id<CAMetalDrawable> mtlDrawable, const MVKImagePresentInfo& presentInfo, bool atRequest) {
+	MVKPresentDiagnosticInfo diagnostics;
+	MVKForensics::ErrnoGuard preserveErrno;
+	diagnostics.session = mvkForensicsSessionID();
+	if (!diagnostics.session) { return diagnostics; } // No diagnostic ObjC queries while disabled.
+	diagnostics.metadataStartMachNS = mvkStutterMonotonicNS();
+	diagnostics.presentationID = mvkNextPresentDiagnosticID();
+	diagnostics.imageGeneration = _diagnosticImageGeneration;
+	diagnostics.drawableGeneration = _diagnosticDrawableGeneration.load(std::memory_order_relaxed);
+	diagnostics.swapchain = uint64_t(uintptr_t(_swapchain));
+	diagnostics.imageIndex = _swapchainIndex;
+	diagnostics.drawable = uint64_t(uintptr_t(mtlDrawable));
+	diagnostics.drawableID = mtlDrawable.drawableID;
+	CAMetalLayer* layer = mtlDrawable.layer;
+	diagnostics.layer = uint64_t(uintptr_t(layer));
+	diagnostics.layerObservationGeneration = diagnostics.drawableGeneration;
+	if (atRequest) {
+		diagnostics.requestMachNS = diagnostics.metadataStartMachNS;
+		diagnostics.requestCANS = uint64_t(CACurrentMediaTime() * 1.0e9);
+	}
+	diagnostics.metadataEndMachNS = mvkStutterMonotonicNS();
+	mvkForensicsRecordForSession(diagnostics.session, "NativeDrawablePresentRequest", {
+		{"presentationID", diagnostics.presentationID}, {"imageGeneration", diagnostics.imageGeneration},
+		{"drawableGeneration", diagnostics.drawableGeneration}, {"layerObservationGeneration", diagnostics.layerObservationGeneration},
+		{"swapchain", diagnostics.swapchain}, {"imageIndex", diagnostics.imageIndex},
+		{"drawable", diagnostics.drawable}, {"drawableID", diagnostics.drawableID}, {"layer", diagnostics.layer},
+		{"requestMachNS", diagnostics.requestMachNS}, {"requestCANS", diagnostics.requestCANS},
+		{"metadataStartMachNS", diagnostics.metadataStartMachNS}, {"metadataEndMachNS", diagnostics.metadataEndMachNS},
+		{"requestObserved", uint64_t(atRequest)}, {"drawableKnown", uint64_t(mtlDrawable != nil)},
+		{"desiredPresentTimeNS", presentInfo.desiredPresentTime}, {"presentModeOverride", uint64_t(presentInfo.presentMode)},
+		{"ownerNativeCB", presentInfo.diagnosticNativeCB}, {"ownerFrame", presentInfo.diagnosticFrameID},
+		{"presentId", presentInfo.presentId}, {"presentIDGoogle", presentInfo.presentIDGoogle}});
+	return diagnostics;
 }
 
 // Present the drawable and make myself available only once the command buffer has completed.
@@ -1681,9 +1732,13 @@ VkResult MVKPresentableSwapchainImage::presentCAMetalDrawable(id<MTLCommandBuffe
     if(!presentInfo.diagnosticFrameID)presentInfo.diagnosticFrameID=provenance.frame;
     if(!presentInfo.diagnosticCaptureSession)presentInfo.diagnosticCaptureSession=provenance.session;
     presentInfo.diagnosticPartialPrefix=presentInfo.diagnosticPartialPrefix||provenance.partialPrefix;
+	auto diagnostics = getPresentDiagnostics(mtlDrwbl, presentInfo, true);
 	MVKSwapchainSignaler signaler = getPresentationSignaler();
 	[mtlCmdBuff addScheduledHandler: ^(id<MTLCommandBuffer> mcb) {
 
+		auto actualDiagnostics = diagnostics;
+		// Timestamp before existing native metadata logging or diagnostic ObjC queries.
+		uint64_t scheduledHandlerEntryMachNS = (actualDiagnostics.session || mvkForensicsArmed()) ? mvkStutterMonotonicNS() : 0;
         // A counter/native capture may have been armed after creation.
         // Re-read metadata at scheduling, without changing presentation timing.
         auto actualPresentInfo=presentInfo;
@@ -1692,17 +1747,61 @@ VkResult MVKPresentableSwapchainImage::presentCAMetalDrawable(id<MTLCommandBuffe
         if(scheduledProvenance.session)actualPresentInfo.diagnosticCaptureSession=scheduledProvenance.session;
         if(scheduledProvenance.nativeID)actualPresentInfo.diagnosticNativeCB=scheduledProvenance.nativeID;
         actualPresentInfo.diagnosticPartialPrefix=actualPresentInfo.diagnosticPartialPrefix||scheduledProvenance.partialPrefix;
-        addPresentedHandler(mtlDrwbl, actualPresentInfo, signaler);
+		if (!actualDiagnostics.session) { actualDiagnostics = getPresentDiagnostics(mtlDrwbl, actualPresentInfo, false); }
+		actualDiagnostics.scheduledHandlerEntryMachNS = scheduledHandlerEntryMachNS;
+        addPresentedHandler(mtlDrwbl, actualPresentInfo, signaler, actualDiagnostics);
 
 		// Try to do any present mode transitions as late as possible in an attempt
 		// to avoid visual disruptions on any presents already on the queue.
 		if (presentInfo.presentMode != VK_PRESENT_MODE_MAX_ENUM_KHR) {
 			mtlDrwbl.layer.displaySyncEnabledMVK = (presentInfo.presentMode != VK_PRESENT_MODE_IMMEDIATE_KHR);
 		}
+		// Read effective layer settings only while this bounded diagnostic is armed.
+		// This is an observed layer generation, not proof of a swapchain recreation.
+		uint64_t displaySync = 0, maximumDrawables = 0, drawableWidth = 0, drawableHeight = 0;
+		uint64_t presentsWithTransaction = 0, drawsAsynchronously = 0, layerHidden = 0, hasSuperlayer = 0;
+		uint64_t callStartMachNS = 0, callStartCANS = 0, callStartRuntimeNS = 0;
+		if (actualDiagnostics.session) {
+			MVKForensics::ErrnoGuard preserveErrno;
+			CAMetalLayer* layer = mtlDrwbl.layer;
+			displaySync = layer.displaySyncEnabledMVK;
+			maximumDrawables = layer.maximumDrawableCount;
+			drawableWidth = uint64_t(layer.drawableSize.width);
+			drawableHeight = uint64_t(layer.drawableSize.height);
+			presentsWithTransaction = layer.presentsWithTransaction;
+			drawsAsynchronously = layer.drawsAsynchronously;
+			layerHidden = layer.hidden;
+			hasSuperlayer = layer.superlayer != nil;
+			callStartCANS = uint64_t(CACurrentMediaTime() * 1.0e9);
+			callStartRuntimeNS = mvkGetRuntimeNanoseconds();
+			callStartMachNS = mvkStutterMonotonicNS();
+		}
+		// No explicit diagnostic calls between these API boundary samples. A re-entrant
+		// callback, if any, is included in the interval; it is not exclusive driver CPU time.
 		if (presentInfo.desiredPresentTime) {
 			[mtlDrwbl presentAtTime: (double)presentInfo.desiredPresentTime * 1.0e-9];
 		} else {
 			[mtlDrwbl present];
+		}
+		if (actualDiagnostics.session) {
+			MVKForensics::ErrnoGuard preserveErrno;
+			uint64_t callEndMachNS = mvkStutterMonotonicNS();
+			uint64_t callEndCANS = uint64_t(CACurrentMediaTime() * 1.0e9);
+			mvkForensicsRecordForSession(actualDiagnostics.session, "NativeDrawablePresentCall", {
+				{"presentationID", actualDiagnostics.presentationID}, {"imageGeneration", actualDiagnostics.imageGeneration},
+				{"drawableGeneration", actualDiagnostics.drawableGeneration}, {"layerObservationGeneration", actualDiagnostics.layerObservationGeneration},
+				{"swapchain", actualDiagnostics.swapchain}, {"imageIndex", actualDiagnostics.imageIndex},
+				{"drawable", actualDiagnostics.drawable}, {"drawableID", actualDiagnostics.drawableID}, {"layer", actualDiagnostics.layer},
+				{"requestMachNS", actualDiagnostics.requestMachNS}, {"scheduledHandlerEntryMachNS", scheduledHandlerEntryMachNS},
+				{"callStartMachNS", callStartMachNS}, {"callEndMachNS", callEndMachNS},
+				{"callStartCANS", callStartCANS}, {"callEndCANS", callEndCANS}, {"callStartRuntimeNS", callStartRuntimeNS},
+				{"desiredPresentTimeNS", presentInfo.desiredPresentTime}, {"presentAPI", uint64_t(presentInfo.desiredPresentTime != 0)},
+				{"presentModeOverride", uint64_t(presentInfo.presentMode)}, {"displaySyncEnabled", displaySync},
+				{"maximumDrawableCount", maximumDrawables}, {"drawableWidth", drawableWidth}, {"drawableHeight", drawableHeight},
+				{"presentsWithTransaction", presentsWithTransaction}, {"drawsAsynchronously", drawsAsynchronously},
+				{"layerHidden", layerHidden}, {"hasSuperlayer", hasSuperlayer},
+				{"ownerNativeCB", actualPresentInfo.diagnosticNativeCB}, {"ownerFrame", actualPresentInfo.diagnosticFrameID},
+				{"presentId", presentInfo.presentId}});
 		}
 	}];
 
@@ -1754,15 +1853,27 @@ MVKSwapchainSignaler MVKPresentableSwapchainImage::getPresentationSignaler() {
 // Pass MVKImagePresentInfo & MVKSwapchainSignaler by value because they may not exist when the callback runs.
 void MVKPresentableSwapchainImage::addPresentedHandler(id<CAMetalDrawable> mtlDrawable,
 													   MVKImagePresentInfo presentInfo,
-													   MVKSwapchainSignaler signaler) {
+													   MVKSwapchainSignaler signaler,
+													   MVKPresentDiagnosticInfo diagnostics) {
 	beginPresentation(presentInfo);
 
 #if !MVK_OS_SIMULATOR
 	[mtlDrawable addPresentedHandler: ^(id<MTLDrawable> mtlDrwbl) {
+		auto callbackDiagnostics = diagnostics;
+		if (callbackDiagnostics.session) {
+			// Entry and raw value are captured BEFORE context/timer work and detachment lock.
+			callbackDiagnostics.handlerEntryMachNS = mvkStutterMonotonicNS();
+			callbackDiagnostics.handlerEntryCANS = uint64_t(CACurrentMediaTime() * 1.0e9);
+		}
+		double rawPresentedTime = mtlDrwbl.presentedTime;
+		if (callbackDiagnostics.session) {
+			callbackDiagnostics.rawPresentedTimeBits = mvkPresentDiagnosticDoubleBits(rawPresentedTime);
+			callbackDiagnostics.handlerRawReadEndMachNS = mvkStutterMonotonicNS();
+		}
         MVKCPUContext context;context.domain=7;context.submission=presentInfo.diagnosticFrameID;
         context.frame=presentInfo.diagnosticFrameID;context.nativeCB=presentInfo.diagnosticNativeCB;
         MVKCPUContextGuard contextGuard(context);MVK_CPU_SCOPE_CPU(CallbackCompletion);
-		endPresentation(presentInfo, signaler, mtlDrwbl.presentedTime * 1.0e9);
+		endPresentation(presentInfo, signaler, rawPresentedTime * 1.0e9, &callbackDiagnostics);
 	}];
 #else
 	// If MTLDrawable.presentedTime/addPresentedHandler isn't supported,
@@ -1781,7 +1892,8 @@ void MVKPresentableSwapchainImage::beginPresentation(const MVKImagePresentInfo& 
 
 void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& presentInfo,
 												   const MVKSwapchainSignaler& signaler,
-												   uint64_t actualPresentTime) {
+												   uint64_t actualPresentTime,
+												   const MVKPresentDiagnosticInfo* diagnostics) {
 
 	// If the presentation time is not available, use the current nanosecond runtime clock,
 	// which should be reasonably accurate (sub-ms) to the presentation time. The presentation
@@ -1789,11 +1901,18 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 	// running headless, or on a test harness that is not attached to the windowing system.
 	uint64_t nativePresentTime = actualPresentTime;
 	if (actualPresentTime == 0) { actualPresentTime = mvkGetRuntimeNanoseconds(); }
+	bool diagnosticActive = diagnostics && diagnostics->session;
+	uint64_t lockRequestedMachNS = diagnosticActive ? mvkStutterMonotonicNS() : 0;
+	uint64_t lockAcquiredMachNS = 0, callbackSwapchain = 0;
 
 	{	// Scope to avoid deadlock if release() is run within detachment lock
 		// If I have become detached from the swapchain, it means the swapchain, and possibly the
 		// VkDevice, have been destroyed by the time of this callback, so do not reference them.
 		lock_guard<mutex> lock(_detachmentLock);
+		if (diagnosticActive) {
+			lockAcquiredMachNS = mvkStutterMonotonicNS();
+			callbackSwapchain = uint64_t(uintptr_t(_swapchain));
+		}
 		if (_device) { addPerformanceInterval(getPerformanceStats().queue.presentSwapchains, _presentationStartTime); }
 		if (_swapchain) {
             mvkForensicsRecord("NativePresentedFrame",{{"frame",presentInfo.diagnosticFrameID},
@@ -1806,6 +1925,23 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
             _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime);
         }
 	}
+	if (diagnosticActive) {
+		// Emit after releasing the existing lock. This row adds no I/O to its hold time.
+		uint64_t lockReleasedMachNS = mvkStutterMonotonicNS();
+		mvkForensicsRecordForSession(diagnostics->session, "NativeDrawablePresented", {
+			{"presentationID", diagnostics->presentationID}, {"imageGeneration", diagnostics->imageGeneration},
+			{"drawableGeneration", diagnostics->drawableGeneration}, {"layerObservationGeneration", diagnostics->layerObservationGeneration},
+			{"swapchain", diagnostics->swapchain}, {"callbackSwapchain", callbackSwapchain}, {"imageIndex", diagnostics->imageIndex},
+			{"drawable", diagnostics->drawable}, {"drawableID", diagnostics->drawableID}, {"layer", diagnostics->layer},
+			{"requestMachNS", diagnostics->requestMachNS}, {"scheduledHandlerEntryMachNS", diagnostics->scheduledHandlerEntryMachNS},
+			{"handlerEntryMachNS", diagnostics->handlerEntryMachNS}, {"handlerEntryCANS", diagnostics->handlerEntryCANS},
+			{"handlerRawReadEndMachNS", diagnostics->handlerRawReadEndMachNS}, {"rawPresentedTimeBits", diagnostics->rawPresentedTimeBits},
+			{"nativeTimestampCANS", nativePresentTime}, {"nativeTimestampValid", uint64_t(nativePresentTime != 0)},
+			{"lockRequestedMachNS", lockRequestedMachNS}, {"lockAcquiredMachNS", lockAcquiredMachNS},
+			{"lockReleasedMachNS", lockReleasedMachNS}, {"detachedAtCallback", uint64_t(callbackSwapchain == 0)},
+			{"ownerNativeCB", presentInfo.diagnosticNativeCB}, {"ownerFrame", presentInfo.diagnosticFrameID},
+			{"presentId", presentInfo.presentId}});
+	}
 
 	// Makes an image available for acquisition by the app.
 	// If any semaphores are waiting to be signaled when this image becomes available, the
@@ -1816,8 +1952,18 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 
 // Releases the CAMetalDrawable underlying this image.
 void MVKPresentableSwapchainImage::releaseMetalDrawable() {
+	uint64_t diagnosticSession = mvkForensicsSessionID();
+	uint64_t imageGeneration = _diagnosticImageGeneration;
+	uint64_t drawableGeneration = _diagnosticDrawableGeneration.load(std::memory_order_relaxed);
+	uint64_t drawable = uint64_t(uintptr_t(_mtlDrawable));
+	uint64_t releaseStartMachNS = diagnosticSession ? mvkStutterMonotonicNS() : 0;
     [_mtlDrawable release];
 	_mtlDrawable = nil;
+	if (diagnosticSession && drawable) {
+		mvkForensicsRecordForSession(diagnosticSession, "NativeDrawableReferenceReleased", {
+			{"imageGeneration", imageGeneration}, {"drawableGeneration", drawableGeneration}, {"drawable", drawable},
+			{"releaseStartMachNS", releaseStartMachNS}, {"releaseEndMachNS", mvkStutterMonotonicNS()}});
+	}
 }
 
 // Signal, untrack, and release any signalers that are tracking.
@@ -1844,6 +1990,7 @@ MVKPresentableSwapchainImage::MVKPresentableSwapchainImage(MVKDevice* device,
 														   uint32_t swapchainIndex) :
 	MVKSwapchainImage(device, pCreateInfo, swapchain, swapchainIndex) {
 
+	_diagnosticImageGeneration = mvkNextPresentDiagnosticID();
 	_availability.acquisitionID = _swapchain->getNextAcquisitionID();
 	_availability.isAvailable = true;
 

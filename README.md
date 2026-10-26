@@ -12,6 +12,8 @@
 
 同一轮诊断计划：先覆盖已知提交、资源、编译、GPU 和呈现路径，再由用户开一次游戏；采样可在原进程内重开。见 [中文说明](docs/ONE-RUN-DIAGNOSTICS.zh-CN.md)。v36 公开内容为源码与诊断工具；现有下载包未替换，不代表可玩性结论。
 
+2026-10-26：[v37 采样纹理读计划源码与独立 GPU 回归](docs/SAMPLED-READ-PLAN-2026-10-26.md)；实际游戏性能仍待验证。
+
 ## 下载与测试
 
 [最新诊断版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)

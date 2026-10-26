@@ -218,6 +218,8 @@ struct MVKUseResourceHelper {
 		batchArgumentHeaps = value && !strcmp(value, "1");
         value = getenv("MVK_AMD_ENCODER_HEAP_PLANS");
         encoderHeapPlans = batchArgumentHeaps && batchLiveResources && value && !strcmp(value, "1");
+        value = getenv("MVK_AMD_SAMPLED_TEXTURE_HEAP_PLANS");
+        encoderSampledHeapPlans = encoderHeapPlans && value && !strcmp(value, "1");
 		value = getenv("MVK_AMD_ARGUMENT_HEAP_THRESHOLD");
 		if (value) {
 			char* end = nullptr;
@@ -303,6 +305,7 @@ struct MVKUseResourceHelper {
 	bool batchLiveResources = false;
 	bool batchArgumentHeaps = false;
     bool encoderHeapPlans = false;
+    bool encoderSampledHeapPlans = false;
     MVKEncoderHeapLedger<id<MTLResource>, id<MTLHeap>> heapLedger;
     MVKSmallVector<id<MTLHeap>> encoderHeapOwners;
     struct HeapReadSnapshot {
@@ -324,7 +327,7 @@ struct MVKUseResourceHelper {
     uint64_t statsHeapPlanHeapCalls=0, statsHeapPlanWriteCalls=0, statsHeapPlanWriteReplays=0;
     bool tryAddBufferHeapSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                                  id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
-                                 MVKResourceUsageStages stage);
+                                 MVKResourceUsageStages stage, bool sampledTextures = false);
     id<MTLHeap> ownHeapPlanResource(id<MTLResource> resource, ResourceInfo& info);
     void resetHeapPlanEncoder();
     void bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, bool graphics);
@@ -386,7 +389,8 @@ struct MVKUseResourceHelper {
     uint64_t statsSnapshotBulkFastHits=0, statsSnapshotBulkResources=0;
     void addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                          id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
-                         MVKResourceUsageStages stage, bool write, bool knownBuffers = false);
+                         MVKResourceUsageStages stage, bool write, bool knownBuffers = false,
+                         bool sampleOnlyTextures = false);
 	uint64_t statsCalls=0, statsLookups=0, statsRetainedHits=0, statsAbsentHits=0, statsLiveFound=0;
 	// Counts the resource declarations that survive helper-side deduplication
 	// and are actually submitted to Metal.  The high-level call counters above
@@ -522,6 +526,9 @@ struct MVKStageResourceBindings {
 	} buffers[kMVKMaxBufferCount];
 	id<MTLSamplerState> samplers[kMVKMaxSamplerCount];
 	MVKBitArray descriptorSetResourceUse[kMVKMaxDescriptorSetCount];
+    // Heap sampling is weaker than precise texture preparation. A pipeline
+    // transition to read/fetch/unknown must invalidate the binding early-exit.
+    bool sampleOnlyImageAccess = false;
 	MVKOnePerEnumEntry<uint8_t, MVKNonVolatileImplicitBuffer> implicitBufferIndices = {};
 	static Buffer ImplicitBuffer(MVKImplicitBuffer buffer) {
 		return { nil, static_cast<VkDeviceSize>(buffer) + 1 };

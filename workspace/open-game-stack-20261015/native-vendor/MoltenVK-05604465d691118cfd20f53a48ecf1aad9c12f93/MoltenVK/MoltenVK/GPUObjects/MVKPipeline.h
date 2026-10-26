@@ -240,6 +240,9 @@ struct MVKPipelineStageResourceInfo {
 	MVKPipelineBindScript bindScript;
 	MVKImplicitBufferBindings implicitBuffers;
 	bool usesPhysicalStorageBufferAddresses;
+	// Runtime-only, all emitted variants for this stage must qualify.
+	bool sampleOnlyImageAccess = false;
+	bool sampleOnlyImageAccessEvaluated = false;
 	MVKStageResourceBits resources;
 };
 

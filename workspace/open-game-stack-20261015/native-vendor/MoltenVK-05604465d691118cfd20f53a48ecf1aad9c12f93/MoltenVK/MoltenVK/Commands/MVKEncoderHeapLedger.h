@@ -1,4 +1,8 @@
-// CPU-only encoder residency bookkeeping. The caller owns every identity.
+// CPU-only encoder residency bookkeeping. The caller owns every identity and
+// serializes access. One ledger covers exactly one native encoder. Resources
+// and their heap identities must remain retained and immutable until reset().
+// All heap declarations that may replace precise coverage must use this ledger;
+// untracked native declarations/encoder changes require reset(), never reuse.
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -12,10 +16,11 @@ public:
     struct Stats {
         uint64_t heapQueueCalls=0, heapQueueSuppressed=0, writeQueueCalls=0;
         uint64_t preciseReadQueueCalls=0, readQueueSuperseded=0, readCallsEmitted=0;
+        uint64_t preciseReadQueueSuppressed=0, readExceptionsReplayed=0;
         uint64_t flushes=0, heapCallsEmitted=0, writeCallsEmitted=0;
         uint64_t writeExceptionsReplayed=0, writeMetadataVisits=0;
         uint64_t readMetadataVisits=0;
-        uint64_t readResourceReplayOperations=0; // There is no read-resource loop.
+        uint64_t readResourceReplayOperations=0; // No cached bulk-plan child loop.
     };
 private:
     struct HeapState {
@@ -24,6 +29,7 @@ private:
         uint32_t preciseReadStages=0;
         uint64_t epoch=0;
         bool epochKnown=false, dirty=false;
+        std::vector<size_t> reads;
         std::vector<size_t> writes;
         explicit HeapState(Heap value):heap(value){}
     };
@@ -39,6 +45,7 @@ private:
         Heap heap{};
         uint32_t stages=0;
         bool dirty=false;
+        uint64_t selectedSerial=0;
     };
     std::unordered_map<Heap,size_t> _heapIndex;
     std::unordered_map<Resource,size_t> _writeIndex;
@@ -46,7 +53,7 @@ private:
     std::vector<HeapState> _heaps;
     std::vector<WriteState> _writes;
     std::vector<ReadState> _reads;
-    std::vector<size_t> _dirtyHeaps, _dirtyReads, _dirtyWrites, _selectedWrites;
+    std::vector<size_t> _dirtyHeaps, _dirtyReads, _dirtyWrites, _selectedReads, _selectedWrites;
     uint64_t _flushSerial=0;
     bool _flushing=false;
     Stats _stats;
@@ -74,6 +81,12 @@ private:
         _selectedWrites.push_back(index);
         if(!entry.dirty)++_stats.writeExceptionsReplayed;
     }
+    void selectRead(size_t index) {
+        auto& entry=_reads[index];
+        if(entry.selectedSerial==_flushSerial)return;
+        entry.selectedSerial=_flushSerial;
+        _selectedReads.push_back(index);
+    }
 public:
     // Mask must contain Metal render/compute stages in a caller-chosen encoding.
     // Epoch denotes currently allocated/registered children of this heap.
@@ -94,24 +107,28 @@ public:
     // Track precise reads (including nonheap/texture fallbacks) so a later heap
     // call cannot discard earlier stage coverage. This visits only the precise
     // resource being queued, never the members of a cached bulk-read plan.
+    // Returns false for invalid/unchanged requests; already pending heap/read/
+    // write work still flushes normally. Coverage never survives reset().
     bool queuePreciseRead(Resource resource,Heap heap,uint32_t stages) {
         requireNotFlushing();++_stats.preciseReadQueueCalls;
         if(resource==Resource{}||!stages)return false;
         auto writer=_writeIndex.find(resource);
         if(writer!=_writeIndex.end()&&_writes[writer->second].heap!=heap)
             throw std::logic_error("retained resource changed heap identity");
-        auto found=_readIndex.find(resource);size_t index;
+        auto found=_readIndex.find(resource);size_t index;bool changed=false;
         if(found==_readIndex.end()){
             index=_reads.size();_reads.push_back(ReadState{resource,heap,stages});
             _readIndex.emplace(resource,index);
+            if(heap!=Heap{})_heaps[heapIndex(heap)].reads.push_back(index);
+            changed=true;
         }else{
             index=found->second;
             if(_reads[index].heap!=heap)
                 throw std::logic_error("retained resource changed heap identity");
+            changed=(_reads[index].stages|stages)!=_reads[index].stages;
             _reads[index].stages|=stages;
         }
         auto& entry=_reads[index];
-        if(!entry.dirty){entry.dirty=true;_dirtyReads.push_back(index);}
         if(heap!=Heap{}){
             auto& h=_heaps[heapIndex(heap)];h.preciseReadStages|=stages;
             // A pending heap declaration may absorb these stages immediately.
@@ -119,9 +136,19 @@ public:
             if(h.dirty)h.readStages|=stages;
         }
         if(writer!=_writeIndex.end()){
-            auto& write=_writes[writer->second];write.stages|=entry.stages;
-            if(!write.dirty){write.dirty=true;_dirtyWrites.push_back(writer->second);}
+            auto& write=_writes[writer->second];
+            bool writeChanged=(write.stages|entry.stages)!=write.stages;
+            write.stages|=entry.stages;
+            if(writeChanged&&!write.dirty){write.dirty=true;_dirtyWrites.push_back(writer->second);}
+            // A tracked precise read/write declaration subsumes a read at all
+            // previously declared stages. Dirty heaps select it again at flush.
+            if(!writeChanged){++_stats.preciseReadQueueSuppressed;return false;}
+            return true;
         }
+        // Only successful flushes clear dirty state. Same-stage reuse is valid
+        // within this encoder; a later dirty heap selects all read exceptions.
+        if(!changed){++_stats.preciseReadQueueSuppressed;return false;}
+        if(!entry.dirty){entry.dirty=true;_dirtyReads.push_back(index);}
         return true;
     }
     // Repeated writes are coalesced until flush. Previous precise stage coverage
@@ -158,7 +185,7 @@ public:
     // emission, followed by
     // writeCallback(Resource,uint32_t readWriteStages).
     // Callbacks must not mutate this ledger. If a callback throws, dirty state
-    // remains and a retry replays heap reads and write exceptions conservatively.
+    // remains and a retry replays heap reads and precise read/write exceptions.
     template<class HeapCallback,class ReadCallback,class WriteCallback,class AfterHeapsCallback>
     void flush(HeapCallback&& heapCallback,ReadCallback&& readCallback,WriteCallback&& writeCallback,
                AfterHeapsCallback&& afterHeapsCallback) {
@@ -166,24 +193,27 @@ public:
         _flushing=true;
         struct Restore {bool& flag;~Restore(){flag=false;}} restore{_flushing};
         ++_stats.flushes;
-        if(++_flushSerial==0){for(auto& w:_writes)w.selectedSerial=0;_flushSerial=1;}
-        _selectedWrites.clear();
+        if(++_flushSerial==0){for(auto& w:_writes)w.selectedSerial=0;for(auto& r:_reads)r.selectedSerial=0;_flushSerial=1;}
+        _selectedReads.clear();_selectedWrites.clear();
+        for(size_t index:_dirtyReads)selectRead(index);
         for(size_t index:_dirtyWrites){++_stats.writeMetadataVisits;selectWrite(index);}
         for(size_t index:_dirtyHeaps){
+            for(size_t ri:_heaps[index].reads)selectRead(ri);
             for(size_t wi:_heaps[index].writes){++_stats.writeMetadataVisits;selectWrite(wi);}
         }
-        // Heap reads may reset native per-resource write declarations. Emit all
-        // touched heaps first, then reassert every tracked write exception last.
+        // Heap reads may replace native precise declarations/access treatment.
+        // Reassert precise read exceptions, then every write exception last.
         for(size_t index:_dirtyHeaps){
             const auto& entry=_heaps[index];
             heapCallback(entry.heap,entry.readStages);++_stats.heapCallsEmitted;
         }
-        for(size_t index:_dirtyReads){
+        for(size_t index:_selectedReads){
             ++_stats.readMetadataVisits;const auto& entry=_reads[index];
             if(_writeIndex.find(entry.resource)!=_writeIndex.end()){
                 ++_stats.readQueueSuperseded;continue;
             }
             readCallback(entry.resource,entry.stages|heapReadStages(entry.heap));
+            if(!entry.dirty)++_stats.readExceptionsReplayed;
             ++_stats.readCallsEmitted;
         }
         // The caller can emit aggregated heap arrays and precise reads here.
@@ -196,9 +226,9 @@ public:
             ++_stats.writeCallsEmitted;
         }
         for(size_t index:_dirtyHeaps)_heaps[index].dirty=false;
-        for(size_t index:_dirtyReads)_reads[index].dirty=false;
+        for(size_t index:_selectedReads)_reads[index].dirty=false;
         for(size_t index:_selectedWrites)_writes[index].dirty=false;
-        _dirtyHeaps.clear();_dirtyReads.clear();_dirtyWrites.clear();_selectedWrites.clear();
+        _dirtyHeaps.clear();_dirtyReads.clear();_dirtyWrites.clear();_selectedReads.clear();_selectedWrites.clear();
     }
     template<class HeapCallback,class WriteCallback,class AfterHeapsCallback>
     void flush(HeapCallback&& heapCallback,WriteCallback&& writeCallback,
@@ -218,7 +248,7 @@ public:
     void reset() {
         requireNotFlushing();
         _heapIndex.clear();_writeIndex.clear();_readIndex.clear();_heaps.clear();_writes.clear();_reads.clear();
-        _dirtyHeaps.clear();_dirtyReads.clear();_dirtyWrites.clear();_selectedWrites.clear();_flushSerial=0;
+        _dirtyHeaps.clear();_dirtyReads.clear();_dirtyWrites.clear();_selectedReads.clear();_selectedWrites.clear();_flushSerial=0;
     }
     uint32_t coveredHeapReadStages(Heap heap) const { return heapReadStages(heap); }
     size_t heapCount() const {return _heaps.size();}

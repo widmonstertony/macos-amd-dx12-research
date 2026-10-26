@@ -466,8 +466,11 @@ MVKPipeline::~MVKPipeline() {
 #pragma mark MVKGraphicsPipeline
 
 /** Populate a MVKStageResourceBits based on the resources used by the given shader info. */
-static void populateResourceUsage(MVKPipelineStageResourceInfo& dst, SPIRVToMSLConversionConfiguration& src, SPIRVToMSLConversionResultInfo& results, spv::ExecutionModel stage) {
+static void populateResourceUsage(MVKPipelineStageResourceInfo& dst, SPIRVToMSLConversionConfiguration& src, SPIRVToMSLConversionResultInfo& results, spv::ExecutionModel stage, bool sampleOnlyImageAccess) {
 	dst.usesPhysicalStorageBufferAddresses = results.usesPhysicalStorageBufferAddressesCapability;
+	dst.sampleOnlyImageAccess = sampleOnlyImageAccess &&
+		(!dst.sampleOnlyImageAccessEvaluated || dst.sampleOnlyImageAccess);
+	dst.sampleOnlyImageAccessEvaluated = true;
 	dst.implicitBuffers.needed |= MVKImplicitBufferList(MVKImplicitBuffer::Output,        results.needsOutputBuffer);
 	dst.implicitBuffers.needed |= MVKImplicitBufferList(MVKImplicitBuffer::PatchOutput,   results.needsPatchOutputBuffer);
 	dst.implicitBuffers.needed |= MVKImplicitBufferList(MVKImplicitBuffer::BufferSize,    results.needsBufferSizeBuffer);
@@ -1811,7 +1814,7 @@ bool MVKGraphicsPipeline::addVertexShaderToPipeline(MTLRenderPipelineDescriptor*
 		return false;
 	}
 	plDesc.rasterizationEnabled = !funcRslts.isRasterizationDisabled;
-	populateResourceUsage(_stageResources[kMVKShaderStageVertex], shaderConfig, funcRslts, spv::ExecutionModelVertex);
+	populateResourceUsage(_stageResources[kMVKShaderStageVertex], shaderConfig, funcRslts, spv::ExecutionModelVertex, func.sampleOnlyImageAccess);
 	_stageResources[kMVKShaderStageVertex].implicitBuffers.needed.set(MVKImplicitBuffer::EmulatedReversedDepthViewport, shaderConfig.options.mslOptions.emulate_reversed_depth_viewport);
 	_layout->populateBindOperations(_stageResources[kMVKShaderStageVertex].bindScript, shaderConfig, spv::ExecutionModelVertex);
 
@@ -1998,7 +2001,7 @@ bool MVKGraphicsPipeline::addVertexShaderToPipeline(MTLMeshRenderPipelineDescrip
 	if ( !mtlFunc ) { return false; }
 
 	auto& funcRslts = func.shaderConversionResults;
-	populateResourceUsage(_stageResources[kMVKShaderStageVertex], shaderConfig, funcRslts, spv::ExecutionModelVertex);
+	populateResourceUsage(_stageResources[kMVKShaderStageVertex], shaderConfig, funcRslts, spv::ExecutionModelVertex, func.sampleOnlyImageAccess);
 	_layout->populateBindOperations(_stageResources[kMVKShaderStageVertex].bindScript, shaderConfig, spv::ExecutionModelVertex);
 
 	plDesc.objectFunction = mtlFunc;
@@ -2054,7 +2057,7 @@ bool MVKGraphicsPipeline::addGeometryShaderToPipeline(MTLMeshRenderPipelineDescr
 		setConfigurationResult(reportError(VK_ERROR_INITIALIZATION_FAILED, "Geometry shader requires transform feedback buffers, but there is no free slot to pass them."));
 		return false;
 	}
-	populateResourceUsage(_stageResources[kMVKShaderStageGeometry], shaderConfig, funcRslts, spv::ExecutionModelGeometry);
+	populateResourceUsage(_stageResources[kMVKShaderStageGeometry], shaderConfig, funcRslts, spv::ExecutionModelGeometry, func.sampleOnlyImageAccess);
 	_layout->populateBindOperations(_stageResources[kMVKShaderStageGeometry].bindScript, shaderConfig, spv::ExecutionModelGeometry);
 
 	plDesc.meshFunction = mtlFunc;
@@ -2102,7 +2105,7 @@ bool MVKGraphicsPipeline::addVertexShaderToPipeline(MTLComputePipelineDescriptor
 		pVtxFunctions[i] = func;
 
 		auto& funcRslts = func.shaderConversionResults;
-		populateResourceUsage(_stageResources[kMVKShaderStageVertex], shaderConfig, funcRslts, spv::ExecutionModelVertex);
+		populateResourceUsage(_stageResources[kMVKShaderStageVertex], shaderConfig, funcRslts, spv::ExecutionModelVertex, func.sampleOnlyImageAccess);
 	}
 
 	_layout->populateBindOperations(_stageResources[kMVKShaderStageVertex].bindScript, shaderConfig, spv::ExecutionModelVertex);
@@ -2147,7 +2150,7 @@ bool MVKGraphicsPipeline::addTessCtlShaderToPipeline(MTLComputePipelineDescripto
 		MVKImplicitBuffer::IndirectParams,
 		MVKImplicitBuffer::TessLevel,
 	});
-	populateResourceUsage(_stageResources[kMVKShaderStageTessCtl], shaderConfig, funcRslts, spv::ExecutionModelTessellationControl);
+	populateResourceUsage(_stageResources[kMVKShaderStageTessCtl], shaderConfig, funcRslts, spv::ExecutionModelTessellationControl, func.sampleOnlyImageAccess);
 	_layout->populateBindOperations(_stageResources[kMVKShaderStageTessCtl].bindScript, shaderConfig, spv::ExecutionModelTessellationControl);
 
 	return verifyImplicitBuffers(kMVKShaderStageTessCtl);
@@ -2187,7 +2190,7 @@ bool MVKGraphicsPipeline::addTessEvalShaderToPipeline(MTLRenderPipelineDescripto
 		return false;
 	}
 	plDesc.rasterizationEnabled = !funcRslts.isRasterizationDisabled;
-	populateResourceUsage(_stageResources[kMVKShaderStageTessEval], shaderConfig, funcRslts, spv::ExecutionModelTessellationEvaluation);
+	populateResourceUsage(_stageResources[kMVKShaderStageTessEval], shaderConfig, funcRslts, spv::ExecutionModelTessellationEvaluation, func.sampleOnlyImageAccess);
 	_stageResources[kMVKShaderStageTessEval].implicitBuffers.needed.set(MVKImplicitBuffer::EmulatedReversedDepthViewport, shaderConfig.options.mslOptions.emulate_reversed_depth_viewport);
 	_layout->populateBindOperations(_stageResources[kMVKShaderStageTessEval].bindScript, shaderConfig, spv::ExecutionModelTessellationEvaluation);
 
@@ -2257,7 +2260,7 @@ bool MVKGraphicsPipeline::addFragmentShaderToPipeline(T* plDesc,
 		if ( !mtlFunc ) { return false; }
 
 		auto& funcRslts = func.shaderConversionResults;
-		populateResourceUsage(_stageResources[kMVKShaderStageFragment], shaderConfig, funcRslts, spv::ExecutionModelFragment);
+		populateResourceUsage(_stageResources[kMVKShaderStageFragment], shaderConfig, funcRslts, spv::ExecutionModelFragment, func.sampleOnlyImageAccess);
 		_layout->populateBindOperations(_stageResources[kMVKShaderStageFragment].bindScript, shaderConfig, spv::ExecutionModelFragment);
 	}
 	return verifyImplicitBuffers(kMVKShaderStageFragment);
@@ -3271,7 +3274,7 @@ MVKMTLFunction MVKComputePipeline::getMTLFunction(const VkComputePipelineCreateI
 		}
 	}
 	auto& funcRslts = func.shaderConversionResults;
-	populateResourceUsage(_stageResources, shaderConfig, funcRslts, spv::ExecutionModelGLCompute);
+	populateResourceUsage(_stageResources, shaderConfig, funcRslts, spv::ExecutionModelGLCompute, func.sampleOnlyImageAccess);
 	_layout->populateBindOperations(_stageResources.bindScript, shaderConfig, spv::ExecutionModelGLCompute);
 
 	return func;

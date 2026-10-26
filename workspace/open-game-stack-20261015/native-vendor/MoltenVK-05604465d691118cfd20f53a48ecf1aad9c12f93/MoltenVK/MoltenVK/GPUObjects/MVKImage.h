@@ -24,6 +24,7 @@
 #include "MVKSmallVector.h"
 #include <MoltenVKShaderConverter/SPIRVToMSLConverter.h>
 #include <unordered_map>
+#include <atomic>
 #include <mutex>
 
 #import <IOSurface/IOSurfaceRef.h>
@@ -469,6 +470,20 @@ struct MVKSwapchainSignaler {
 	uint64_t semaphoreSignalToken;
 };
 
+// Private diagnostic provenance, not a cache key or presentation decision.
+// layerObservationGeneration is this image's drawable-acquisition generation at
+// observation. It is NOT a CAMetalLayer/swapchain creation epoch; a reused layer
+// pointer cannot be distinguished without additional swapchain provenance.
+struct MVKPresentDiagnosticInfo {
+	uint64_t session = 0, presentationID = 0;
+	uint64_t imageGeneration = 0, drawableGeneration = 0, layerObservationGeneration = 0;
+	uint64_t swapchain = 0, imageIndex = 0, drawable = 0, drawableID = 0, layer = 0;
+	uint64_t requestMachNS = 0, requestCANS = 0, metadataStartMachNS = 0, metadataEndMachNS = 0;
+	uint64_t scheduledHandlerEntryMachNS = 0;
+	uint64_t handlerEntryMachNS = 0, handlerEntryCANS = 0, handlerRawReadEndMachNS = 0;
+	uint64_t rawPresentedTimeBits = 0;
+};
+
 
 /** Represents a Vulkan swapchain image that can be submitted to the presentation engine. */
 class MVKPresentableSwapchainImage : public MVKSwapchainImage {
@@ -488,7 +503,8 @@ public:
 	/** Called via callback when the presentation completes. */
 	void endPresentation(const MVKImagePresentInfo& presentInfo,
 						 const MVKSwapchainSignaler& signaler,
-						 uint64_t actualPresentTime = 0);
+						 uint64_t actualPresentTime = 0,
+						 const MVKPresentDiagnosticInfo* diagnostics = nullptr);
 
 #pragma mark Construction
 
@@ -503,7 +519,10 @@ protected:
 	friend MVKSwapchain;
 
 	id<CAMetalDrawable> getCAMetalDrawable();
-	void addPresentedHandler(id<CAMetalDrawable> mtlDrawable, MVKImagePresentInfo presentInfo, MVKSwapchainSignaler signaler);
+	void addPresentedHandler(id<CAMetalDrawable> mtlDrawable, MVKImagePresentInfo presentInfo,
+						 MVKSwapchainSignaler signaler, MVKPresentDiagnosticInfo diagnostics);
+	MVKPresentDiagnosticInfo getPresentDiagnostics(id<CAMetalDrawable> mtlDrawable,
+												const MVKImagePresentInfo& presentInfo, bool atRequest);
 	void releaseMetalDrawable();
 	MVKSwapchainImageAvailability getAvailability();
 	void makeAvailable();
@@ -518,6 +537,8 @@ protected:
 	std::mutex _availabilityLock;
 	uint64_t _beginPresentTime = 0;
 	uint64_t _presentationStartTime = 0;
+	uint64_t _diagnosticImageGeneration = 0;
+	std::atomic<uint64_t> _diagnosticDrawableGeneration{0};
 };
 
 

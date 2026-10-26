@@ -64,6 +64,7 @@ def main():
     parser.add_argument('--sharded-shader-cache-locks',action='store_true')
     parser.add_argument('--descriptor-write-shards',action='store_true')
     parser.add_argument('--encoder-heap-plans',action='store_true')
+    parser.add_argument('--sampled-texture-heap-plans',action='store_true')
     parser.add_argument('--stutter-coverage',action='store_true')
     parser.add_argument('--negative-live-cache',action='store_true')
     parser.add_argument('--batch-argument-heaps', action='store_true')
@@ -134,6 +135,9 @@ def main():
     if args.sharded_shader_cache_locks:env['MVK_AMD_SHARDED_SHADER_CACHE_LOCKS']='1'
     if args.descriptor_write_shards:env['MVK_AMD_DESCRIPTOR_WRITE_SHARDS']='1'
     if args.encoder_heap_plans:env['MVK_AMD_ENCODER_HEAP_PLANS']='1'
+    if args.sampled_texture_heap_plans:
+        if not args.encoder_heap_plans:parser.error('Sampled texture heap plans require encoder heap plans')
+        env['MVK_AMD_SAMPLED_TEXTURE_HEAP_PLANS']='1'
     if args.stutter_coverage:env['MVK_AMD_STUTTER_COVERAGE']='1'
     if args.gpu_counter_burst:env['MVK_AMD_GPU_COUNTER_BURST']='1'
     if args.batch_argument_heaps:
@@ -182,7 +186,7 @@ def main():
               "crossEncoderLiveCache": args.cross_encoder_live_cache,
               "registrationDeltaCache": args.registration_delta_cache,
               "shardedShaderCacheLocks": args.sharded_shader_cache_locks,
-              "descriptorWriteShards": args.descriptor_write_shards, "encoderHeapPlans": args.encoder_heap_plans, "stutterCoverage": args.stutter_coverage, "gpuCounterBurst": args.gpu_counter_burst,
+              "descriptorWriteShards": args.descriptor_write_shards, "encoderHeapPlans": args.encoder_heap_plans, "sampledTextureHeapPlans": args.sampled_texture_heap_plans, "stutterCoverage": args.stutter_coverage, "gpuCounterBurst": args.gpu_counter_burst,
               "qualificationScope": "compute-only" if args.compute_only else "compute-and-presentation",
               "batchArgumentHeaps": args.batch_argument_heaps,
               "argumentHeapThreshold": args.argument_heap_threshold, "results": {}}

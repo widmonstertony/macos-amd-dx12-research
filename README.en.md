@@ -12,6 +12,8 @@ v36 adds known D3D12, resource, compilation, queue, GPU and presentation diagnos
 
 The one-process diagnostic plan covers known submit, resource, compilation, GPU and presentation paths before one human game run. Capture windows can be rearmed without restarting. See [the plan and limits](docs/ONE-RUN-DIAGNOSTICS.en.md). v36 publishes source and diagnostic tools; existing release downloads are unchanged. It is not a playability claim.
 
+2026-10-26: [v37 sampled read-plan source and owned GPU validation](docs/SAMPLED-READ-PLAN-2026-10-26.md); actual game performance is still unvalidated.
+
 ## Download and test
 
 [Latest diagnostic download](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.2.0-watchdog-diagnostic) · [Testing](docs/TESTING.en.md) · [Known issues](docs/KNOWN_ISSUES.en.md) · [Contributing](CONTRIBUTING.md)

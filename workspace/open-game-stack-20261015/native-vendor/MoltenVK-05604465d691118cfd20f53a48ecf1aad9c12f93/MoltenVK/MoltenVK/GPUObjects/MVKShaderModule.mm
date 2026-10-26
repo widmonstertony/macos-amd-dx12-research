@@ -40,6 +40,7 @@ MVKMTLFunction::MVKMTLFunction(id<MTLFunction> mtlFunc, const SPIRVToMSLConversi
 MVKMTLFunction::MVKMTLFunction(const MVKMTLFunction& other) {
 	_mtlFunction = [other._mtlFunction retain];		// retained
 	shaderConversionResults = other.shaderConversionResults;
+	sampleOnlyImageAccess = other.sampleOnlyImageAccess;
 	threadGroupSize = other.threadGroupSize;
 }
 
@@ -50,6 +51,7 @@ MVKMTLFunction& MVKMTLFunction::operator=(const MVKMTLFunction& other) {
 	_mtlFunction = other._mtlFunction;
 
 	shaderConversionResults = other.shaderConversionResults;
+	sampleOnlyImageAccess = other.sampleOnlyImageAccess;
 	threadGroupSize = other.threadGroupSize;
 	return *this;
 }
@@ -236,6 +238,7 @@ MVKShaderLibrary::MVKShaderLibrary(MVKVulkanAPIDeviceObject* owner,
 	_maySpecializeWithMacro(true) {
 
 	_shaderConversionResultInfo = conversionResult.resultInfo;
+	_sampleOnlyImageAccessState.store(conversionResult.sampleOnlyImageAccess ? 1 : 0);
 	compressMSL(conversionResult.msl);
 	compileLibrary(conversionResult.msl);
 }
@@ -312,6 +315,7 @@ MVKShaderLibrary::MVKShaderLibrary(const MVKShaderLibrary& other) :
 
 	_mtlLibrary = [other._mtlLibrary retain];
 	_shaderConversionResultInfo = other._shaderConversionResultInfo;
+	_sampleOnlyImageAccessState.store(other._sampleOnlyImageAccessState.load());
 	_compressedMSL = other._compressedMSL;
 }
 
@@ -323,6 +327,7 @@ MVKShaderLibrary& MVKShaderLibrary::operator=(const MVKShaderLibrary& other) {
 	_owner = other._owner;
     _conservativeMeshLibrary = other._conservativeMeshLibrary;
 	_shaderConversionResultInfo = other._shaderConversionResultInfo;
+	_sampleOnlyImageAccessState.store(other._sampleOnlyImageAccessState.load());
 	_compressedMSL = other._compressedMSL;
 	return *this;
 }
@@ -636,6 +641,38 @@ MVKMTLFunction MVKShaderModule::getMTLFunction(SPIRVToMSLConversionConfiguration
         if (!mvkGPUTimeoutTraceEnabled() || ![[NSFileManager defaultManager] fileExistsAtPath:path])
 		[[NSData dataWithBytes:source.data() length:source.size()] writeToFile:path options:NSDataWritingAtomic error:nil];
 		if (trace) mvkWriteRuntimeTrace(getMVKConfig(), @"function", @{@"shader":[NSString stringWithFormat:@"%016zx",_key.codeHash],@"sourceHash":[NSString stringWithFormat:@"%016zx",sourceHash],@"requested":requestedConfig,@"selected":mvkTraceConfig(*pShaderConfig),@"function":mvkTraceFunction(function),@"pipelineCache":@(pipeline->getPipelineCache()!=nullptr),@"fpFastMathFlags":@(result.shaderConversionResults.entryPoint.fpFastMathFlags),@"positionInvariant":@(result.shaderConversionResults.isPositionInvariant)});
+	}
+	// Runtime metadata is deliberately absent from serialized caches. Requalify
+	// an old entry only once, against its exact source and the current converter.
+	// Structural rejection precedes decompression/reconversion. The library is
+	// specific to this module/entry/stage/conversion variant, and the mutex also
+	// prevents duplicate first-use work from parallel pipeline creation.
+	if (mvkLib && !_directMSLLibrary && result.getMTLFunction()) {
+		int8_t qualification = mvkLib->_sampleOnlyImageAccessState.load();
+		if (qualification < 0) {
+			lock_guard<mutex> lock(mvkLib->_sampleOnlyImageAccessLock);
+			qualification = mvkLib->_sampleOnlyImageAccessState.load();
+			if (qualification < 0) {
+				qualification = 0;
+				// Qualification is optional runtime metadata. Allocation/parser
+				// failure must fall back to precise declarations, never invalidate
+				// an otherwise usable serialized shader-library cache hit.
+				try {
+				if (_spvConverter.mayUseSampleOnlyImageAccess()) {
+					std::string cachedMSL;
+					mvkLib->decompressMSL(cachedMSL);
+					SPIRVToMSLConversionConfiguration qualificationConfig = *pShaderConfig;
+					SPIRVToMSLConversionResult qualificationResult;
+					if (_spvConverter.convert(qualificationConfig, qualificationResult) &&
+						qualificationResult.sampleOnlyImageAccess && qualificationResult.msl == cachedMSL) {
+						qualification = 1;
+					}
+				}
+				} catch (...) { qualification = 0; }
+				mvkLib->_sampleOnlyImageAccessState.store(qualification);
+			}
+		}
+		result.sampleOnlyImageAccess = qualification > 0;
 	}
 	return result;
 }

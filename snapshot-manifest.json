@@ -2194,14 +2194,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.h",
-      "bytes": 41802,
-      "sha256": "5757f1ea7297c03a4b6589f67bbe43e7eae032d5273869bbfd507848bc45cc65",
+      "bytes": 42274,
+      "sha256": "ab3141dac382d5112998a229ef3dae2ca854b8fef4f447ba7e5b94fe50800d12",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 173781,
-      "sha256": "70d476251c710305b1dc55d3136c60c23319e918f2d9d0572826c35c60da443c",
+      "bytes": 174927,
+      "sha256": "e35f1c913fee8ced28a4720b451809b9a73f3d68e63edb6d998171e7810667a9",
       "executable": false
     },
     {
@@ -2254,8 +2254,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKEncoderHeapLedger.h",
-      "bytes": 11056,
-      "sha256": "f21d4c9013bddd1b0b8ecd005483d74de46c041dcb734f359d3d400236efd444",
+      "bytes": 12982,
+      "sha256": "86484f86457fbb37b7a57dad071fb10c6cbd7d5afdf3a9c655f620e22ca81d3c",
       "executable": false
     },
     {
@@ -2314,8 +2314,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKBufferHeapReadPlan.h",
-      "bytes": 2810,
-      "sha256": "1e758cf1d720198c5e73fc4e0f14854e17662065c99e23dfec075b5c66fa718c",
+      "bytes": 5896,
+      "sha256": "feb6fab47e1a94be05fea6d2d11aa6bbfc1caf4343d107976e1bfc88710e62dd",
       "executable": false
     },
     {
@@ -2350,8 +2350,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKDevice.h",
-      "bytes": 63467,
-      "sha256": "cc3c6f8b627a117af30746f0d68e53e20f2efde2deb191110b4f1d7192d338e0",
+      "bytes": 63949,
+      "sha256": "de26115a583f40874b24ff2a6770da3d36aff3a923acbd9708000bc0bc460cb3",
       "executable": false
     },
     {
@@ -2410,14 +2410,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKImage.h",
-      "bytes": 27638,
-      "sha256": "da2d8eaeb10754f647ad80063fdb0bb86b72486fa4dc8d47be3e522c0b006f37",
+      "bytes": 28835,
+      "sha256": "e3aa30336ddd8f15c8b4384ec56ced3b998bd5cf1e2f2699f984f0616a123ecc",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKImage.mm",
-      "bytes": 129998,
-      "sha256": "68169e5eef263c90041d93f408e03642877b063c52424cb1725c3686c7a14ccb",
+      "bytes": 139880,
+      "sha256": "221330dbaf8a2be74ab2897a8125c8eed2280cb6d7a15854ea0eea528c0c0247",
       "executable": false
     },
     {
@@ -2458,14 +2458,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.h",
-      "bytes": 35478,
-      "sha256": "5fff914d696af6ae1e5de081e00048591a54931eb961ce27b0405c87003dc9d4",
+      "bytes": 35629,
+      "sha256": "485da0951234f703682226e85859a17b9c139557f774b86877e13b5b9a1d5c5c",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKPipeline.mm",
-      "bytes": 241200,
-      "sha256": "3724f151541902638396df9ed32046bee7afca0185da493788ffdbe717f0992e",
+      "bytes": 241620,
+      "sha256": "d696ae0475382d056b4e27cd46787f273b233e5bf795ffa122619e26335a3d8a",
       "executable": false
     },
     {
@@ -2584,14 +2584,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.h",
-      "bytes": 13580,
-      "sha256": "609be67d447a09187bd488a0d88058cc028a5afd85e9748442222cdc1f4af702",
+      "bytes": 13885,
+      "sha256": "855887fc9e00e96c7a11f1300bf6037b8d829448c63e345e6df5664075eecc7f",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKShaderModule.mm",
-      "bytes": 55465,
-      "sha256": "4b329a025cbb2d041bdcc9842b3c2098afbc29b256bfa39c316a145d23114abb",
+      "bytes": 57374,
+      "sha256": "f0bb5f1e5c90fd861b1f53491518022f74ac470b76d7a60b1d1982f4a6af87f2",
       "executable": false
     },
     {
@@ -3033,6 +3033,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVSampleOnlyAccess.h",
+      "bytes": 25641,
+      "sha256": "b988c63e75d83f5e80967a00dbaca9dcf9595da7f3a37b327671d6b126403d46",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVSupport.cpp",
       "bytes": 3916,
       "sha256": "97a3a26757070e7e98934d0ac13dac1fa6e0549fbdd012097224fe3e47d9028c",
@@ -3046,14 +3052,14 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVToMSLConverter.cpp",
-      "bytes": 25903,
-      "sha256": "ea539a6e91200bfcad26f372564d402dc940f956315d7512f7450e76b36bdb07",
+      "bytes": 26483,
+      "sha256": "63246564221b394bd7d640cf4c2ae866349bdc442715ef4ae726b2a4e9634933",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVKShaderConverter/MoltenVKShaderConverter/SPIRVToMSLConverter.h",
-      "bytes": 13579,
-      "sha256": "0ef538b938ea23a168a42668d31f871b8c0959d8905277747a1f7eb58d7aa2b6",
+      "bytes": 13821,
+      "sha256": "11cf9bf8b82feff797aaa5ddd8df33ad6057185d51c0d6b2e66c2d014b488ebf",
       "executable": false
     },
     {
@@ -33285,6 +33291,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/profiles/base-game-trial-config.h",
+      "bytes": 2401,
+      "sha256": "9a6d1fa43365a3b1af0c6e7543a99dd74c4e64556d806786c7d2b574ccb9e232",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/profiles/buffer-read-plan-v35.json",
       "sha256": "ffe748419a8ad79b3dd9d5023133d9515c0cb99630887b4d951e7acd8fd13712",
       "bytes": 1355,
@@ -33294,6 +33306,12 @@
       "path": "open-game-stack-20261015/profiles/full-forensics-v36.json",
       "bytes": 1677,
       "sha256": "7a843583470ef5cf57d8f01c107fdbf8c0160ee8fbc24a8b2ee14b0baaf4fd3f",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/profiles/sampled-read-plan-v37.json",
+      "bytes": 1998,
+      "sha256": "7e82d3949885ced53f558222daeab12c9d55083cbf558f331754c8a39e0b9c47",
       "executable": false
     },
     {
@@ -33998,6 +34016,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/encoder_heap_ledger_control.cpp",
+      "bytes": 6962,
+      "sha256": "34fb934b44724c5e2a3c3e535a4b19300a07fdc49493aaf9c15676388cfff990",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/controls/stable_use_before_pointer_return.h",
       "bytes": 2913,
       "sha256": "bd8952dfdef8fe69331f217a029d3550c1af0212813f59220908ebf898bd9656",
@@ -34496,6 +34520,36 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/sample_texture_plan_gpu.cpp",
+      "bytes": 28950,
+      "sha256": "c68b61b22c2f0dc239a88180d7b99c1365a920db264fb16b17479a3a310387cb",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/sample_texture_plan_shaders/fetch.frag",
+      "bytes": 347,
+      "sha256": "6e7a05f38349d0048e7b2766b1b9536257fc8c6793609a46d1f735e8f88f4b5f",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/sample_texture_plan_shaders/fullscreen-sampled.vert",
+      "bytes": 523,
+      "sha256": "9920aaae081ab5b479441cb140d37e9e5676cc85444be344fe08abe65af5d136",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/sample_texture_plan_shaders/fullscreen.vert",
+      "bytes": 144,
+      "sha256": "7cc0effdbd4e1f49fedd369c01317576f9d81c0432b2637d9be8d990f719ddee",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/sample_texture_plan_shaders/sample.frag",
+      "bytes": 432,
+      "sha256": "77e78c22f51b1f7917c7cef48195bc8f5e887793027e49c91fc88f17b598cf7d",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/sharded_shader_cache_gpu.cpp",
       "bytes": 6896,
       "sha256": "6cd4624c14322839ed90d2f93812493f48f801b0495ab63f67f7e901295059b7",
@@ -34734,8 +34788,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_profile_candidate.py",
-      "sha256": "bc31f06ab0e51bcbb6c07f220032b33b0514aa6f82be66be9927b1a33019915b",
-      "bytes": 15551,
+      "bytes": 16170,
+      "sha256": "86b83b93eac886c718f7e669bbc3d953ea346a63a2f9d1014b43db76aedb4061",
       "executable": false
     },
     {
@@ -34941,8 +34995,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_geometry_specialization.py",
-      "sha256": "db00c2acb605809c051fcdf950b15bff410316803240b6618886ab397d7e7c8a",
-      "bytes": 12708,
+      "bytes": 12974,
+      "sha256": "3f74a78d61f6d3f4160bb5cb4f7ce38a60f8276375357b1c5f6d986d9f2c8777",
       "executable": false
     },
     {
@@ -34953,8 +35007,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/qualify_private_cache_candidate.py",
-      "bytes": 21391,
-      "sha256": "4b3b9827d80959769cfc400064b1c9797de8877b381759303ec2be0bbe822df8",
+      "bytes": 21730,
+      "sha256": "b18493bf52a8bfc49faed5f1e61f6b371fc5c9d4768e1d50e019aac95b0b5e70",
       "executable": false
     },
     {
@@ -34967,6 +35021,12 @@
       "path": "open-game-stack-20261015/tools/qualify_render_cache_native.py",
       "bytes": 5530,
       "sha256": "2edd5e3b71e891c884c865e22c3c1b439147a50222fe8db9d7089772e6825f32",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_sampled_texture_gpu.py",
+      "bytes": 5955,
+      "sha256": "04ff94ff2cb51f15056310de03f47b87ea8064ccea53f59c2dd00054f38ce8dc",
       "executable": false
     },
     {
@@ -35008,6 +35068,12 @@
       "path": "open-game-stack-20261015/tools/restart_original_steam_game_diagnostics.py",
       "bytes": 4296,
       "sha256": "12e163eb132f31e3c2bb8de540783a843dcd640af0ee5b8b0dd5ed55571258a1",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/restore_stellar_fsr3_options.py",
+      "bytes": 3250,
+      "sha256": "daa9df76e0f1bc53d7e5bbd86691797a23da4f677e1f304422c1ed2d5bb8501e",
       "executable": false
     },
     {
@@ -35090,6 +35156,12 @@
       "path": "open-game-stack-20261015/tools/summarize_slow_submissions.py",
       "bytes": 4072,
       "sha256": "5aa68a558f3dace3722175092f53a9c7017becb9bb4179c2fbc66df2897f7fbf",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/test_native_sample_only_access.cpp",
+      "bytes": 5558,
+      "sha256": "c3b657a80f89e5160f56f98cdd7a9238625850c5cf665ba73b3a6a9b6285b852",
       "executable": false
     },
     {
@@ -70739,19 +70811,8 @@
     }
   ],
   "updatedUTC": "2026-10-24T03:54:53.820584+00:00",
-  "currentSourceState": {
-    "label": "buffer-read-plan-v35-20261025",
-    "gamePlayable": false,
-    "candidateDeployed": true,
-    "actualGamePerformanceValidated": false,
-    "humanGameTestingOnly": true,
-    "nativeCandidateSHA256": "151af81c4674b8a005bafd2c7ebdfb0d251acb97e0119dcdb9737aaca9b589bf",
-    "nativeImplementationReusedFromV34": true,
-    "encoderHeapPlansEnabled": true,
-    "focus": "Reuse lease-owned large buffer read plans before per-resource replay; preserve precise writes and runtime fallback",
-    "sourceFilesUpdatedThisCheckpoint": 7
-  },
+  "currentSourceState": "v37 sampled read plan: component GPU-qualified; game performance, historical crashes and FSR3 remain unvalidated; raw private evidence excluded.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-25T22:54:40.983777+00:00",
-  "lastSourceOnlyUpdateUTC": "2026-10-22T02:19:58.857641+00:00"
+  "lastSourceOnlyUpdateUTC": "2026-10-26T10:05:04.300355+00:00"
 }

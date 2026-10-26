@@ -667,7 +667,8 @@ static void executeBindOps(id<MTLCommandEncoder> encoder,
                            MVKResourceUsageStages useResourceStage,
                            MVKStageResourceBits& exists,
                            MVKStageResourceBindings& bindings,
-                           const MVKResourceBinder& RESTRICT binder) {
+                           const MVKResourceBinder& RESTRICT binder,
+                           bool sampleOnlyImageAccess) {
 	bool didUseResource = false;
     auto& resourceDiagnostics=mvkEncoder.getState().mtlShared()._useResource.resourceForensics;
     resourceDiagnostics.add(MVKResourceForensics::BindingCalls);
@@ -718,7 +719,8 @@ static void executeBindOps(id<MTLCommandEncoder> encoder,
 			MVKLiveList& list = op.opcode == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck ?
 			    mvkEncoder.getDevice()->getLiveResources().buffers : mvkEncoder.getDevice()->getLiveResources().textures;
 			mvkEncoder.getState().mtlShared()._useResource.addLiveSnapshot(resources, list, encoder, binder.useResource, useResourceStage, target,
-                op.opcode == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck);
+                op.opcode == MVKDescriptorBindOperationCode::UseBufferWithLiveCheck,
+                sampleOnlyImageAccess && op.opcode == MVKDescriptorBindOperationCode::UseTextureWithLiveCheck);
 			continue;
 		}
 
@@ -794,6 +796,17 @@ static void bindMetalResources(id<MTLCommandEncoder> encoder,
                                MVKStageResourceBindings& bindings,
                                const MVKResourceBinder& RESTRICT binder) {
     MVK_CPU_SCOPE(BindMetalResources);
+    const bool sampledReads = resources.sampleOnlyImageAccess &&
+        mvkEncoder.getState().mtlShared()._useResource.encoderSampledHeapPlans;
+    if (bindings.sampleOnlyImageAccess && !sampledReads) {
+        // A prior useHeap prepares textures for sampling, not texture.read().
+        // Preserve descriptor/Metal buffer bindings; repeat only use decisions.
+        for (size_t idx : resources.resources.descriptorSetData) {
+            const auto* layout = common._layout->getDescriptorSetLayout(idx);
+            bindings.descriptorSetResourceUse[idx].resizeAndClear(layout->bindings().size());
+        }
+    }
+    bindings.sampleOnlyImageAccess = sampledReads;
 	// Upstream KhronosGroup/MoltenVK PR #2822 (shih-liang): resource-use
 	// caching and actual Metal buffer bindings have independent invalidation.
 	MVKStaticBitSet<kMVKMaxDescriptorSetCount> setsNeeded = resources.resources.descriptorSetData.clearingAllIn(exists.descriptorSetData);
@@ -810,7 +823,7 @@ static void bindMetalResources(id<MTLCommandEncoder> encoder,
 		bindBuffer(encoder, set->gpuBufferObject, set->gpuBufferOffset, idx, exists, bindings, binder);
 	}
 
-	executeBindOps(encoder, mvkEncoder, common, implicitBufferData, resources.bindScript.ops.contents(), useResourceStage, exists, bindings, binder);
+	executeBindOps(encoder, mvkEncoder, common, implicitBufferData, resources.bindScript.ops.contents(), useResourceStage, exists, bindings, binder, sampledReads);
 
 	MVKMetalSharedCommandEncoderState& mtlShared = mvkEncoder.getState().mtlShared();
 	if (resources.usesPhysicalStorageBufferAddresses && !isCompatible(mtlShared._gpuAddressableResourceStages, useResourceStage)) {
@@ -1228,11 +1241,11 @@ MVKUseResourceHelper::buildRetainedReadBatch(const std::shared_ptr<RetainedSnaps
 bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
     MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
     id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
-    MVKResourceUsageStages stage) {
+    MVKResourceUsageStages stage, bool sampledTextures) {
     MVK_CPU_SCOPE(HeapPlanReuse);
-    // Small tables retain the direct path. Only validated BUFFER identities
-    // may use a heap read plan: useHeap is not sufficient for texture.read,
-    // shader-write textures, or render-target textures.
+    // Small tables retain the direct path. Texture plans require proven
+    // sample-only pipeline access and immutable per-resource exclusions;
+    // texture.read(), writes, attachments and unknown access stay precise.
     if (snapshot->size() < 128) { resourceForensics.add(MVKResourceForensics::RejectSmall); return false; }
     if (resourceUseStats) ++statsHeapPlanCalls;
     uint64_t additions = list.additionGeneration();
@@ -1275,7 +1288,8 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
         if (cached) *cached = {snapshot, &list, additions, lease};
         else heapReadSnapshots.push_back({snapshot, &list, additions, lease});
     }
-    const auto& plan = [&]() -> decltype(auto) { MVK_CPU_SCOPE(HeapPlanBuild); return lease->bufferReadPlan(); }();
+    const auto& plan = [&]() -> decltype(auto) { MVK_CPU_SCOPE(HeapPlanBuild);
+        return sampledTextures ? lease->sampledTextureReadPlan() : lease->bufferReadPlan(); }();
     size_t eligible = plan.eligibleResourceCount(heapBatchThreshold);
     if (eligible < 128) { resourceForensics.add(MVKResourceForensics::RejectHeapSmall); return false; }
     if(resourceForensics.armed) {
@@ -1461,16 +1475,18 @@ MVKDescriptorUseCache::Snapshot MVKUseResourceHelper::descriptorSnapshot(
 
 void MVKUseResourceHelper::addLiveSnapshot(MVKDescriptorUseCache::Snapshot snapshot, MVKLiveList& list,
                                            id<MTLCommandEncoder> encoder, MVKResourceBinder::UseResource func,
-                                           MVKResourceUsageStages stage, bool write, bool knownBuffers) {
+                                           MVKResourceUsageStages stage, bool write, bool knownBuffers,
+                                           bool sampleOnlyTextures) {
     MVK_CPU_SCOPE(ResourceReplay);
     resourceForensics.add(MVKResourceForensics::SnapshotCalls);
     resourceForensics.add(MVKResourceForensics::SnapshotWords,snapshot->size());
     if (!encoderHeapPlans) resourceForensics.add(MVKResourceForensics::RejectDisabled);
-    else if (!knownBuffers) resourceForensics.add(MVKResourceForensics::RejectTexture);
+    else if (!knownBuffers && !sampleOnlyTextures) resourceForensics.add(MVKResourceForensics::RejectTexture);
     else if (write) resourceForensics.add(MVKResourceForensics::RejectWrite);
     if (resourceUseStats) ++statsSnapshotCalls;
-    if (encoderHeapPlans && knownBuffers && !write &&
-        tryAddBufferHeapSnapshot(snapshot, list, encoder, func, stage)) return;
+    const bool sampled = encoderSampledHeapPlans && sampleOnlyTextures && !knownBuffers;
+    if (encoderHeapPlans && (knownBuffers || sampled) && !write &&
+        tryAddBufferHeapSnapshot(snapshot, list, encoder, func, stage, sampled)) return;
     // Read before validation. Registration during validation must invalidate
     // a cached absence too. Validated objects remain owned by this helper.
     uint64_t additions = list.additionGeneration();

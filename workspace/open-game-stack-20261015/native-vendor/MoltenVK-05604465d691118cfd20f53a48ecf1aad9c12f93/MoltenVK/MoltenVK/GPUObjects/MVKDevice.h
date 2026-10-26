@@ -595,6 +595,7 @@ public:
         RetainedSnapshot(const RetainedSnapshot&) = delete;
         ~RetainedSnapshot() {
             _bufferReadPlan.reset();
+            _sampledTextureReadPlan.reset();
             for (id object : *this) [object release];
         }
         // Only the buffer registry's immutable, owned lease may enter this path.
@@ -608,10 +609,18 @@ public:
             });
             return *_bufferReadPlan;
         }
+        const BufferHeapReadPlan& sampledTextureReadPlan() const {
+            std::call_once(_sampledTexturePlanOnce, [this] {
+                _sampledTextureReadPlan = std::make_unique<const BufferHeapReadPlan>(*this, true);
+            });
+            return *_sampledTextureReadPlan;
+        }
         inline static std::atomic<uint64_t> bufferPlanBuilds{0}, bufferPlanHeapQueries{0};
     private:
         mutable std::once_flag _bufferPlanOnce;
         mutable std::unique_ptr<const BufferHeapReadPlan> _bufferReadPlan;
+        mutable std::once_flag _sampledTexturePlanOnce;
+        mutable std::unique_ptr<const BufferHeapReadPlan> _sampledTextureReadPlan;
     };
     using SnapshotLease = std::shared_ptr<const RetainedSnapshot>;
 private:

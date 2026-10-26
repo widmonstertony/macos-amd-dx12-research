@@ -24,6 +24,7 @@
 #include "MVKSmallVector.h"
 #include <MoltenVKShaderConverter/SPIRVToMSLConverter.h>
 #include <mutex>
+#include <atomic>
 
 #import <Metal/Metal.h>
 
@@ -39,6 +40,8 @@ class MVKShaderModule;
 typedef struct MVKMTLFunction {
   mvk::SPIRVToMSLConversionResultInfo shaderConversionResults;
 	MTLSize threadGroupSize;
+	// Runtime-only; never included in SPIRVToMSLConversionResultInfo serialization.
+	bool sampleOnlyImageAccess = false;
 	id<MTLFunction> getMTLFunction() { return _mtlFunction; }
 
 	MVKMTLFunction(id<MTLFunction> mtlFunc, const mvk::SPIRVToMSLConversionResultInfo scRslts, MTLSize tgSize);
@@ -155,6 +158,9 @@ protected:
 	id<MTLLibrary> _mtlLibrary;
 	MVKCompressor<std::string> _compressedMSL;
 	mvk::SPIRVToMSLConversionResultInfo _shaderConversionResultInfo;
+	// -1 means an old serialized cache entry needs runtime requalification.
+	std::atomic<int8_t> _sampleOnlyImageAccessState{-1};
+	std::mutex _sampleOnlyImageAccessLock;
 
 	/** When true, representing a library created with source, but never specialized */
 	bool _maySpecializeWithMacro;

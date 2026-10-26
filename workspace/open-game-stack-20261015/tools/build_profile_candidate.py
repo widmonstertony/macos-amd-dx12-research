@@ -5,7 +5,9 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser();p.add_argument('--label',required=True);p.add_argument('--resource-stats',action='store_true');p.add_argument('--shared-live-snapshots',action='store_true');p.add_argument('--snapshot-reuse',action='store_true');p.add_argument('--negative-cache',action='store_true');p.add_argument('--cross-snapshot-reuse',action='store_true');p.add_argument('--failure-context',action='store_true');p.add_argument('--registration-delta-cache',action='store_true');p.add_argument('--split-command-buffers',action='store_true',help='Commit between Vulkan command buffers inside one queue submission');p.add_argument('--geometry-command-buffer-batch-limit',type=int,help='Commit and resume a direct geometry draw after this many native mesh batches');p.add_argument('--armed-work-trace',action='store_true');p.add_argument('--continuous-work-trace',action='store_true');p.add_argument('--slow-command-buffer-trace-ms',type=float,help='Dump a bounded completed-command-buffer work record when GPU time meets this threshold');p.add_argument('--gpu-counters',action='store_true',help='Enable only timed, bounded native GPU counter diagnostics');p.add_argument('--gpu-counter-pipeline-label',help='Pipeline-label substring that lazily starts command-buffer GPU timestamps');p.add_argument('--gpu-counter-all-draws',action='store_true',help='Sample every draw boundary in the one lazily selected command buffer');p.add_argument('--geometry-draw-trace-label',help='Geometry pipeline-label substring captured only while timed GPU counters are armed');p.add_argument('--dump-function-substrings',help='Comma-separated generated Metal entry-point substrings whose already-used MSL source is recorded');p.add_argument('--geometry-index-capture-element',type=int,help='First selected indexed-geometry element copied by a one-shot GPU diagnostic');p.add_argument('--geometry-index-capture-count',type=int,help='Number of selected indexed-geometry elements copied by a one-shot GPU diagnostic');p.add_argument('--suppress-archive-trace',action='store_true',help='Keep archive reuse enabled but omit one JSON file per pipeline during focused GPU diagnosis');p.add_argument('--normal-mesh-libraries',action='store_true',help='Use cached shader-module libraries after the unique Metal entry-point fix; disable the old per-pipeline fresh-library diagnostic');p.add_argument('--sharded-shader-cache-locks',action='store_true',help='Protect only the pipeline-cache map globally and serialize compilation per shader module');p.add_argument('--descriptor-write-shards',action='store_true',help='Hold address-striped descriptor locks across writes instead of one per-set lock');p.add_argument('--suppress-link-differential',action='store_true',help='Disable the bounded mesh-link differential trace after its root cause has been verified');p.add_argument('--encoder-heap-plans',action='store_true',help='Buffer-only shared heap read plans with precise write replay');p.add_argument('--stutter-coverage',action='store_true',help='Add bounded CPU/system/native submission diagnostics without enabling the heap-plan optimization');p.add_argument('--gpu-counter-burst',action='store_true',help='Timed bounded GPU counter capture across queues/command buffers')
 p.add_argument('--startup-cpu-capture', action='store_true', help='Opt in to one bounded startup CPU capture; otherwise arm explicitly after scene entry')
 p.add_argument('--full-forensics',action='store_true',help='Bounded rearmable causal diagnostics; no performance algorithm changes')
+p.add_argument('--sampled-texture-heap-plans',action='store_true',help='Pipeline-qualified sampled texture heap plans with precise exceptions; requires encoder heap plans')
 a=p.parse_args()
+if a.sampled_texture_heap_plans and not a.encoder_heap_plans:p.error('Sampled texture plans require encoder heap plans')
 if a.full_forensics and not a.stutter_coverage:p.error('Full forensics requires stutter coverage')
 if a.startup_cpu_capture and not a.stutter_coverage:p.error('Startup CPU capture requires stutter coverage')
 if a.gpu_counters and not a.failure_context:p.error('Timed GPU counters require bounded failure context')
@@ -21,8 +23,9 @@ if a.continuous_work_trace and (a.armed_work_trace or not a.failure_context):p.e
 if a.slow_command_buffer_trace_ms is not None and (not a.continuous_work_trace or not 1 <= a.slow_command_buffer_trace_ms <= 60000):p.error('Slow command-buffer trace requires continuous work trace and a 1..60000 ms threshold')
 if not re.fullmatch('[a-z0-9-]{1,64}',a.label):p.error('Safe label required')
 evidence=ROOT/'evidence'/a.label;evidence.mkdir(exist_ok=False);(evidence/'msl').mkdir()
-template=ROOT/'evidence/effective-submission-profile-20261020/game-trial-config.h'
-config=template.read_text().replace(str(template.parent),str(evidence))
+template=ROOT/'profiles/base-game-trial-config.h'
+config=(template.read_text().replace('@MVK_PROFILE_EVIDENCE_DIR@',str(evidence))
+        .replace('@MVK_STACK_ROOT@',str(ROOT)).replace('@MVK_RESEARCH_ROOT@',str(ROOT.parent)))
 # The game is normally requested through a second Steam.exe process, which can
 # hand the launch to an already-running client. Keep this correctness switch in
 # the game-loaded proxy configuration too instead of relying only on the parent
@@ -43,6 +46,7 @@ if a.cross_snapshot_reuse and not a.snapshot_reuse:p.error('Cross-encoder snapsh
 if a.registration_delta_cache and not a.cross_snapshot_reuse:p.error('Registration delta cache requires cross snapshot reuse')
 for name,value in [('MVK_AMD_SHARED_LIVE_SNAPSHOTS',a.shared_live_snapshots),('MVK_AMD_REGISTRATION_DELTA_CACHE',a.registration_delta_cache),('MVK_AMD_QUEUE_FAILURE_CONTEXT',a.failure_context),('MVK_AMD_RESOURCE_USE_STATS',a.resource_stats),('MVK_AMD_DESCRIPTOR_SNAPSHOT_REUSE',a.snapshot_reuse),('MVK_AMD_NEGATIVE_LIVE_CACHE',a.negative_cache),('MVK_AMD_CROSS_ENCODER_SNAPSHOT_REUSE',a.cross_snapshot_reuse),('MVK_AMD_SPLIT_VULKAN_COMMAND_BUFFERS',a.split_command_buffers),('MVK_AMD_SHARDED_SHADER_CACHE_LOCKS',a.sharded_shader_cache_locks),('MVK_AMD_DESCRIPTOR_WRITE_SHARDS',a.descriptor_write_shards),('MVK_AMD_ENCODER_HEAP_PLANS',a.encoder_heap_plans),('MVK_AMD_STUTTER_COVERAGE',a.stutter_coverage),('MVK_AMD_GPU_COUNTER_BURST',a.gpu_counter_burst)]:
  config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("{name}", "{int(value)}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
+config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("MVK_AMD_SAMPLED_TEXTURE_HEAP_PLANS", "{int(a.sampled_texture_heap_plans)}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
 if a.stutter_coverage:
  for name,value in [('MVK_AMD_STUTTER_CPU_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_DETAIL_ARM_PATH',str(evidence/'cpu-stutter.arm')),('MVK_AMD_STUTTER_ARM_PATH',str(evidence/('gpu-counter.arm' if a.gpu_counters else 'stutter.arm')))]:
   config=config.replace('    setenv("MVK_AMD_QUEUE_TIMING"',f'    setenv("{name}", "{value}", 1);\n    setenv("MVK_AMD_QUEUE_TIMING"')
@@ -114,6 +118,7 @@ for kind in ['probe','game']:
  record['shardedShaderCacheLocks']=a.sharded_shader_cache_locks
  record['descriptorWriteShards']=a.descriptor_write_shards
  record['encoderHeapPlans']=a.encoder_heap_plans
+ record['sampledTextureHeapPlans']=a.sampled_texture_heap_plans
  record['startupCPUCapture']=a.startup_cpu_capture
  record['fullForensics']=a.full_forensics
  record['cpuFineSampleEvery']=64 if a.full_forensics else 1

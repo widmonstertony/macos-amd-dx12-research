@@ -8,6 +8,8 @@
 
 当前 CPU 瓶颈与实测见 [2026-10-25 位图修复](docs/CPU-DIRTY-BITMAP-2026-10-25.md) 和 [诊断开销修复](docs/DIAGNOSTIC-CPU-FIX-2026-10-25.md)。历史源码、精确候选哈希与实测限制见 [2026-10-23 检查点](docs/CHECKPOINT-2026-10-23.md) 和 [完整研究状态](docs/STATE.md)。公开下载包仍是实验基线，尚不承诺《剑星》可玩。
 
+2026-10-26：[v37 采样纹理读计划源码与独立 GPU 回归](docs/SAMPLED-READ-PLAN-2026-10-26.md)；实际游戏性能仍待验证。
+
 ## 下载与测试
 
 [实验版本下载](https://github.com/widmonstertony/macos-amd-dx12-research/releases/tag/v0.1.0-experimental) · [测试说明](docs/TESTING.zh-CN.md) · [已知问题](docs/KNOWN_ISSUES.zh-CN.md) · [参与贡献](CONTRIBUTING.md)

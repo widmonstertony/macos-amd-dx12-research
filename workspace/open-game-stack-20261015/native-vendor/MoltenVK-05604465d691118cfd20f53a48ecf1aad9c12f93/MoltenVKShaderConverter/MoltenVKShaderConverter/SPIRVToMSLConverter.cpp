@@ -17,6 +17,7 @@
  */
 
 #include "SPIRVToMSLConverter.h"
+#include "SPIRVSampleOnlyAccess.h"
 #include "MVKCommonEnvironment.h"
 #include "MVKStrings.h"
 #include "FileSupport.h"
@@ -288,6 +289,10 @@ MVK_PUBLIC_SYMBOL void SPIRVToMSLConverter::setSPIRV(const uint32_t* spirvCode, 
 	}
 }
 
+MVK_PUBLIC_SYMBOL bool SPIRVToMSLConverter::mayUseSampleOnlyImageAccess() const {
+	return sample_only_image_access::classifyStructure(_spirv.data(), _spirv.size()).eligible;
+}
+
 MVK_PUBLIC_SYMBOL bool SPIRVToMSLConverter::convert(SPIRVToMSLConversionConfiguration& shaderConfig,
 													SPIRVToMSLConversionResult& conversionResult,
 													bool shouldLogSPIRV,
@@ -301,13 +306,14 @@ MVK_PUBLIC_SYMBOL bool SPIRVToMSLConverter::convert(SPIRVToMSLConversionConfigur
 
 	if (shouldLogSPIRV) { logSPIRV(conversionResult.resultLog, "Converting"); }
 
-	CompilerMSL* pMSLCompiler = nullptr;
+	SampleOnlyCompilerMSL* pMSLCompiler = nullptr;
 	bool wasConverted = true;
+	conversionResult.sampleOnlyImageAccess = false;
 
 #ifndef SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS
 	try {
 #endif
-		pMSLCompiler = new CompilerMSL(_spirv);
+		pMSLCompiler = new SampleOnlyCompilerMSL(_spirv, mayUseSampleOnlyImageAccess());
 
 		if (shaderConfig.options.hasEntryPoint()) {
 			pMSLCompiler->set_entry_point(shaderConfig.options.entryPointName, shaderConfig.options.entryPointStage);
@@ -369,6 +375,12 @@ MVK_PUBLIC_SYMBOL bool SPIRVToMSLConverter::convert(SPIRVToMSLConversionConfigur
 			}
 		}
 		conversionResult.msl = pMSLCompiler->compile();
+		try {
+			conversionResult.sampleOnlyImageAccess = pMSLCompiler->qualifiesSampleOnlyImageAccess(conversionResult.msl);
+		} catch (...) {
+			// An optional residency hint cannot make valid shader conversion fail.
+			conversionResult.sampleOnlyImageAccess = false;
+		}
 
         if (shouldLogMSL) { logSource(conversionResult.resultLog, conversionResult.msl, "MSL", "Converted"); }
 

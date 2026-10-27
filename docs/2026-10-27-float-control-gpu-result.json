@@ -1,0 +1,37 @@
+{
+  "timeUTC": "2026-10-27T20:08:54.763285+00:00",
+  "hardware": "AMD Radeon Pro 5600M",
+  "modes": {
+    "0": "legacy fastMath disabled",
+    "1": "legacy fastMath enabled",
+    "2": "public Safe + Precise + preserveInvariance"
+  },
+  "observations": [
+    {
+      "mode": 0,
+      "caseCount": 16,
+      "preserveMismatches": 14,
+      "flushMismatches": 0
+    },
+    {
+      "mode": 1,
+      "caseCount": 16,
+      "preserveMismatches": 14,
+      "flushMismatches": 0
+    },
+    {
+      "mode": 2,
+      "caseCount": 16,
+      "preserveMismatches": 14,
+      "flushMismatches": 0
+    }
+  ],
+  "caseCoverage": "Selected float32 multiply/add/subtract/divide with positive/negative subnormal inputs/results and normal controls",
+  "fullFloatControlsConformanceProven": false,
+  "preserveContractPassedInAnyTestedMode": false,
+  "publicCompileSwitchFixFound": false,
+  "driverBinaryChanged": false,
+  "capabilityBitsChanged": false,
+  "gameRestartedForThisAudit": false,
+  "rawLog": "float-denorm-controls-safe-precise.log"
+}

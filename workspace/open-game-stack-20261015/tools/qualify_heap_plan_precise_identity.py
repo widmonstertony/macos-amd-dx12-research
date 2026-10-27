@@ -40,6 +40,7 @@ def main():
 
     inputs = [Path(__file__).resolve(), SOURCE, CALLER,
               COMMANDS / 'MVKEncoderHeapLedger.h',
+              COMMANDS / 'MVKEncoderResourceIndex.h',
               OBJECTS / 'MVKBufferHeapReadPlan.h', EXISTING]
     manifest = []
     commands = []

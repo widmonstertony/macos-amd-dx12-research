@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
-#include <unordered_map>
+#include "MVKEncoderResourceIndex.h"
 #include <utility>
 #include <vector>
 
@@ -47,9 +47,9 @@ private:
         bool dirty=false;
         uint64_t selectedSerial=0;
     };
-    std::unordered_map<Heap,size_t> _heapIndex;
-    std::unordered_map<Resource,size_t> _writeIndex;
-    std::unordered_map<Resource,size_t> _readIndex;
+    MVKEncoderResourceIndex<Heap> _heapIndex;
+    MVKEncoderResourceIndex<Resource> _writeIndex;
+    MVKEncoderResourceIndex<Resource> _readIndex;
     std::vector<HeapState> _heaps;
     std::vector<WriteState> _writes;
     std::vector<ReadState> _reads;
@@ -62,8 +62,8 @@ private:
         if (_flushing) throw std::logic_error("encoder heap ledger callbacks must not re-enter");
     }
     size_t heapIndex(Heap heap) {
-        auto found=_heapIndex.find(heap);
-        if(found!=_heapIndex.end())return found->second;
+        auto found=_heapIndex.findValue(heap);
+        if(found!=nullptr)return *found;
         size_t index=_heaps.size();
         _heaps.push_back(HeapState{heap});
         _heapIndex.emplace(heap,index);
@@ -71,8 +71,8 @@ private:
     }
     uint32_t heapReadStages(Heap heap) const {
         if(heap==Heap{})return 0;
-        auto found=_heapIndex.find(heap);
-        return found==_heapIndex.end()?0:_heaps[found->second].readStages;
+        auto found=_heapIndex.findValue(heap);
+        return found==nullptr?0:_heaps[*found].readStages;
     }
     void selectWrite(size_t index) {
         auto& entry=_writes[index];
@@ -112,17 +112,17 @@ public:
     bool queuePreciseRead(Resource resource,Heap heap,uint32_t stages) {
         requireNotFlushing();++_stats.preciseReadQueueCalls;
         if(resource==Resource{}||!stages)return false;
-        auto writer=_writeIndex.find(resource);
-        if(writer!=_writeIndex.end()&&_writes[writer->second].heap!=heap)
+        auto writer=_writeIndex.findValue(resource);
+        if(writer!=nullptr&&_writes[*writer].heap!=heap)
             throw std::logic_error("retained resource changed heap identity");
-        auto found=_readIndex.find(resource);size_t index;bool changed=false;
-        if(found==_readIndex.end()){
+        auto found=_readIndex.findValue(resource);size_t index;bool changed=false;
+        if(found==nullptr){
             index=_reads.size();_reads.push_back(ReadState{resource,heap,stages});
             _readIndex.emplace(resource,index);
             if(heap!=Heap{})_heaps[heapIndex(heap)].reads.push_back(index);
             changed=true;
         }else{
-            index=found->second;
+            index=*found;
             if(_reads[index].heap!=heap)
                 throw std::logic_error("retained resource changed heap identity");
             changed=(_reads[index].stages|stages)!=_reads[index].stages;
@@ -135,11 +135,11 @@ public:
             // An already emitted one must wait for the next queueHeapRead.
             if(h.dirty)h.readStages|=stages;
         }
-        if(writer!=_writeIndex.end()){
-            auto& write=_writes[writer->second];
+        if(writer!=nullptr){
+            auto& write=_writes[*writer];
             bool writeChanged=(write.stages|entry.stages)!=write.stages;
             write.stages|=entry.stages;
-            if(writeChanged&&!write.dirty){write.dirty=true;_dirtyWrites.push_back(writer->second);}
+            if(writeChanged&&!write.dirty){write.dirty=true;_dirtyWrites.push_back(*writer);}
             // A tracked precise read/write declaration subsumes a read at all
             // previously declared stages. Dirty heaps select it again at flush.
             if(!writeChanged){++_stats.preciseReadQueueSuppressed;return false;}
@@ -158,20 +158,20 @@ public:
         requireNotFlushing();
         ++_stats.writeQueueCalls;
         if(resource==Resource{}||!stages)return false;
-        auto reader=_readIndex.find(resource);
-        if(reader!=_readIndex.end()){
-            const auto& read=_reads[reader->second];
+        auto reader=_readIndex.findValue(resource);
+        if(reader!=nullptr){
+            const auto& read=_reads[*reader];
             if(read.heap!=heap)throw std::logic_error("retained resource changed heap identity");
             stages|=read.stages;
         }
-        auto found=_writeIndex.find(resource);size_t index;
-        if(found==_writeIndex.end()){
+        auto found=_writeIndex.findValue(resource);size_t index;
+        if(found==nullptr){
             index=_writes.size();
             _writes.push_back(WriteState{resource,heap,stages});
             _writeIndex.emplace(resource,index);
             if(heap!=Heap{})_heaps[heapIndex(heap)].writes.push_back(index);
         }else{
-            index=found->second;
+            index=*found;
             if(_writes[index].heap!=heap)
                 throw std::logic_error("retained resource changed heap identity");
             _writes[index].stages|=stages;
@@ -209,7 +209,7 @@ public:
         }
         for(size_t index:_selectedReads){
             ++_stats.readMetadataVisits;const auto& entry=_reads[index];
-            if(_writeIndex.find(entry.resource)!=_writeIndex.end()){
+            if(_writeIndex.findValue(entry.resource)!=nullptr){
                 ++_stats.readQueueSuperseded;continue;
             }
             readCallback(entry.resource,entry.stages|heapReadStages(entry.heap));

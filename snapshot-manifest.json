@@ -34279,15 +34279,21 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/fh6_ags_dxgi.h",
+      "bytes": 4374,
+      "sha256": "98b66e273a66dfc07637685d11f6ee7b9f9bdd44010f8474559d0deb9e1e6b11",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/fh6_wine_compat.cpp",
-      "bytes": 8572,
-      "sha256": "f03ba0b160edda3df163a385eb0986d0cef9e84fb3dc675d6538e8acac4be315",
+      "bytes": 10368,
+      "sha256": "2c5323dcb2b0614d641c33ac949a873c772d41ab5c34e56a94b779a533f39ad9",
       "executable": false
     },
     {
       "path": "open-game-stack-20261015/src/fh6_wine_compat_control.cpp",
-      "bytes": 1430,
-      "sha256": "933ff3bb27a2982d8cdfcb82a9a85e921f52f694be7bb5ae7c818d1f5560912e",
+      "bytes": 5389,
+      "sha256": "664577c9c457ad9ab189bbdbe88b830ffb7da0d4d939db3a3054e9e2cb339f29",
       "executable": false
     },
     {
@@ -35016,8 +35022,8 @@
     },
     {
       "path": "open-game-stack-20261015/tools/build_fh6_wine_compat.py",
-      "bytes": 2640,
-      "sha256": "9ab897bf97e637f336e9b17ec90c530a92076ea04e5a033e5180897f348c8617",
+      "bytes": 2979,
+      "sha256": "f77321455978aa94e2b96cf1c36a92ef3d1a72fa5ba561f0ed3dcf36b0f7aa3d",
       "executable": false
     },
     {
@@ -71174,5 +71180,5 @@
   "currentSourceState": "v38: real game run hit a120s RenderThread watchdog; underlying block unresolved. Add bounded prelaunch native/forensics and automatic stack/tail recorder. Native/performance implementation and historical runtimes unchanged; no playable claim.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-25T22:54:40.983777+00:00",
-  "lastSourceOnlyUpdateUTC": "2026-10-27T19:41:03.438223+00:00"
+  "lastSourceOnlyUpdateUTC": "2026-10-27T19:55:30.794855+00:00"
 }

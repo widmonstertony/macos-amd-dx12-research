@@ -1,6 +1,7 @@
 // App-local Wine API compatibility, not a graphics capability override.
 // GetIntegratedDisplaySize semantics: Wine c68ed23672 / Highball patch 0017.
-// Original AGS calls and exception handling are forwarded unchanged.
+// Original AGS is preferred; absent Windows drivers use real DXGI/D3D12 base
+// services. Exceptions and requested D3D feature levels remain unchanged.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <d3d11.h>
@@ -125,6 +126,8 @@ static FARPROC original_function(const char *name) {
     return GetProcAddress(original, name);
 }
 
+#include "fh6_ags_dxgi.h"
+
 extern "C" AGSReturnCode agsInitialize(
         int version, const AGSConfiguration *config, AGSContext **context, AGSGPUInfo *info) {
     auto function = (AGS_INITIALIZE)original_function("agsInitialize");
@@ -133,10 +136,17 @@ extern "C" AGSReturnCode agsInitialize(
     auto result = function(version, config, context, info);
     log_line("agsInitialize exit result=%d context=%p devices=%d deviceArray=%p", result,
              context ? *context : NULL, info ? info->numDevices : -1, info ? info->devices : NULL);
+    if (result == AGS_NO_AMD_DRIVER_INSTALLED) {
+        auto fallback = compat_initialize(version, context, info);
+        log_line("agsInitialize DXGI-base result=%d context=%p devices=%d", fallback,
+                 context ? *context : NULL, fallback == AGS_SUCCESS && info ? info->numDevices : -1);
+        return fallback;
+    }
     return result;
 }
 
 extern "C" AGSReturnCode agsDeInitialize(AGSContext *context) {
+    if (auto object = compat_context(context)) { compat_destroy(object); return AGS_SUCCESS; }
     auto function = (AGS_DEINITIALIZE)original_function("agsDeInitialize");
     log_line("agsDeInitialize context=%p", context);
     return function ? function(context) : AGS_MISSING_D3D_DLL;
@@ -145,6 +155,7 @@ extern "C" AGSReturnCode agsDeInitialize(AGSContext *context) {
 extern "C" AGSReturnCode agsDriverExtensionsDX12_CreateDevice(
         AGSContext *context, const AGSDX12DeviceCreationParams *creation,
         const AGSDX12ExtensionParams *extensions, AGSDX12ReturnedParams *returned) {
+    if (compat_context(context)) return compat_create_device(creation, returned);
     auto function = (AGS_DRIVEREXTENSIONSDX12_CREATEDEVICE)original_function("agsDriverExtensionsDX12_CreateDevice");
     log_line("agsCreateDevice enter context=%p creation=%p adapter=%p featureLevel=0x%x returned=%p",
              context, creation, creation ? creation->pAdapter : NULL,
@@ -155,6 +166,26 @@ extern "C" AGSReturnCode agsDriverExtensionsDX12_CreateDevice(
     return result;
 }
 
+extern "C" AGSReturnCode agsGetGPUInfo(AGSContext *context, AGSGPUInfo *info) {
+    if (auto object = compat_context(context)) {
+        if (!info) return AGS_INVALID_ARGS;
+        *info = object->info; return AGS_SUCCESS;
+    }
+    auto function = (AGS_GETGPUINFO)original_function("agsGetGPUInfo");
+    return function ? function(context, info) : AGS_MISSING_D3D_DLL;
+}
+
+extern "C" AGSReturnCode agsDriverExtensionsDX12_DestroyDevice(AGSContext *context, ID3D12Device *device,
+                                                              unsigned int *references) {
+    if (compat_context(context)) {
+        ULONG count = device ? device->Release() : 0;
+        if (references) *references = count;
+        return AGS_SUCCESS;
+    }
+    auto function = (AGS_DRIVEREXTENSIONSDX12_DESTROYDEVICE)original_function("agsDriverExtensionsDX12_DestroyDevice");
+    return function ? function(context, device, references) : AGS_MISSING_D3D_DLL;
+}
+
 BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, void *) {
     if (reason != DLL_PROCESS_ATTACH) return TRUE;
     self = module; DisableThreadLibraryCalls(module);
@@ -162,7 +193,11 @@ BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, void *) {
     wchar_t *slash = wcsrchr(directory, L'\\'); if (!slash) return FALSE; slash[1] = 0;
     swprintf(log_path, 32768, L"%lsfh6-wine-compat.log", directory);
     if (!scoped_process()) return TRUE;
-    log_line("compat-loaded display-stub=Wine-c68ed23672 AGS=unchanged-forwarder GPU-identity=unchanged");
+    wchar_t graphics_log[32768];
+    swprintf(graphics_log, 32768, L"%lsfh6-vkd3d.log", directory);
+    SetEnvironmentVariableW(L"VKD3D_LOG_FILE", graphics_log);
+    SetEnvironmentVariableW(L"VKD3D_DEBUG", L"info");
+    log_line("compat-loaded display-stub=Wine-c68ed23672 AGS=DXGI-base-if-Windows-driver-absent GPU-identity=unchanged");
     AddVectoredExceptionHandler(1, observe_fault);
     repair_missing_display_import();
     return TRUE;

@@ -13,7 +13,12 @@
 #include <algorithm>
 
 class BufferHeapReadPlan {
+    // Diagnostics only. The resource plan and its eligibility stay immutable.
+    mutable std::atomic<uint64_t> _diagnosticSession{0};
 public:
+    bool claimDiagnosticSession(uint64_t session) const {
+        return session && _diagnosticSession.exchange(session, std::memory_order_relaxed) != session;
+    }
     struct Group {
         id<MTLHeap> heap = nil;
         // Non-owning children. The corresponding immutable lease owns them.

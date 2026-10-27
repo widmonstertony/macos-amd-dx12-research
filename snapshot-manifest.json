@@ -2200,8 +2200,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
-      "bytes": 177449,
-      "sha256": "77819a7fea4cd8d2e848f3001078d273700d4670b5f19c9684496923030580d8",
+      "bytes": 184335,
+      "sha256": "dd602f346319aa0226dfd98bdcb8c13a055972f143c5a0def0ae494a8cdefe66",
       "executable": false
     },
     {
@@ -2314,8 +2314,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKBufferHeapReadPlan.h",
-      "bytes": 5988,
-      "sha256": "81bb27d041ed43f18db2f38b2397c91767e3ffe082de46bb6065562bcafa1e95",
+      "bytes": 6290,
+      "sha256": "cb406c3618d36d3a1f9a7b609a2e43fe6ad2f0d5b9cde1c2857ab887caaeab88",
       "executable": false
     },
     {
@@ -34628,6 +34628,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/resource_property_gpu.mm",
+      "bytes": 14677,
+      "sha256": "2c9cf11c190c51d3e89c26e4c488aa8941b9fb3586cd41c1cc71d7e0a0b59062",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/sample_only_image_access.h",
       "bytes": 20199,
       "sha256": "c9173ec51993c5acc0a2d05d412c1329b89f99512a773af0293a91625f2e7e59",
@@ -34863,6 +34869,12 @@
       "path": "open-game-stack-20261015/tools/analyze_native_sync.py",
       "bytes": 11184,
       "sha256": "2babe52d43f435c80aad5576953a8684cca71941b64baf3fbbe0428709fc4492",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/analyze_resource_pipeline_burst.py",
+      "bytes": 11019,
+      "sha256": "30c334d1de2551adda2369164d9af703e0813282c5d437f470c6e38af1b3e549",
       "executable": false
     },
     {
@@ -35195,6 +35207,12 @@
       "path": "open-game-stack-20261015/tools/qualify_render_cache_native.py",
       "bytes": 5530,
       "sha256": "2edd5e3b71e891c884c865e22c3c1b439147a50222fe8db9d7089772e6825f32",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_resource_property_gpu.py",
+      "bytes": 6729,
+      "sha256": "3d894b21a17c3c2504d280314b1a647b0d7269adc30e9f3fc032cbe2c8db0df3",
       "executable": false
     },
     {

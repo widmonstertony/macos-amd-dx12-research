@@ -1300,6 +1300,78 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
     const auto& plan = [&]() -> decltype(auto) { MVK_CPU_SCOPE(HeapPlanBuild);
         return sampledTextures ? lease->sampledTextureReadPlan() : lease->bufferReadPlan(); }();
     size_t eligible = plan.eligibleResourceCount(heapBatchThreshold);
+    // Report physical properties of the *excluded* children before the small
+    // eligible-group early return. A plan can predate arming by hours; collect
+    // lazily once per arm session instead of relying on its creation time.
+    // These overlapping categories describe properties, not exclusive causes:
+    // a texture may be both writable and a render attachment. No eligibility,
+    // residency decisions or generated shader code are changed here.
+    if (resourceForensics.armed && plan.claimDiagnosticSession(resourceForensics.session)) {
+        MVK_CPU_SCOPE(DiagnosticPublish);
+        uint64_t started = mvkStutterMonotonicNS();
+        uint64_t excluded=0, buffers=0, textures=0, nonheap=0, writable=0, attachments=0;
+        uint64_t views=0, bufferBacked=0, nonprivate=0, multisample=0, otherUsage=0;
+        uint64_t writableOnly=0, attachmentOnly=0, writableAttachment=0;
+        uint64_t twoD=0, arrays=0, threeD=0, cubes=0, otherTypes=0, missingRead=0;
+        uint64_t automaticAliases=0, individuallyEligible=0, smallGroupResources=0;
+        auto classify = [&](id<MTLResource> resource) {
+            ++excluded;
+            if (!resource.heap) ++nonheap;
+            if (![resource conformsToProtocol:@protocol(MTLTexture)]) { ++buffers; return; }
+            ++textures;
+            auto texture = static_cast<id<MTLTexture>>(resource);
+            auto usage = texture.usage;
+            if (!(usage & MTLTextureUsageShaderRead)) ++missingRead;
+            if (usage & MTLTextureUsageShaderWrite) ++writable;
+            if (usage & MTLTextureUsageRenderTarget) ++attachments;
+            if ((usage & MTLTextureUsageShaderWrite) && (usage & MTLTextureUsageRenderTarget)) ++writableAttachment;
+            else if (usage & MTLTextureUsageShaderWrite) ++writableOnly;
+            else if (usage & MTLTextureUsageRenderTarget) ++attachmentOnly;
+            if (usage & ~(MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite |
+                          MTLTextureUsageRenderTarget | MTLTextureUsagePixelFormatView)) ++otherUsage;
+            if (texture.parentTexture) ++views;
+            if (texture.buffer) ++bufferBacked;
+            if (texture.storageMode != MTLStorageModePrivate) ++nonprivate;
+            if (texture.sampleCount != 1) ++multisample;
+            switch (texture.textureType) {
+                case MTLTextureType2D: ++twoD; break;
+                case MTLTextureType2DArray: ++arrays; break;
+                case MTLTextureType3D: ++threeD; break;
+                case MTLTextureTypeCube: case MTLTextureTypeCubeArray: ++cubes; break;
+                default: ++otherTypes;
+            }
+            id<MTLHeap> heap = texture.heap;
+            if (texture.isAliasable && (!heap || heap.type != MTLHeapTypePlacement)) ++automaticAliases;
+            if (heap && BufferHeapReadPlan::canPrepareSampledTexture(resource)) ++individuallyEligible;
+        };
+        for (id<MTLResource> resource : plan.nilHeapResources) classify(resource);
+        for (const auto& group : plan.groups) if (group.resources.size() < heapBatchThreshold) {
+            smallGroupResources += group.resources.size();
+            for (id<MTLResource> resource : group.resources) classify(resource);
+        }
+        mvkForensicsRecordForSession(resourceForensics.session,"resourceReadPlanProperties",{
+            {"diagnosticSchema",1},{"plan",reinterpret_cast<uintptr_t>(&plan)},
+            {"texturePlan",sampledTextures},{"snapshotChildren",snapshot->size()},
+            {"eligibleChildren",eligible},{"excludedChildren",excluded},
+            {"requiredEligibleChildren",128},{"heapGroupThreshold",heapBatchThreshold},
+            {"smallGroupChildren",smallGroupResources},{"nilHeapBucketChildren",plan.nilHeapResources.size()},
+            {"groupCount",plan.groups.size()},{"propertyCategoriesOverlap",1},
+            {"excludedBuffersOrNontextures",buffers},{"excludedTextures",textures},
+            {"excludedNoPhysicalHeap",nonheap},{"excludedShaderWritable",writable},
+            {"excludedRenderTarget",attachments},{"excludedParentView",views},
+            {"excludedWritableWithoutAttachment",writableOnly},
+            {"excludedAttachmentWithoutWrite",attachmentOnly},
+            {"excludedWritableAttachment",writableAttachment},
+            {"excludedBufferBacked",bufferBacked},{"excludedNonprivate",nonprivate},
+            {"excludedMultisample",multisample},{"excludedOtherUsage",otherUsage},
+            {"excludedMissingShaderRead",missingRead},{"excludedType2D",twoD},
+            {"excludedType2DArray",arrays},{"excludedType3D",threeD},
+            {"excludedTypeCube",cubes},{"excludedOtherType",otherTypes},
+            {"excludedAutomaticAlias",automaticAliases},
+            {"excludedShapeEligibleWithHeap",individuallyEligible},
+            {"classificationWallNS",mvkStutterMonotonicNS()-started},
+            {"recordOfferedNotAdmissionProof",1}});
+    }
     if (eligible < 128) { resourceForensics.add(MVKResourceForensics::RejectHeapSmall); return false; }
     if(resourceForensics.armed) {
         resourceForensics.add(MVKResourceForensics::PlanEligibleChildren,eligible);
@@ -1684,6 +1756,8 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
         uint64_t dirtyBitmapBuilds=0, dirtyBitmapReadSlots=0, dirtyBitmapEnvelopeSlots=0;
         uint64_t heapPlanCalls=0, heapPlanSkips=0, heapPlanResources=0, heapPlanPrecise=0, heapPlanRefreshes=0;
         uint64_t plannedHeapCalls=0, plannedWriteCalls=0, plannedWriteReplays=0, plannedPreciseReads=0;
+        uint64_t ledgerReadQueued=0, ledgerReadSuppressed=0, ledgerReadReplays=0;
+        uint64_t ledgerReadVisits=0, ledgerHeapSuppressed=0;
 		uint64_t bindCalls=0, inputRead=0, inputReadWrite=0;
 		uint64_t preciseRead=0, preciseReadWrite=0, collapsedRead=0, heapDeclarations=0, heapQueries=0;
 		uint64_t heapDeclarationNS=0, readDeclarationNS=0, writeDeclarationNS=0, declarationMaxNS=0;
@@ -1705,6 +1779,11 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     total.plannedWriteCalls+=heapPlanStats.writeCallsEmitted;
     total.plannedWriteReplays+=heapPlanStats.writeExceptionsReplayed;
     total.plannedPreciseReads+=heapPlanStats.readCallsEmitted;
+    total.ledgerReadQueued+=heapPlanStats.preciseReadQueueCalls;
+    total.ledgerReadSuppressed+=heapPlanStats.preciseReadQueueSuppressed;
+    total.ledgerReadReplays+=heapPlanStats.readExceptionsReplayed;
+    total.ledgerReadVisits+=heapPlanStats.readMetadataVisits;
+    total.ledgerHeapSuppressed+=heapPlanStats.heapQueueSuppressed;
     total.heapDeclarationNS+=statsHeapDeclarationNS;
     total.readDeclarationNS+=statsReadDeclarationNS;
     total.writeDeclarationNS+=statsWriteDeclarationNS;
@@ -1773,6 +1852,21 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
             }
         }
         char planPath[4096];
+        // Always refresh the current ledger window, even after bounded JSONL
+        // history stops. Replayed read exceptions are not interchangeable with
+        // fresh descriptor reads or with CPU queueing operations.
+        char ledgerPath[4096], ledgerLine[2048];
+        int ledgerPathLength=snprintf(ledgerPath,sizeof(ledgerPath),"%s/resource-ledger-current-%d.json",directory,getpid());
+        int ledgerLineLength=snprintf(ledgerLine,sizeof(ledgerLine),
+            "{\"schema\":1,\"time\":%.6f,\"wallSeconds\":%.6f,\"preciseReadQueueCalls\":%llu,\"preciseReadQueueSuppressed\":%llu,\"readExceptionsReplayed\":%llu,\"readMetadataVisits\":%llu,\"nativePreciseReadReferences\":%llu,\"nativeHeapReferences\":%llu,\"heapQueueSuppressed\":%llu,\"writeExceptionsReplayed\":%llu}\n",
+            now,now-total.start,(unsigned long long)total.ledgerReadQueued,
+            (unsigned long long)total.ledgerReadSuppressed,(unsigned long long)total.ledgerReadReplays,
+            (unsigned long long)total.ledgerReadVisits,(unsigned long long)total.plannedPreciseReads,
+            (unsigned long long)total.plannedHeapCalls,(unsigned long long)total.ledgerHeapSuppressed,
+            (unsigned long long)total.plannedWriteReplays);
+        if(ledgerPathLength>0 && static_cast<size_t>(ledgerPathLength)<sizeof(ledgerPath) &&
+           ledgerLineLength>0 && static_cast<size_t>(ledgerLineLength)<sizeof(ledgerLine))
+            mvkWriteTraceSnapshot(ledgerPath,ledgerLine);
         snprintf(planPath,sizeof(planPath),"%s/heap-plan-stats-%d.jsonl",directory,getpid());
         if (records < 1024) {
             if (FILE* file=fopen(planPath,"a")) {

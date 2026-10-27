@@ -121,3 +121,5 @@ CPU 栈明确到 bindHeapPlansAndReset → queuePreciseRead/heapIndex → AMD Me
 资源资格、着色器、缓存格式和游戏参数均未修改。候选已构建，实际游戏仍运行 v41b，未自动重启或换入。新增工具 analyze_resource_pipeline_burst.py 只分析冻结文件；qualify_resource_property_gpu.py 使用匹配的 Native 库与头文件，不是跨版本 ABI 性能对照。游戏物理帧率、剩余精确资源主因和可玩性仍未证明。
 
 最终诊断候选的 24,576 个混合纹理像素、2,580 个 helper 输出值和 512 个几何像素回归全部零差异。自有控制实测每个 plan/session 一次属性记录，准确识别 128 个合格子项与 1 个可写但非附件例外，五秒 current 账本也已真实输出；这不是游戏性能修复或帧率验证。
+
+用户确认退出后，最终 v42 诊断库已换入原游戏启动链，缓存元数据核对不变。源码提交 e4aac2a，部署及回滚步骤见 operations/2026-10-26-v42-deployment.json。Git revert 只回滚源码；运行库还需重新构建并换入。

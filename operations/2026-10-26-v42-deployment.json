@@ -1,0 +1,24 @@
+{
+  "operation": "deploy-resource-breakdown-diagnostics",
+  "sourceCommit": "e4aac2a6ae34b853bbaab1bd538eda287a4ea1f1",
+  "previousSourceCommit": "4614d11",
+  "deployed": true,
+  "gameStartedAtRecordTime": false,
+  "nativeSourceSHA256": "8b7bc80ff42b9b7da506b3b2c39c0421b754816484791c632551de72d381d508",
+  "deployedNativeSHA256": "b5c4e7e70ae925592c5dff7fa23a9f0c6da68dccd45d7a54530b58257c7a6480",
+  "deployedProxySHA256": "41c646288f0e7503ba31e78250a12b08455ad46dc2cc746ac8e24b4a2c0eb5bc",
+  "cacheMetadataPreserved": true,
+  "diagnosticOnly": true,
+  "shaderAndEligibilityRulesChanged": false,
+  "normalSteamLaunchAuthorized": true,
+  "rollback": {
+    "gitCommand": "git revert e4aac2a6ae34b853bbaab1bd538eda287a4ea1f1",
+    "next": "After reverting source, sync only the two reverted Native files from workspace to the active source directory, rebuild Native and its game profile, then deploy after game exit. Git alone does not replace a mapped/installed dylib.",
+    "nativeFiles": [
+      "MoltenVK/MoltenVK/Commands/MVKCommandEncoderState.mm",
+      "MoltenVK/MoltenVK/GPUObjects/MVKBufferHeapReadPlan.h"
+    ],
+    "cacheAndSaveDataInGit": false
+  },
+  "rawGameLogsUploaded": false
+}

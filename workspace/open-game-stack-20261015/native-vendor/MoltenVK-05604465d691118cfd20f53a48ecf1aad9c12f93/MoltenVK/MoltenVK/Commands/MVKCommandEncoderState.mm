@@ -1345,7 +1345,7 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
             if (heap && BufferHeapReadPlan::canPrepareSampledTexture(resource)) ++individuallyEligible;
         };
         for (id<MTLResource> resource : plan.nilHeapResources) classify(resource);
-        for (const auto& group : plan.groups) if (group.resources.size() < heapBatchThreshold) {
+        for (const auto& group : plan.groups) if (!group.eligible(heapBatchThreshold)) {
             smallGroupResources += group.resources.size();
             for (id<MTLResource> resource : group.resources) classify(resource);
         }
@@ -1353,6 +1353,8 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
             {"diagnosticSchema",1},{"plan",reinterpret_cast<uintptr_t>(&plan)},
             {"texturePlan",sampledTextures},{"snapshotChildren",snapshot->size()},
             {"eligibleChildren",eligible},{"excludedChildren",excluded},
+            {"baselineEligibleChildren",plan.baselineEligibleResourceCount(heapBatchThreshold)},
+            {"additionalHeapCoveredChildren",eligible-plan.baselineEligibleResourceCount(heapBatchThreshold)},
             {"requiredEligibleChildren",128},{"heapGroupThreshold",heapBatchThreshold},
             {"smallGroupChildren",smallGroupResources},{"nilHeapBucketChildren",plan.nilHeapResources.size()},
             {"groupCount",plan.groups.size()},{"propertyCategoriesOverlap",1},
@@ -1372,7 +1374,7 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
             {"classificationWallNS",mvkStutterMonotonicNS()-started},
             {"recordOfferedNotAdmissionProof",1}});
     }
-    if (eligible < 128) { resourceForensics.add(MVKResourceForensics::RejectHeapSmall); return false; }
+    if (plan.baselineEligibleResourceCount(heapBatchThreshold) < 128) { resourceForensics.add(MVKResourceForensics::RejectHeapSmall); return false; }
     if(resourceForensics.armed) {
         resourceForensics.add(MVKResourceForensics::PlanEligibleChildren,eligible);
         resourceForensics.add(MVKResourceForensics::PlanPreciseChildren,plan.preciseResourceCount(heapBatchThreshold));
@@ -1401,7 +1403,7 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
     // A changed registry epoch forces a new heap declaration even if its stage
     // mask is unchanged, so allocations made after an earlier useHeap are covered.
     for (const auto& group : plan.groups) {
-        if (group.resources.size() < heapBatchThreshold) continue;
+        if (!group.eligible(heapBatchThreshold)) continue;
         resourceForensics.add(MVKResourceForensics::PlanGroups);
         size_t before = heapLedger.heapCount();
         heapLedger.queueHeapRead(group.heap, mask, additions);
@@ -1421,7 +1423,7 @@ bool MVKUseResourceHelper::tryAddBufferHeapSnapshot(
     // preserve it so later draws agree with the encoder's retained ledger.
     for (id<MTLResource> resource : plan.nilHeapResources) addPrecise(resource,resource.heap);
     for (const auto& group : plan.groups)
-        if (group.resources.size() < heapBatchThreshold)
+        if (!group.eligible(heapBatchThreshold))
             for (id<MTLResource> resource : group.resources) addPrecise(resource,group.heap);
     if (resourceUseStats) {
         statsHeapPlanResources += eligible;

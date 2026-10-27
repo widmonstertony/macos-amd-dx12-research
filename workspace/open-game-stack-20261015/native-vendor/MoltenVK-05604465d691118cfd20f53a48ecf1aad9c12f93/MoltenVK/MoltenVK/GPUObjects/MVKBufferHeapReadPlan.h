@@ -7,6 +7,7 @@
 #import <Metal/Metal.h>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <mutex>
 #include <atomic>
@@ -31,11 +32,23 @@ public:
     static bool canPrepareSampledTexture(id<MTLResource> resource) {
         if (![resource conformsToProtocol:@protocol(MTLTexture)]) return false;
         id<MTLTexture> texture = static_cast<id<MTLTexture>>(resource);
-        const MTLTextureUsage allowed = MTLTextureUsageShaderRead | MTLTextureUsagePixelFormatView;
+        const bool texelBuffer = texture.textureType == MTLTextureTypeTextureBuffer;
+        MTLTextureUsage allowed = MTLTextureUsageShaderRead | MTLTextureUsagePixelFormatView;
+        // ShaderWrite is a capability, not the access of this binding. Only
+        // readonly callers reach this plan; actual writes remain precise and
+        // are replayed after useHeap by the encoder ledger. Do not extend this
+        // permission to render attachments, arbitrary image views or atomics.
+        if (texelBuffer) allowed |= MTLTextureUsageShaderWrite;
         if (!(texture.usage & MTLTextureUsageShaderRead) || (texture.usage & ~allowed)) return false;
-        if (texture.textureType != MTLTextureType2D && texture.textureType != MTLTextureType2DArray) return false;
+        if (!texelBuffer && texture.textureType != MTLTextureType2D && texture.textureType != MTLTextureType2DArray) return false;
         if (texture.sampleCount != 1 || texture.storageMode != MTLStorageModePrivate) return false;
-        if (texture.parentTexture || texture.buffer) return false;
+        if (texture.parentTexture) return false;
+        id<MTLBuffer> backing = texture.buffer;
+        if (texelBuffer) {
+            if (!backing || backing.storageMode != MTLStorageModePrivate ||
+                !texture.heap || texture.heap != backing.heap) return false;
+            if (backing.isAliasable && backing.heap.type != MTLHeapTypePlacement) return false;
+        } else if (backing) return false;
         // Placed resources permit explicit aliasing even at distinct offsets;
         // isAliasable alone does not establish overlap. Automatic heaps can
         // reuse aliasable memory, so they keep the precise fallback.
@@ -73,9 +86,17 @@ public:
             for (auto& group : groups) {
                 if (group.heap.type != MTLHeapTypePlacement) continue;
                 std::vector<std::pair<NSUInteger,NSUInteger>> ranges;
+                std::unordered_set<id<MTLResource>> physicalOwners;
                 bool valid = true;
                 for (id<MTLResource> resource : group.resources) {
-                    NSUInteger offset = resource.heapOffset, size = resource.allocatedSize;
+                    // Texel views of one MTLBuffer intentionally share storage.
+                    // Validate that retained physical allocation exactly once.
+                    // Different overlapping allocations still reject the group.
+                    auto texture = static_cast<id<MTLTexture>>(resource);
+                    id<MTLResource> owner = texture.textureType == MTLTextureTypeTextureBuffer
+                        ? static_cast<id<MTLResource>>(texture.buffer) : resource;
+                    if (!physicalOwners.insert(owner).second) continue;
+                    NSUInteger offset = owner.heapOffset, size = owner.allocatedSize;
                     if (!size || offset > group.heap.size || size > group.heap.size - offset) {
                         valid = false; break;
                     }

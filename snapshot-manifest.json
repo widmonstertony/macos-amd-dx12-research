@@ -2314,8 +2314,8 @@
     },
     {
       "path": "open-game-stack-20261015/native-vendor/MoltenVK-05604465d691118cfd20f53a48ecf1aad9c12f93/MoltenVK/MoltenVK/GPUObjects/MVKBufferHeapReadPlan.h",
-      "bytes": 6290,
-      "sha256": "cb406c3618d36d3a1f9a7b609a2e43fe6ad2f0d5b9cde1c2857ab887caaeab88",
+      "bytes": 7764,
+      "sha256": "63829c7719a327e190edc86e4f216936f60aad88ded371157acf29ce8d64bde4",
       "executable": false
     },
     {
@@ -34076,6 +34076,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/controls/texel_heap_plan_control.mm",
+      "bytes": 4481,
+      "sha256": "91a0900d1eac8dbc289835244b85c26ff4a2766a3be30f4e405e46ef0d027ffb",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/crash_metadata_probe.c",
       "bytes": 2517,
       "sha256": "bcf0beeb5e5a8b959d714d45a2b9d5d2ea9515096cc920b16db2d3990e1567e2",
@@ -34790,6 +34796,18 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/texel_heap_helper_gpu.mm",
+      "bytes": 16729,
+      "sha256": "bcb021b3a78b23627bd241f7bf0e240f4788af69ded5b82aed30955ba2c51758",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/texel_heap_read_gpu.mm",
+      "bytes": 9186,
+      "sha256": "0dcd114438052dc7ae66008c6c0c5b79f49ef10b49c42bec82bbdf07138b628e",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/timed_trace_arm_control.cpp",
       "sha256": "926534734bc344d0f37b301c66318833b0ebceea171f686acd3d3c9f3dabb274",
       "bytes": 1458
@@ -35231,6 +35249,12 @@
       "path": "open-game-stack-20261015/tools/qualify_sync_render_candidate.py",
       "bytes": 3316,
       "sha256": "1fb476c71f6a6779b4b95ca189b53f0436aaa7b508d86422393f14b8df6781cc",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/qualify_texel_heap_helper_gpu.py",
+      "bytes": 3227,
+      "sha256": "03641fb177fb0eacde269ea59b5b5ae8b2a7846337483e5c09a360f547a4aa9d",
       "executable": false
     },
     {

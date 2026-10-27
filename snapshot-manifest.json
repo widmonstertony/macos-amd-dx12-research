@@ -34279,6 +34279,18 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/fh6_wine_compat.cpp",
+      "bytes": 8572,
+      "sha256": "f03ba0b160edda3df163a385eb0986d0cef9e84fb3dc675d6538e8acac4be315",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/src/fh6_wine_compat_control.cpp",
+      "bytes": 1430,
+      "sha256": "933ff3bb27a2982d8cdfcb82a9a85e921f52f694be7bb5ae7c818d1f5560912e",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/fresh-mesh-specialization.frag",
       "bytes": 181,
       "sha256": "0d7bcdab4d092dd9ad88545ac084f11a343e53e4efc65b4dcc3cf398bad89e50",
@@ -34903,6 +34915,12 @@
       "executable": false
     },
     {
+      "path": "open-game-stack-20261015/src/vendor/amd_ags.h",
+      "bytes": 91284,
+      "sha256": "d4a5760a02fc224877a4e485b73ba12bcdd5c8e4304dc1102ad9a4f81a9b6763",
+      "executable": false
+    },
+    {
       "path": "open-game-stack-20261015/src/vulkan_byte_copy_gpu.cpp",
       "bytes": 6245,
       "sha256": "efd4807b66ecf34a61bac62fb31fb74af82afd0e35b953febb9ce3a2adc9f7a5",
@@ -34994,6 +35012,12 @@
       "path": "open-game-stack-20261015/tools/build_descriptor_validation_control.py",
       "bytes": 1411,
       "sha256": "c4d11cffc8eaa80ab0d44d3c7cb3ad0a93facc3e1cce309e23e272d65c6ecef6",
+      "executable": false
+    },
+    {
+      "path": "open-game-stack-20261015/tools/build_fh6_wine_compat.py",
+      "bytes": 2640,
+      "sha256": "9ab897bf97e637f336e9b17ec90c530a92076ea04e5a033e5180897f348c8617",
       "executable": false
     },
     {
@@ -71150,5 +71174,5 @@
   "currentSourceState": "v38: real game run hit a120s RenderThread watchdog; underlying block unresolved. Add bounded prelaunch native/forensics and automatic stack/tail recorder. Native/performance implementation and historical runtimes unchanged; no playable claim.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-25T22:54:40.983777+00:00",
-  "lastSourceOnlyUpdateUTC": "2026-10-27T19:19:29.870076+00:00"
+  "lastSourceOnlyUpdateUTC": "2026-10-27T19:41:03.438223+00:00"
 }

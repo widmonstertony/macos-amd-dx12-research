@@ -126,7 +126,7 @@ static void apply_original_asset_guard(void) {
      * create the first window.  Sandboxing that client process here makes the
      * updater assert, even though the driver itself loaded correctly.  The
      * authenticated Steam child receives the same proxy environment, so apply
-     * the original-asset guard only in the actual Stellar Blade process.  Its
+     * the original-asset guard only in registered game processes. Their
      * shader/compiler children inherit that policy.  Qualification probes can
      * request the exact same guard explicitly.
      */
@@ -136,7 +136,8 @@ static void apply_original_asset_guard(void) {
     for (int index = 0; index < count; ++index) {
         const char *arg = args[index];
         if (!arg) continue;
-        if (strcasestr(arg, "SB-Win64") || strcasestr(arg, "StellarBlade")) {
+        if (strcasestr(arg, "SB-Win64") || strcasestr(arg, "StellarBlade") ||
+            strcasestr(arg, "ForzaHorizon6")) {
             game_process = 1;
             break;
         }

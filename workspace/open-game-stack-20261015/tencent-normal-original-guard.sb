@@ -3,6 +3,8 @@
 ; Preserve the user's real installed assets, including through overlay symlinks.
 (deny file-write*
     (subpath "/Volumes/Applications/Program Files (x86)/Steam/steamapps/common/StellarBlade"))
+(deny file-write*
+    (subpath "/Volumes/Applications/Program Files (x86)/Steam/steamapps/common/ForzaHorizon6"))
 ; Only genuine shared redistributables (228980) may stage downloads. Allow the
 ; directory itself so Steam can create it; deny other app download paths.
 (deny file-write*

@@ -34595,8 +34595,8 @@
     },
     {
       "path": "open-game-stack-20261015/src/mvk_guard_proxy.c",
-      "bytes": 7722,
-      "sha256": "1f5aa691fe5664b4bf057d819181916b8ce2abac2e251f8128fcdf99b9d56d4c",
+      "bytes": 7764,
+      "sha256": "bc9dc4f2251043e0d90ffb46c00661f03857efb9b6395ca8d6ad9813531c94af",
       "executable": false
     },
     {
@@ -34922,8 +34922,8 @@
     },
     {
       "path": "open-game-stack-20261015/tencent-normal-original-guard.sb",
-      "bytes": 1691,
-      "sha256": "b779e41cbf24284c9baba9bb4b03cfaf8653df4a94c7afe50e0741e669a85b0e",
+      "bytes": 1805,
+      "sha256": "577cd87361f52d49645aa40832830685bd98431cd44db624f2fa44d13bca9922",
       "executable": false
     },
     {
@@ -71150,5 +71150,5 @@
   "currentSourceState": "v38: real game run hit a120s RenderThread watchdog; underlying block unresolved. Add bounded prelaunch native/forensics and automatic stack/tail recorder. Native/performance implementation and historical runtimes unchanged; no playable claim.",
   "lastSourceUpdateUTC": "2026-10-21T22:34:00.763039+00:00",
   "latestSourceUpdateUTC": "2026-10-25T22:54:40.983777+00:00",
-  "lastSourceOnlyUpdateUTC": "2026-10-26T17:12:02.396197+00:00"
+  "lastSourceOnlyUpdateUTC": "2026-10-27T19:19:29.870076+00:00"
 }

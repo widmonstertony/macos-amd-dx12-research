@@ -10,6 +10,8 @@ Rollback: revert this commit for source. To disconnect, first exit the game and 
 
 ## Short path / 短路径
 
-The first actual game launch exited with “Installation path is too long.” The separate library is therefore mapped as F: in the existing Wine prefix, with the Steam install path `F:\steamapps\common\ForzaHorizon6` (33 characters). Only the imported research manifest and common-directory link were moved into this library; original assets were not moved. Steam library metadata was edited only after its client exited normally. The previous Stellar Blade library path is unchanged.
+The first actual game launch exited with “Installation path is too long.” An attempted F: mapping was not mounted by the already-running Wine session; Steam reported that library unavailable and showed its install dialog. No new game download was started.
 
-首次真实启动明确报告安装路径过长。地平线使用单独的 F: Steam 游戏库，剑星原库路径保持不变；只移动研究目录中的清单和链接，未移动原游戏文件。恢复时可在游戏与 Steam 都退出后移除这条新增库配置和 Wine 的 f: 链接。
+Use a directory link under the existing C: drive instead: `C:\FH` points to the owned ForzaSteam research library, giving the short install path `C:\FH\steamapps\common\ForzaHorizon6`. Only the imported research manifest/common link moved; original assets and the existing Stellar Blade library path remain unchanged. The unused F: link was removed. Windows path visibility is checked before another normal Steam launch. Steam library metadata is edited only after its client exits normally; the Wine server is not restarted.
+
+首次真实启动报告路径过长。新增 F: 映射未被当前 Wine 会话挂载，Steam 因而显示安装对话框，没有启动重新下载。改用现有 C: 下的 `C:\FH` 目录链接；先在 Windows 命名空间验证清单可见，再通过原 Steam 启动。原始文件与剑星路径保持不变。恢复时，在游戏与 Steam 退出后移除新增库配置和 `drive_c/FH` 链接即可。

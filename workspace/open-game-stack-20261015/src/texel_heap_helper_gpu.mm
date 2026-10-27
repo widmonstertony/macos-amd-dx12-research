@@ -39,6 +39,7 @@ int main(int argc,const char**argv){@autoreleasepool{
  std::string error;unsigned checked=0,mismatches=0,renderHeaps=0,renderReads=0,computeHeaps=0,computeWrites=0,computeWriteCalls=0;
  uint64_t applied=0,precise=0;bool setup=false,metadata=false,excluded=false,renderDone=false,writeDone=false,resetDone=false;
  id<MTLRenderCommandEncoder>activeRender=nil;id<MTLComputeCommandEncoder>activeCompute=nil;
+ const bool logicalWrites=getenv("TEXEL_FIXTURE_LOGICAL_WRITES")!=nullptr;
  const bool allWrite=getenv("TEXEL_FIXTURE_ALL_WRITE_TABLE")!=nullptr;
  const char*report=argc>1?argv[1]:"/dev/null";bool fetchFirst=argc<3||std::string(argv[2])=="fetch-first";
  try{
@@ -72,7 +73,7 @@ int main(int argc,const char**argv){@autoreleasepool{
   id<MTLRenderPipelineState>pso[3];for(unsigned i=0;i<3;++i){auto desc=[MTLRenderPipelineDescriptor new];desc.vertexFunction=i==2?vs:vp;desc.fragmentFunction=i==0?ff:i==1?fs:fm;desc.colorAttachments[0].pixelFormat=MTLPixelFormatRGBA8Unorm;pso[i]=[d newRenderPipelineStateWithDescriptor:desc error:&err];need(pso[i]!=nil,err.localizedDescription.UTF8String?:"render PSO failed");[desc release];}
   auto wpso=[d newComputePipelineStateWithFunction:kw error:&err],rpso=[d newComputePipelineStateWithFunction:kr error:&err];need(wpso&&rpso,"compute PSO failed");
   auto outputDesc=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:T height:H mipmapped:NO];outputDesc.storageMode=MTLStorageModePrivate;outputDesc.usage=MTLTextureUsageRenderTarget;auto target=[d newTextureWithDescriptor:outputDesc];need(target!=nil,"render target failed");auto pixels=[d newBufferWithLength:1024*H options:MTLResourceStorageModeShared];auto result=[d newBufferWithLength:T*4 options:MTLResourceStorageModeShared];auto result2=[d newBufferWithLength:T*4 options:MTLResourceStorageModeShared];
-  MVKUseResourceHelper helper;helper.cacheLiveResources=true;helper.crossEncoderLiveCache=true;helper.batchLiveResources=true;helper.batchArgumentHeaps=true;helper.encoderHeapPlans=true;helper.encoderSampledHeapPlans=true;helper.resourceUseStats=true;helper.heapBatchThreshold=2;helper.descriptorSnapshotReuse=true;helper.crossEncoderSnapshotReuse=true;setup=true;helper.resetForEncoder();
+  MVKUseResourceHelper helper;helper.canonicalTexelWrites=!logicalWrites;helper.cacheLiveResources=true;helper.crossEncoderLiveCache=true;helper.batchLiveResources=true;helper.batchArgumentHeaps=true;helper.encoderHeapPlans=true;helper.encoderSampledHeapPlans=true;helper.resourceUseStats=true;helper.heapBatchThreshold=2;helper.descriptorSnapshotReuse=true;helper.crossEncoderSnapshotReuse=true;setup=true;helper.resetForEncoder();
   cb=[q commandBuffer];auto pass=[MTLRenderPassDescriptor renderPassDescriptor];pass.colorAttachments[0].texture=target;pass.colorAttachments[0].loadAction=MTLLoadActionClear;pass.colorAttachments[0].storeAction=MTLStoreActionStore;auto enc=[cb renderCommandEncoderWithDescriptor:pass];activeRender=enc;auto ledger=[TextureExceptionLedger new];ledger->native=enc;
   for(unsigned row=0;row<H;++row){bool sampled=row==2||((row==0)==!fetchFirst)||row==3;unsigned pipeline=row==2?2:sampled?1:0;
    if(row==2)helper.addLiveSnapshot(snapshot,live,(id<MTLCommandEncoder>)ledger,useOne,MVKResourceUsageStages::Vertex,false,false,true);
@@ -102,7 +103,7 @@ int main(int argc,const char**argv){@autoreleasepool{
   computeHeaps=cl->heaps;computeWrites=cl->writes;computeWriteCalls=cl->writeCalls;applied+=helper.statsHeapPlanResources;precise+=helper.statsHeapPlanPreciseResources;helper.resetForEncoder();resetDone=true;
   for(unsigned i=0;i<T;++i){if(reinterpret_cast<uint32_t*>(result.contents)[i]!=(i==N||i==0?changed:color(i)))++mismatches;++checked;}
   for(unsigned i=0;i<T;++i){if(reinterpret_cast<uint32_t*>(result2.contents)[i]!=(i==N||i<2?changed:color(i)))++mismatches;++checked;}
-  need(metadata,"precise exception stored heap metadata does not match retained native resource");need(renderReads<=4,"eligible texture children unexpectedly declared precisely");need(renderHeaps>=1&&computeHeaps>=1,"actual bulk heap API missing");need(computeWriteCalls>=(allWrite?2u:4u)&&computeWrites>=(allWrite?T+N:4u),"write exception was not replayed after actual heap declaration");need(applied>=N*3,"sample plan/stage/reset applications missing");need(!mismatches,"actual GPU readback mismatch");
+  need(metadata,"precise exception stored heap metadata does not match retained native resource");need(renderReads<=4,"eligible texture children unexpectedly declared precisely");need(renderHeaps>=1&&computeHeaps>=1,"actual bulk heap API missing");need(computeWriteCalls>=(allWrite?2u:4u)&&computeWrites>=(allWrite?(logicalWrites?T+N:3u):4u),"write exception was not replayed after actual heap declaration");need(applied>=N*3,"sample plan/stage/reset applications missing");need(!mismatches,"actual GPU readback mismatch");
   helper.resetForEncoder();
   for(auto t:textures)live.remove(t);
  }catch(const std::exception&e){error=e.what();if(activeRender)[activeRender endEncoding];if(activeCompute)[activeCompute endEncoding];}

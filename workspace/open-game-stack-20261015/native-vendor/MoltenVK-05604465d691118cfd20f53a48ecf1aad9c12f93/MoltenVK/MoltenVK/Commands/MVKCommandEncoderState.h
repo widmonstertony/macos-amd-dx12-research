@@ -290,6 +290,7 @@ struct MVKUseResourceHelper {
 		// declarations. Non-retained entries refresh this at each generation.
 		id<MTLHeap> heap = nil;
 		bool heapKnown = false;
+        id<MTLResource> writeResidencyResource = nil;
 	};
 	struct RecentLiveResource {
 		id<MTLResource> resource = nil;
@@ -307,6 +308,10 @@ struct MVKUseResourceHelper {
     bool encoderHeapPlans = false;
     bool encoderSampledHeapPlans = false;
     MVKEncoderHeapLedger<id<MTLResource>, id<MTLHeap>> heapLedger;
+    MVKEncoderResourceIndex<id<MTLResource>> retainedWriteParentOwners, writeBatchDedup;
+    bool canonicalTexelWrites = true;
+    uint64_t statsTexelParentWriteRequests = 0;
+    id<MTLResource> ownWriteResidencyResource(id<MTLResource>,ResourceInfo&,id<MTLHeap>);
     MVKSmallVector<id<MTLHeap>> encoderHeapOwners;
     struct HeapReadSnapshot {
         MVKDescriptorUseCache::Snapshot snapshot;
@@ -319,7 +324,7 @@ struct MVKUseResourceHelper {
     struct CoveredHeapReadPlan { const BufferHeapReadPlan* plan; uint32_t stages; };
     std::vector<CoveredHeapReadPlan> coveredHeapReadPlans;
     struct HeapPlanHeapBatch { uint32_t stages; std::vector<id<MTLHeap>> resources; };
-    struct HeapPlanResourceBatch { uint32_t stages; std::vector<id<MTLResource>> resources; };
+    struct HeapPlanResourceBatch { uint32_t stages; std::vector<id<MTLResource>> resources; bool needsDedup=false; };
     std::vector<HeapPlanHeapBatch> heapPlanHeapBatches;
     std::vector<HeapPlanResourceBatch> heapPlanReadBatches, heapPlanWriteBatches;
     uint64_t statsHeapPlanCalls=0, statsHeapPlanSkips=0, statsHeapPlanResources=0;

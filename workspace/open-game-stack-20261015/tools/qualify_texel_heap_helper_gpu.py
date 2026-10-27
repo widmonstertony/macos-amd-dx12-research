@@ -25,17 +25,25 @@ ident=subprocess.check_output(['otool','-D',str(lib)],text=True).splitlines()[1]
 subprocess.run(['install_name_tool','-change',ident,str(lib),str(exe)],check=True)
 subprocess.run(['codesign','--force','--sign','-',str(exe)],check=True)
 results=[]
-for allWrite in [False,True]:
-    for order in ['fetch-first','sample-first']:
-        label=('write-table-' if allWrite else 'read-table-')+order
-        env={k:v for k,v in os.environ.items() if not k.startswith(('MVK_','MTL_','VK_','DYLD_','TEXEL_FIXTURE_'))}
-        env.update(MTL_DEBUG_LAYER='1',MVK_AMD_SHARED_LIVE_SNAPSHOTS='1',MVK_AMD_ENCODER_HEAP_PLANS='1',
-                   MVK_CONFIG_SHADER_DUMP_DIR=str(out/'msl'),MVK_AMD_FORENSICS_ARM_PATH=str(out/'forensics.arm'))
-        if allWrite:env['TEXEL_FIXTURE_ALL_WRITE_TABLE']='1'
-        with (out/(label+'.stdout')).open('w') as so,(out/(label+'.stderr')).open('w') as se:
-            subprocess.run([str(exe),str(out/(label+'.json')),order],env=env,stdout=so,stderr=se,timeout=30,check=True)
-        row=json.loads((out/(label+'.json')).read_text());assert row['passed'] and row['mismatches']==0
-        row.update(allWriteTable=allWrite,label=label);results.append(row)
+for logicalWrites in [False,True]:
+    for allWrite in [False,True]:
+        for order in ['fetch-first','sample-first']:
+            label=('logical-' if logicalWrites else 'canonical-')+('write-table-' if allWrite else 'read-table-')+order
+            env={k:v for k,v in os.environ.items() if not k.startswith(('MVK_','MTL_','VK_','DYLD_','TEXEL_FIXTURE_'))}
+            env.update(MTL_DEBUG_LAYER='1',MVK_AMD_SHARED_LIVE_SNAPSHOTS='1',MVK_AMD_ENCODER_HEAP_PLANS='1',
+                       MVK_CONFIG_SHADER_DUMP_DIR=str(out/'msl'),MVK_AMD_FORENSICS_ARM_PATH=str(out/'forensics.arm'))
+            if allWrite:env['TEXEL_FIXTURE_ALL_WRITE_TABLE']='1'
+            if logicalWrites:env['TEXEL_FIXTURE_LOGICAL_WRITES']='1'
+            with (out/(label+'.stdout')).open('w') as so,(out/(label+'.stderr')).open('w') as se:
+                subprocess.run([str(exe),str(out/(label+'.json')),order],env=env,stdout=so,stderr=se,timeout=30,check=True)
+            row=json.loads((out/(label+'.json')).read_text());assert row['passed'] and row['mismatches']==0
+            row.update(allWriteTable=allWrite,logicalWritesControl=logicalWrites,label=label);results.append(row)
+for order in ['fetch-first','sample-first']:
+    canonical=next(r for r in results if r['allWriteTable'] and not r['logicalWritesControl'] and r['order']==order)
+    logical=next(r for r in results if r['allWriteTable'] and r['logicalWritesControl'] and r['order']==order)
+    assert canonical['actualComputeWriteResources']==3 and logical['actualComputeWriteResources']==257
+    assert canonical['actualComputeWriteCalls']==logical['actualComputeWriteCalls']==2
+    assert canonical['actualComputeHeapDeclarations']==logical['actualComputeHeapDeclarations']==1
 assert librarySHA==sha(lib) and sourceSHA==sha(source)
 report={'passed':True,'candidateSHA256':librarySHA,'sourceSHA256':sourceSHA,
         'results':results,'totalGPUValues':sum(r['pixelsOrWordsChecked'] for r in results),

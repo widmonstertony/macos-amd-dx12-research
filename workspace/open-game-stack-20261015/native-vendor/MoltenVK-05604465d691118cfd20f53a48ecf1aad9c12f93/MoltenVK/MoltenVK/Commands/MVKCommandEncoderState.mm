@@ -1,3 +1,4 @@
+#include "MVKTexelWriteResidency.h"
 /*
  * MVKCommandEncoderState.mm
  *
@@ -1444,6 +1445,19 @@ id<MTLHeap> MVKUseResourceHelper::ownHeapPlanResource(id<MTLResource> resource, 
     return info.heap;
 }
 
+id<MTLResource> MVKUseResourceHelper::ownWriteResidencyResource(id<MTLResource> resource,ResourceInfo& info,id<MTLHeap> heap) {
+    if (!canonicalTexelWrites) return resource;
+    auto cached=info.writeResidencyResource;
+    if (cached && (cached==resource || retainedWriteParentOwners.findValue(cached))) return cached;
+    auto declaration=mvkTexelWriteResidencyResource(resource,heap);
+    if (declaration!=resource && !retainedWriteParentOwners.findValue(declaration)) {
+        retainedWriteParentOwners.emplace(declaration,0);
+        retainedLiveResources.push_back([declaration retain]);
+    }
+    info.writeResidencyResource=declaration;
+    return declaration;
+}
+
 void MVKUseResourceHelper::resetHeapPlanEncoder() {
     // Called only after the previous native encoder has ended. Keep children
     // owned by the existing leases/live references; discard encoder coverage.
@@ -1452,7 +1466,7 @@ void MVKUseResourceHelper::resetHeapPlanEncoder() {
     encoderHeapOwners.clear();
     for (auto& batch : heapPlanHeapBatches) batch.resources.clear();
     for (auto& batch : heapPlanReadBatches) batch.resources.clear();
-    for (auto& batch : heapPlanWriteBatches) batch.resources.clear();
+    for (auto& batch : heapPlanWriteBatches) { batch.resources.clear(); batch.needsDedup=false; }
 }
 
 void MVKUseResourceHelper::bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, bool graphics) {
@@ -1477,8 +1491,11 @@ void MVKUseResourceHelper::bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, 
                 ResourceInfo{stage,write,true,false,encoderGeneration}).first;
             id<MTLHeap> heap = ownHeapPlanResource(resource, *info);
             size_t before = heapLedger.heapCount();
-            if (write) heapLedger.queueWrite(resource,heap,mask);
-            else heapLedger.queuePreciseRead(resource,heap,mask);
+            if (write) {
+                auto declaration=ownWriteResidencyResource(resource,*info,heap);
+                if(resourceUseStats && declaration!=resource)++statsTexelParentWriteRequests;
+                heapLedger.queueWrite(resource,heap,mask,declaration);
+            } else heapLedger.queuePreciseRead(resource,heap,mask);
             if (heap && heapLedger.heapCount()!=before) encoderHeapOwners.push_back([heap retain]);
         };
         for (id<MTLResource> resource : entry.read.resources) queue(resource,false);
@@ -1487,12 +1504,19 @@ void MVKUseResourceHelper::bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, 
         entry.read.clear(); entry.retainedSnapshotReads.clear(); entry.readWrite.clear();
     }
     auto batchFor = [](auto& batches, uint32_t mask) -> auto& {
-        for (auto& entry : batches) if (entry.stages==mask) return entry.resources;
-        batches.push_back({mask,{}}); return batches.back().resources;
+        for (auto& entry : batches) if (entry.stages==mask) return entry;
+        batches.push_back({mask,{}}); return batches.back();
     };
     auto emitResources = [&](auto& batches, MTLResourceUsage usage, const char* kind) {
         for (auto& batch : batches) {
             if (batch.resources.empty()) continue;
+            if (usage==MTLResourceUsageReadWrite && batch.needsDedup) {
+                writeBatchDedup.clear();size_t kept=0;
+                for(auto resource:batch.resources) if(!writeBatchDedup.findValue(resource)) {
+                    writeBatchDedup.emplace(resource,0);batch.resources[kept++]=resource;
+                }
+                batch.resources.resize(kept);
+            }
             if (resourceUseStats) {
                 if (usage==MTLResourceUsageRead) statsPreciseRead+=batch.resources.size();
                 else statsPreciseReadWrite+=batch.resources.size();
@@ -1508,13 +1532,16 @@ void MVKUseResourceHelper::bindHeapPlansAndReset(id<MTLCommandEncoder> encoder, 
                 else [static_cast<id<MTLComputeCommandEncoder>>(encoder)
                     useResources:batch.resources.data() count:batch.resources.size() usage:usage];
             });
-            batch.resources.clear();
+            batch.resources.clear(); batch.needsDedup=false;
         }
     };
     heapLedger.flush(
-        [&](id<MTLHeap> heap, uint32_t mask) { batchFor(heapPlanHeapBatches,mask).push_back(heap); },
-        [&](id<MTLResource> resource, uint32_t mask) { batchFor(heapPlanReadBatches,mask).push_back(resource); },
-        [&](id<MTLResource> resource, uint32_t mask) { batchFor(heapPlanWriteBatches,mask).push_back(resource); },
+        [&](id<MTLHeap> heap, uint32_t mask) { batchFor(heapPlanHeapBatches,mask).resources.push_back(heap); },
+        [&](id<MTLResource> resource, uint32_t mask) { batchFor(heapPlanReadBatches,mask).resources.push_back(resource); },
+        [&](id<MTLResource> resource,id<MTLResource> declaration,uint32_t mask) {
+            auto& batch=batchFor(heapPlanWriteBatches,mask);
+            batch.resources.push_back(declaration);batch.needsDedup|=resource!=declaration;
+        },
         [&] {
             // Metal useHeap resets prior usage to Read. Emit every heap array
             // before precise reads, and all current/prior write exceptions last.
@@ -1759,7 +1786,7 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
         uint64_t heapPlanCalls=0, heapPlanSkips=0, heapPlanResources=0, heapPlanPrecise=0, heapPlanRefreshes=0;
         uint64_t plannedHeapCalls=0, plannedWriteCalls=0, plannedWriteReplays=0, plannedPreciseReads=0;
         uint64_t ledgerReadQueued=0, ledgerReadSuppressed=0, ledgerReadReplays=0;
-        uint64_t ledgerReadVisits=0, ledgerHeapSuppressed=0;
+        uint64_t ledgerReadVisits=0, ledgerHeapSuppressed=0, texelParentWriteRequests=0;
 		uint64_t bindCalls=0, inputRead=0, inputReadWrite=0;
 		uint64_t preciseRead=0, preciseReadWrite=0, collapsedRead=0, heapDeclarations=0, heapQueries=0;
 		uint64_t heapDeclarationNS=0, readDeclarationNS=0, writeDeclarationNS=0, declarationMaxNS=0;
@@ -1779,6 +1806,7 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
     auto heapPlanStats = heapLedger.takeStats();
     total.plannedHeapCalls+=heapPlanStats.heapCallsEmitted;
     total.plannedWriteCalls+=heapPlanStats.writeCallsEmitted;
+    total.texelParentWriteRequests+=statsTexelParentWriteRequests;statsTexelParentWriteRequests=0;
     total.plannedWriteReplays+=heapPlanStats.writeExceptionsReplayed;
     total.plannedPreciseReads+=heapPlanStats.readCallsEmitted;
     total.ledgerReadQueued+=heapPlanStats.preciseReadQueueCalls;
@@ -1860,12 +1888,13 @@ void MVKUseResourceHelper::publishResourceUseStats(bool encoderReset) {
         char ledgerPath[4096], ledgerLine[2048];
         int ledgerPathLength=snprintf(ledgerPath,sizeof(ledgerPath),"%s/resource-ledger-current-%d.json",directory,getpid());
         int ledgerLineLength=snprintf(ledgerLine,sizeof(ledgerLine),
-            "{\"schema\":1,\"time\":%.6f,\"wallSeconds\":%.6f,\"preciseReadQueueCalls\":%llu,\"preciseReadQueueSuppressed\":%llu,\"readExceptionsReplayed\":%llu,\"readMetadataVisits\":%llu,\"nativePreciseReadReferences\":%llu,\"nativeHeapReferences\":%llu,\"heapQueueSuppressed\":%llu,\"writeExceptionsReplayed\":%llu}\n",
+            "{\"schema\":1,\"time\":%.6f,\"wallSeconds\":%.6f,\"preciseReadQueueCalls\":%llu,\"preciseReadQueueSuppressed\":%llu,\"readExceptionsReplayed\":%llu,\"readMetadataVisits\":%llu,\"nativePreciseReadReferences\":%llu,\"nativeHeapReferences\":%llu,\"heapQueueSuppressed\":%llu,\"writeExceptionsReplayed\":%llu,\"logicalPreciseWriteReferences\":%llu,\"nativePreciseWriteReferences\":%llu,\"texelParentWriteRequests\":%llu}\n",
             now,now-total.start,(unsigned long long)total.ledgerReadQueued,
             (unsigned long long)total.ledgerReadSuppressed,(unsigned long long)total.ledgerReadReplays,
             (unsigned long long)total.ledgerReadVisits,(unsigned long long)total.plannedPreciseReads,
             (unsigned long long)total.plannedHeapCalls,(unsigned long long)total.ledgerHeapSuppressed,
-            (unsigned long long)total.plannedWriteReplays);
+            (unsigned long long)total.plannedWriteReplays,(unsigned long long)total.plannedWriteCalls,
+            (unsigned long long)total.preciseReadWrite,(unsigned long long)total.texelParentWriteRequests);
         if(ledgerPathLength>0 && static_cast<size_t>(ledgerPathLength)<sizeof(ledgerPath) &&
            ledgerLineLength>0 && static_cast<size_t>(ledgerLineLength)<sizeof(ledgerLine))
             mvkWriteTraceSnapshot(ledgerPath,ledgerLine);
@@ -1926,6 +1955,7 @@ void MVKUseResourceHelper::releaseLiveResources() {
 	// across the encoder's used.clear(). Never carry them into another encoder.
 	for (auto& recent : recentLiveResources) recent = {};
 	absentLiveResources.clear();
+    retainedWriteParentOwners.clear();
 	for (id<MTLResource> resource : retainedLiveResources) [resource release];
 	retainedLiveResources.clear();
     retainedSnapshotLeases.clear();

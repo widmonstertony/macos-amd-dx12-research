@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include "MVKEncoderResourceIndex.h"
 #include <utility>
+#include <type_traits>
 #include <vector>
 
 template<class Resource, class Heap> class MVKEncoderHeapLedger {
@@ -39,6 +40,7 @@ private:
         uint32_t stages=0;
         bool dirty=false;
         uint64_t selectedSerial=0;
+        Resource declarationResource{};
     };
     struct ReadState {
         Resource resource{};
@@ -154,10 +156,11 @@ public:
     // Repeated writes are coalesced until flush. Previous precise stage coverage
     // must be supplied too if the caller performs precise reads outside this API.
     // The heap of a retained resource identity is immutable within an encoder.
-    bool queueWrite(Resource resource,Heap heap,uint32_t stages) {
+    bool queueWrite(Resource resource,Heap heap,uint32_t stages,Resource declarationResource=Resource{}) {
         requireNotFlushing();
         ++_stats.writeQueueCalls;
         if(resource==Resource{}||!stages)return false;
+        if(declarationResource==Resource{})declarationResource=resource;
         auto reader=_readIndex.findValue(resource);
         if(reader!=nullptr){
             const auto& read=_reads[*reader];
@@ -167,13 +170,15 @@ public:
         auto found=_writeIndex.findValue(resource);size_t index;
         if(found==nullptr){
             index=_writes.size();
-            _writes.push_back(WriteState{resource,heap,stages});
+            _writes.push_back(WriteState{resource,heap,stages,false,0,declarationResource});
             _writeIndex.emplace(resource,index);
             if(heap!=Heap{})_heaps[heapIndex(heap)].writes.push_back(index);
         }else{
             index=*found;
             if(_writes[index].heap!=heap)
                 throw std::logic_error("retained resource changed heap identity");
+            if(_writes[index].declarationResource!=declarationResource)
+                throw std::logic_error("retained resource changed declaration identity");
             _writes[index].stages|=stages;
         }
         auto& entry=_writes[index];
@@ -222,7 +227,9 @@ public:
         afterHeapsCallback();
         for(size_t index:_selectedWrites){
             const auto& entry=_writes[index];
-            writeCallback(entry.resource,entry.stages|heapReadStages(entry.heap));
+            if constexpr(std::is_invocable_v<WriteCallback,Resource,Resource,uint32_t>)
+                writeCallback(entry.resource,entry.declarationResource,entry.stages|heapReadStages(entry.heap));
+            else writeCallback(entry.resource,entry.stages|heapReadStages(entry.heap));
             ++_stats.writeCallsEmitted;
         }
         for(size_t index:_dirtyHeaps)_heaps[index].dirty=false;
